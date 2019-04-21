@@ -1,0 +1,175 @@
+// Naming: DAC - Distributed Algebraic Computations
+
+// To perform calculations, we first define the spaces they are performed in
+// E.g. for simple vector-matrix arithmetic over the reals (e.g. float32_t)
+// in dimension n
+const vSpace Space.Vector(float32_t, n);
+vec := vSpace.Element.Rand(); // Drop the ".Element" ?
+
+test vectorIdMatrixMul()
+{
+	id := vSpace.Action.identity;
+
+	mul1 := id * vec;
+	mul2 := id_j * vec^j; // Because id is a (1,1) tensor.
+	mul3 := id_{j} * vec^{j};
+	mul4 := id^i_j * vec^j;
+
+	EXPECT_EQU(vec, mul1);
+	// ...
+}
+
+test vectorRotMatrixMul()
+{
+	rotM := vSpace.Action.SO.Rand();
+								
+	mul := rotM * vec;
+}
+
+test vectorTensorMul()
+{
+	ten := Tensor(1, 1, vSpace, vSpace).Rand();
+	mul := ten_j * vec^j
+}
+
+// We may also define direct sum spaces
+const sSpace Space.DirectSum(vSpace, vSpace);
+
+// ... add a symplectic structure
+sSpace.Structure(Symplectic.BlockDiagonal)
+
+test mechanics()
+{
+	sympl := sSpace.Action.Symplectomorphism.Rand();
+	vec := sSpace.Rand(); // Do we want "Element." ?
+
+	mul := sympl * vec;
+}
+
+test ProductAction()
+{
+	act := sSpace.Action.Product(SO, SO);
+}
+
+// We may also define product spaces
+const pSpace Space.TensorProduct(vSpace, vSpace);
+
+// Having a hunch that a different coordinate basis will accelerate things?
+test CoordinateChange()
+{
+	rot := vSpace.Action.SO.Rand();
+	vSpace.ChangeOfBasis(rot);
+	// All elements of vSpace used before this point will be transformed
+	// co(contra)variantly. All elements defined hereafter are assumed to
+	// be supplied in new basis.
+}
+
+// Linear mapping from one space into another: Tensors
+test LinearMapping()
+{
+	vS1 := Space.Vector(float32, 4);
+	vS2 := Space.Vector(float32, 2);
+
+	tS := Space.Tensor(^vS2, _vS1);
+	
+	// vS1 -> vS2
+	tInit := [][]float32({{1, 0, 0, 0}, {0, 1, 0, 0});
+	// or
+	tInit := [vS2.Dim][vS1.Dim]float32.Rand();
+
+	proj := tS.Elem.Set(tInit);
+
+	// or
+
+	tInit := 
+	proj := Tensor(^vS2, _vS1).Set(SparseCOO(tInit);
+
+	// apply it
+	v1 := vS1.Elem.Rand();
+	v2 := proj(v1);
+}
+
+// All the actions above may also be specified as tensors and are internally handled as such.
+
+// Every object knows its type, which may be used to
+// create new objects of the same type
+test CarryOverType()
+{
+	u := Space.Vector(float32, 3).Rand();
+	v := u.Space.Rand();
+
+	w := u + v;
+}
+
+// User Defined Functions
+// The following function akes a vector space element and
+// returns an element of the same space.
+func Square(v Space.Vector) v.Space {
+     	for dim := 0; dim < v.Dim; dim++ {
+	    w[dim] = v[dim] * v[dim];
+	}
+
+	return w;
+}
+
+test UserDefinedFunctions()
+{
+	vS := Space.Vector(float32, 4);
+	v := vS.Element.Rand();
+	vSquared := Square(v);
+}
+
+// Sometimes, e.g. specifying the group of an action is not
+// enough to speed up computation.
+test sparseTensor()
+{    
+	vS1 := Space.Vector(float32, 4);
+	vS2 := Space.Vector(float32, 2);
+
+	// vS1 -> vS2
+	tInit := [][]float32({{1, 0, 0, 0}, {0, 1, 0, 0});
+	// or
+	tInit := [vS2.Dim][vS1.Dim]float32.Rand();
+	
+	proj := Tensor(^vS2, _vS1).Init(tInit);
+
+	proj.Attribute.Sparse.Set(0.001); // specify threshold for setting zero.
+	proj.Attribute.Symmetric.Set(); // totally symmetric, i.e. in all indices
+	proj.Attribute.Diagonal.Set(); // diagonal in all indices
+
+	// .Reset() undoes above.		
+}
+
+
+// TODO: Set Diagonal, Sparse, Symmetric, block
+// TODO: Grid, Triangolation, ...
+
+
+package main
+
+import optimizer
+
+
+var t Tensor()
+
+
+// locals (to this package, useful to recycle names)
+var a Group.Matrix.SO(3, float32); // Matrix with type constructor
+var b [3]Group.Matrix.GL(3, float8); // Matrix array with ..
+var c [4]int8; // vector
+var d [4]int8; // another vector
+
+var q Group.Quaternion(float32)
+
+// Globals (compilation)
+var A [4][4]float32; // 2-Tensor
+var B [4][4][4]float32; // 3-Tensor if you like
+
+
+type myType struct {
+     direction SO(3, float8);
+     norm float32;
+}
+
+
+
