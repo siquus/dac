@@ -1,0 +1,115 @@
+\documentclass{amsbook}
+\usepackage{tikz}
+\usepackage{todonotes}
+\usepackage{amssymb,amsmath}
+\usepackage{hyperref}
+
+\newtheorem{definition}{Definition}
+
+\title{
+  The DAC programming language \\
+  \large Distributed Algebraic Computations}
+
+\begin{document}
+
+\pagenumbering{Alph}
+\begin{titlepage}
+  \maketitle
+  \thispagestyle{empty}
+\end{titlepage}
+\pagenumbering{arabic}
+
+\tableofcontents
+\thispagestyle{empty}
+\newpage
+
+\chapter{introduction}
+
+\todo{Global optimaztion of algebraic structures...}
+\todo{Create highlight rules for the listings latex package}
+
+\begin{definition}
+  A \textbf{space} is a set with some added structure.\footnote{\url{https://en.wikipedia.org/w/index.php?title=Space_(mathematics)&oldid=893420732}}
+\end{definition}
+
+\section{Syntax}
+
+\subsection{Data Types}
+We want to stay mostly C-Compliant.\todo{Implement half-precision}
+
+\begin{verbatim}
+foo Bar;
+\end{verbatim}
+
+\begin{tabular}{l|l|l|l}
+  \textbf{Data Type} & \textbf{Min} & \textbf{Max} & \textbf{Dec. Digit Prec.}\\
+  \hline
+  int8 &  -128 & 127 & \\
+  float32 & -Max & $(2-2^{-23})\times 2^{127}=3.4028235\times 10^{38}$ & 6
+\end{tabular}
+
+\subsection{Spaces}
+
+\begin{verbatim}
+foo Space.Bar(param1, ...);
+baz foo.Elem.Rand();
+\end{verbatim}
+
+\begin{tabular}{lll}
+  \textbf{Space} & \textbf{Parameters} & \textbf{Description} \\
+  Vector & data type, dimension & Vector space of specified dimension.\\
+  Tensor & Product Factors & Vector space created by \\
+  & prefix $\_~/~\hat{}$  denoting co/contravariance & the tensor product of given factors.\\
+  Sum & Summands & Vector space created by \\
+   & $\_~/~\hat{}$  denoting co/contravariance & the direct sum of given summands\\
+\end{tabular}
+
+\subsection{Functions}
+
+\begin{verbatim}
+foo Space.Vector(...);
+func Add(v, w Space.Vector) v.Space {
+     return v + w;
+}
+\end{verbatim}
+
+\subsection{Actions}
+
+\begin{verbatim}
+foo Space.Bar(...);
+baz foo.Action.Qux(...).Rand();
+corge foo.Elem.Rand();
+waldo := baz * corge;
+\end{verbatim}
+
+\subsubsect{Matrix Groups\footnote{\url{https://en.wikipedia.org/wiki/Linear_group}}}
+
+\begin{tabular}{ll}
+  \textbf{Action} & \textbf{Description} \\
+  GL & General Linear \\
+  SL & Special Linear \\
+  O  & Orthogonal \\
+  SO & Special Orthogonal \\
+  U  & Unitary \\
+  SU & Special Unitary \\
+  Sp & Symplectic \\
+  E  & Euclidean \\
+  Lorentz & Lorentz, aka $O(1, n)$ or $O(n, 1)$ \\
+  Poincare & Poincare \\
+\end{tabular}
+
+\subsubsect{Custom Representations}
+
+\begin{verbatim}
+foo Space.Bar(...);
+baz Space.Qux(...);
+
+func BarQuxAction(v Space.Bar, w Space.Qux) v.Space {
+     ...
+}
+
+corge foo.Action.Custom(baz, BarQuxAction).Rand();
+...
+\end{verbatim}
+
+\end{document}
