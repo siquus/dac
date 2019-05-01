@@ -29,40 +29,136 @@
 \todo{Create highlight rules for the listings latex package}
 
 \begin{definition}
-  A \textbf{space} is a set with some added structure.\footnote{\url{https://en.wikipedia.org/w/index.php?title=Space_(mathematics)&oldid=893420732}}
+\cite{wiki:algebraicStructure} An \textbf{Algebraic structure} on a set $A$ (called carrier set or underlying set) is a collection of finitary operations on $A$; the set $A$ with this structure is also called an \textbf{algebra}.
 \end{definition}
 
-\section{Syntax}
+\chapter{Algebraic structures}
+We take over the classification of algebraic structures from \cite{wiki:algebraicStructure}:
 
-\subsection{Data Types}
-We want to stay mostly C-Compliant.\todo{Implement half-precision}
-
-\begin{verbatim}
-foo Bar;
-\end{verbatim}
-
-\begin{tabular}{l|l|l|l}
-  \textbf{Data Type} & \textbf{Min} & \textbf{Max} & \textbf{Dec. Digit Prec.}\\
-  \hline
-  int8 &  -128 & 127 & \\
-  float32 & -Max & $(2-2^{-23})\times 2^{127}=3.4028235\times 10^{38}$ & 6
-\end{tabular}
-
-\subsection{Spaces}
+\begin{itemize}
+\item Ring-like: Two binary operations, often called addition and multiplication, with multiplication distributing over addition. 
+\item Group-like: One binary operation
+\item Lattice-like: Two or more binary operations, including operations called meet and join, connected by the absorption law.
+\item Module-like: Composite systems involving two sets and employing at least two binary operations.
+\item Algebra-like: Composite system defined over two sets, a ring R and a R module M equipped with an operation called multiplication.
+\end{itemize}
 
 \begin{verbatim}
-foo Space.Bar(param1, ...);
+foo Algebra.Bar(param1, ...);
 baz foo.Elem.Rand();
 \end{verbatim}
 
+\section{Ring-like}
+
+\subsection{Machine native}
+Analogously to typedef'ing, one can
+\begin{verbatim}
+foo Algebra.Ring.Int8;
+baz foo.Elem = foo.Elem.Rand();
+qux foo.Elem = 3;
+corge := baz + qux;
+\end{verbatim}
+
+Or directly
+
+\begin{verbatim}
+baz Algebra.Ring.Int8.Elem = Algebra.Ring.Int8.Elem.Zero; // Additive Identity
+qux Algebra.Ring.Int8.Elem = 2;
+corge := baz + qux;
+\end{verbatim}
+
+For native types, it's possible to use shorthand.
+\begin{verbatim}
+baz int8 = int8.Rand();
+qux int8 = int8.One; // Multiplicative Identity
+corge := baz + qux;
+\end{verbatim}
+
+\begin{tabular}{l|l|l|l}
+  \textbf{Ring} & \textbf{Min} & \textbf{Max} & \textbf{Comment}\\
+  \hline
+  int8 &  -128 & 127 & \\
+  uint8 & 0 & 255 & \\
+\end{tabular}
+
+\begin{tabular}{l|l|l|l}
+  \textbf{Field} & \textbf{Min} & \textbf{Max} & \textbf{Comment}\\
+  \hline
+  float32 & -Max & $(2-2^{-23})\times 2^{127}=3.4028235\times 10^{38}$ & 6\\
+  cfloat32 & & & real/imaginary part are each float32  
+\end{tabular}
+
+
+\subsection{Non-machine-native}
+These data types are usually non machine native and require additional computation steps.\todo{E.g. integer mod 42, or float32 mod 2, ...}
+
+\begin{tabular}{l|l|l|l}
+  \textbf{Ring} & \textbf{Min} & \textbf{Max} & \textbf{Comment}\\
+  \hline
+  int8\%n &  $-(n-1)$ & $n-1$ & for $n$ not prime. \\
+\end{tabular}
+
+\begin{tabular}{l|l|l|l}
+  \textbf{Field} & \textbf{Min} & \textbf{Max} & \textbf{Comment}\\
+  \hline
+  int8\%n &  $-(n-1)$ & $n-1$ & for $n$ prime. \\
+  Rational(int8) & & & Rational numbers over int8 \\
+\end{tabular}
+
+\subsection{Special Elements}
+\begin{verbatim}
+qux int8 = int8.One;
+\end{verbatim}
+\begin{tabular}{l|l}
+  \textbf{Element} & \textbf{Comment} \\
+  Zero & Additive Identity \\
+  One & Multiplicative Identity \\
+\end{tabular}
+
+\section{Group-like}
+\subsection{Matrix Groups\protect\footnote{\url{https://en.wikipedia.org/wiki/Linear_group}}}\hfill
+
+\begin{tabular}{ll}
+  \textbf{Action} & \textbf{Description} \\
+  GL & General Linear \\
+  SL & Special Linear \\
+  O  & Orthogonal \\
+  SO & Special Orthogonal \\
+  U  & Unitary \\
+  SU & Special Unitary \\
+  Sp & Symplectic \\
+  E  & Euclidean \\
+  Lorentz & Lorentz, aka $O(1, n)$ or $O(n, 1)$ \\
+  Poincare & Poincare \\
+\end{tabular}
+
+
+\section{Module-like}
+
 \begin{tabular}{lll}
-  \textbf{Space} & \textbf{Parameters} & \textbf{Description} \\
+  \textbf{Algebra} & \textbf{Parameters} & \textbf{Description} \\
   Vector & data type, dimension & Vector space of specified dimension.\\
   Tensor & Product Factors & Vector space created by \\
   & prefix $\_~/~\hat{}$  denoting co/contravariance & the tensor product of given factors.\\
   Sum & Summands & Vector space created by \\
    & $\_~/~\hat{}$  denoting co/contravariance & the direct sum of given summands\\
 \end{tabular}
+
+\section{Lattice-like}
+
+\begin{tabular}{lll}
+  \textbf{Algebra} & \textbf{Parameters} & \textbf{Description} \\
+  SimplicialComplex & vertices, faces, ... & Ordered by inclusion*
+\end{tabular}
+
+*See footnote\footnote{\url{https://en.wikipedia.org/w/index.php?title=Complete_lattice&oldid=867845390\#Examples}}
+
+\subsection{Field}
+rational Numbers
+
+\begin{verbatim}
+foo Algebra.Field.RationalNumbers(int8);
+\end{verbatim}
 
 \subsection{Functions}
 
@@ -82,23 +178,8 @@ corge foo.Elem.Rand();
 waldo := baz * corge;
 \end{verbatim}
 
-\subsubsect{Matrix Groups\footnote{\url{https://en.wikipedia.org/wiki/Linear_group}}}
 
-\begin{tabular}{ll}
-  \textbf{Action} & \textbf{Description} \\
-  GL & General Linear \\
-  SL & Special Linear \\
-  O  & Orthogonal \\
-  SO & Special Orthogonal \\
-  U  & Unitary \\
-  SU & Special Unitary \\
-  Sp & Symplectic \\
-  E  & Euclidean \\
-  Lorentz & Lorentz, aka $O(1, n)$ or $O(n, 1)$ \\
-  Poincare & Poincare \\
-\end{tabular}
-
-\subsubsect{Custom Representations}
+\subsubsection{Custom Actions}
 
 \begin{verbatim}
 foo Space.Bar(...);
@@ -111,5 +192,14 @@ func BarQuxAction(v Space.Bar, w Space.Qux) v.Space {
 corge foo.Action.Custom(baz, BarQuxAction).Rand();
 ...
 \end{verbatim}
+
+\begin{thebibliography}{9}
+
+\bibitem{wiki:algebraicStructure}
+en.wikipedia.org,
+\textit{Algebraic Structure},
+\url{https://en.wikipedia.org/w/index.php?title=Algebraic_structure&oldid=884252836}
+  
+\end{thebibliography}
 
 \end{document}
