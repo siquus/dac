@@ -84,13 +84,13 @@ corge := baz + qux;
 \begin{tabular}{l|l|l|l}
   \textbf{Field} & \textbf{Min} & \textbf{Max} & \textbf{Comment}\\
   \hline
-  float32 & -Max & $(2-2^{-23})\times 2^{127}=3.4028235\times 10^{38}$ & 6\\
+  float32 & -Max & $(2-2^{-23})\times 2^{127}=3.4028235\times 10^{38}$ & 6 decimal digits precision\\
   cfloat32 & & & real/imaginary part are each float32  
 \end{tabular}
 
 
 \subsection{Non-machine-native}
-These data types are usually non machine native and require additional computation steps.\todo{E.g. integer mod 42, or float32 mod 2, ...}
+These data types are usually non machine native and require additional computation steps.
 
 \begin{tabular}{l|l|l|l}
   \textbf{Ring} & \textbf{Min} & \textbf{Max} & \textbf{Comment}\\
@@ -137,10 +137,10 @@ qux int8 = int8.One;
 
 \begin{tabular}{lll}
   \textbf{Algebra} & \textbf{Parameters} & \textbf{Description} \\
-  Vector & data type, dimension & Vector space of specified dimension.\\
-  Tensor & Product Factors & Vector space created by \\
+  VectorSpace & data type, dimension & Vector space of specified dimension.\\
+  TensorProduct & Product Factors & Vector space created by \\
   & prefix $\_~/~\hat{}$  denoting co/contravariance & the tensor product of given factors.\\
-  Sum & Summands & Vector space created by \\
+  DirectSum & Summands & Vector space created by \\
    & $\_~/~\hat{}$  denoting co/contravariance & the direct sum of given summands\\
 \end{tabular}
 
@@ -153,45 +153,48 @@ qux int8 = int8.One;
 
 *See footnote\footnote{\url{https://en.wikipedia.org/w/index.php?title=Complete_lattice&oldid=867845390\#Examples}}
 
-\subsection{Field}
-rational Numbers
+\section{Actions}
+
+\subsection{Standard Actions}
 
 \begin{verbatim}
-foo Algebra.Field.RationalNumbers(int8);
+foo Algebra.VectorSpace(float32, 3);
+baz foo.Action.O.Rand();
+qux foo.Action.SO.Rand();
+corge foo.Elem.Rand();
+waldo := baz * qux * corge;
 \end{verbatim}
 
-\subsection{Functions}
+\subsection{Composite Actions}
 
 \begin{verbatim}
-foo Space.Vector(...);
-func Add(v, w Space.Vector) v.Space {
+foo Algebra.VectorSpace{int32, 4);
+baz foo.Action.Composite(GL(2), SO(2)).Rand();
+\end{verbatim}
+
+\subsection{Custom Actions}
+
+\begin{verbatim}
+foo Algebra.Bar(...);
+baz Algebra.Qux(...);
+
+action BarQuxAction(v Algebra.Bar, w Algebra.Qux) {
+     ...
+}
+
+corge foo.Action.BarQuxAction.Rand();
+...
+\end{verbatim}
+
+\chapter{Functions}
+
+\begin{verbatim}
+foo Algebra.Vector(...);
+func Add(v, w Algebra.Vector) v.Algebra {
      return v + w;
 }
 \end{verbatim}
 
-\subsection{Actions}
-
-\begin{verbatim}
-foo Space.Bar(...);
-baz foo.Action.Qux(...).Rand();
-corge foo.Elem.Rand();
-waldo := baz * corge;
-\end{verbatim}
-
-
-\subsubsection{Custom Actions}
-
-\begin{verbatim}
-foo Space.Bar(...);
-baz Space.Qux(...);
-
-func BarQuxAction(v Space.Bar, w Space.Qux) v.Space {
-     ...
-}
-
-corge foo.Action.Custom(baz, BarQuxAction).Rand();
-...
-\end{verbatim}
 
 \begin{thebibliography}{9}
 
