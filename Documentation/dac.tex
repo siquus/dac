@@ -135,13 +135,16 @@ qux int8 = int8.One;
 
 \section{Module-like}
 
+\begin{verbatim}
+  foo algebra.VectorSpace(float32, 3);
+  corge foo.Elem{1, 2, 3};
+\end{verbatim}
+
 \begin{tabular}{lll}
   \textbf{Algebra} & \textbf{Parameters} & \textbf{Description} \\
   VectorSpace & data type, dimension & Vector space of specified dimension.\\
-  TensorProduct & Product Factors & Vector space created by \\
-  & prefix $\_~/~\hat{}$  denoting co/contravariance & the tensor product of given factors.\\
-  DirectSum & Summands & Vector space created by \\
-   & $\_~/~\hat{}$  denoting co/contravariance & the direct sum of given summands\\
+  TensorProduct & Product Factors & Vector space created by the tensor product of given factors.\\
+  DirectSum & Summands & Vector space created by the direct sum of given summands\\
 \end{tabular}
 
 \section{Lattice-like}

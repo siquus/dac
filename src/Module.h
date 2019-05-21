@@ -1,0 +1,46 @@
+/*
+ * Module.h
+ *
+ *  Created on: May 18, 2019
+ *      Author: derommo
+ */
+
+#ifndef SRC_MODULE_H_
+#define SRC_MODULE_H_
+
+#include <stdint.h>
+#include <vector>
+
+#include "GlobalDefines.h"
+#include "Graph.h"
+#include "Ring.h"
+
+
+namespace Algebra {
+namespace Module {
+
+class VectorSpace {
+	Ring::Type ring_;
+	dimension_t dim_;
+
+public:
+	VectorSpace(Ring::Float32 f32, dimension_t dim);
+
+	class Vector {
+	public:
+		const VectorSpace* __space_;
+		const void* __value_ = nullptr;
+		Graph* __graph_ = nullptr;
+		Graph::NodeId_t __nodeId_ = Graph::NODE_ID_NONE;
+
+		Vector* Add(const Vector* vec);
+	};
+
+	template<typename T>
+	Vector * Element(Graph* graph, const std::vector<T>* initializer);
+};
+
+}
+}
+
+#endif /* SRC_MODULE_H_ */
