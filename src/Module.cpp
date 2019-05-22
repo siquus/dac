@@ -147,9 +147,9 @@ VectorSpace::Vector* VectorSpace::Vector::Multiply(const Vector* vec)
 	node.nodeType = Graph::NodeType::VECTOR_SCALAR_MULTIPLICATION;
 	node.objectType = Graph::ObjectType::MODULE_VECTORSPACE_VECTOR;
 
-	Graph::NodeId_t addNodeId = __graph_->AddNode(&node);
+	retVec->__nodeId_ = __graph_->AddNode(&node);
 
-	if(Graph::NODE_ID_NONE == addNodeId)
+	if(Graph::NODE_ID_NONE == retVec->__nodeId_)
 	{
 		Error("Could not add Node!\n");
 		return nullptr;
@@ -198,9 +198,9 @@ VectorSpace::Vector* VectorSpace::Vector::Add(const Vector* vec)
 	node.nodeType = Graph::NodeType::VECTOR_ADDITION;
 	node.objectType = Graph::ObjectType::MODULE_VECTORSPACE_VECTOR;
 
-	Graph::NodeId_t addNodeId = __graph_->AddNode(&node);
+	retVec->__nodeId_ = __graph_->AddNode(&node);
 
-	if(Graph::NODE_ID_NONE == addNodeId)
+	if(Graph::NODE_ID_NONE == retVec->__nodeId_)
 	{
 		Error("Could not add Node!\n");
 		return nullptr;
