@@ -34,6 +34,7 @@ public:
 		Graph::NodeId_t __nodeId_ = Graph::NODE_ID_NONE;
 
 		Vector* Add(const Vector* vec);
+		Vector* Multiply(const Vector* vec);
 	};
 
 	template<typename T>

@@ -96,6 +96,68 @@ VectorSpace::Vector * VectorSpace::Element(Graph * graph, const std::vector<inTy
 	return retVec;
 }
 
+VectorSpace::Vector* VectorSpace::Vector::Multiply(const Vector* vec)
+{
+	if(1 != vec->__space_->dim_)
+	{
+		Error("Dimension Mismatch!");
+		return nullptr;
+	}
+
+	if(__graph_ != vec->__graph_)
+	{
+		Error("Not on the same Graph!");
+		return nullptr;
+	}
+
+	// Infer space
+	Ring::Type inferredRing = Ring::GetSuperiorRing(__space_->ring_, vec->__space_->ring_);
+	if(Ring::Type::None == inferredRing)
+	{
+		Error("Incompatible Rings");
+		return nullptr;
+	}
+
+	Vector* retVec = new Vector;
+	retVec->__graph_ = __graph_;
+
+	VectorSpace * retSpace = nullptr;
+	switch(inferredRing)
+	{
+	case Ring::Type::Float32:
+	retSpace = new VectorSpace(Ring::Float32(), __space_->dim_);
+	break;
+
+	default:
+		Error("Unknown Ring!");
+		return nullptr;
+	}
+
+	if(nullptr == retSpace)
+	{
+		Error("Could not create VectorSpace");
+		return nullptr;
+	}
+
+	retVec->__space_ = retSpace;
+
+	Graph::Node_t node;
+	node.parents.push_back(__nodeId_);
+	node.parents.push_back(vec->__nodeId_);
+	node.nodeType = Graph::NodeType::VECTOR_SCALAR_MULTIPLICATION;
+	node.objectType = Graph::ObjectType::MODULE_VECTORSPACE_VECTOR;
+
+	Graph::NodeId_t addNodeId = __graph_->AddNode(&node);
+
+	if(Graph::NODE_ID_NONE == addNodeId)
+	{
+		Error("Could not add Node!\n");
+		return nullptr;
+	}
+
+	return retVec;
+}
+
 VectorSpace::Vector* VectorSpace::Vector::Add(const Vector* vec)
 {
 	if(__space_->dim_ != vec->__space_->dim_)

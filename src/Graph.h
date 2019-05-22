@@ -19,6 +19,7 @@ public:
 	enum class NodeType {
 		VECTOR,
 		VECTOR_ADDITION,
+		VECTOR_SCALAR_MULTIPLICATION,
 	};
 
 	enum class ObjectType {

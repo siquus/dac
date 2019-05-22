@@ -21,10 +21,15 @@ int main()
 	auto vec2_init = std::vector<float>{4, 5, 6};
 
 	auto vec1 = myVs.Element(&graph, &vec1_init);
-
 	auto vec2 = myVs.Element(&graph, &vec2_init);
 
 	auto sum = vec1->Add(vec2);
+
+	auto myScalarSpace = Algebra::Module::VectorSpace(Algebra::Ring::Float32(), 1);
+	auto vec3_init = std::vector<float>{42};
+	auto vec3 = myScalarSpace.Element(&graph, &vec3_init);
+
+	auto prod = sum->Multiply(vec3);
 
 	printf("Success!\n");
 }
