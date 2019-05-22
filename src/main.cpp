@@ -10,6 +10,7 @@
 #include "Graph.h"
 #include "Module.h"
 #include "Ring.h"
+#include "Interface.h"
 
 int main()
 {
@@ -30,6 +31,21 @@ int main()
 	auto vec3 = myScalarSpace.Element(&graph, &vec3_init);
 
 	auto prod = sum->Multiply(vec3);
+	if(nullptr == prod)
+	{
+		printf("Could not create product\n");
+		return 1;
+	}
+
+	auto outFile = std::string("myOutput.txt");
+	auto output = Interface::Output(&graph, &outFile);
+
+	bool success = output.Add(prod);
+	if(!success)
+	{
+		printf("Could not add to Output\n");
+		return 1;
+	}
 
 	printf("Success!\n");
 }

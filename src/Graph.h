@@ -20,10 +20,12 @@ public:
 		VECTOR,
 		VECTOR_ADDITION,
 		VECTOR_SCALAR_MULTIPLICATION,
+		OUTPUT,
 	};
 
 	enum class ObjectType {
 		MODULE_VECTORSPACE_VECTOR,
+		INTERFACE_OUTPUT,
 	};
 
 	typedef uint32_t NodeId_t;
@@ -40,6 +42,7 @@ public:
 	} Node_t;
 
 	NodeId_t AddNode(Node_t * node);
+	bool AddParent(NodeId_t parent, NodeId_t child);
 
 private:
 	std::vector<Node_t> nodes_;

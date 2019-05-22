@@ -53,6 +53,23 @@ bool Graph::AddChild(NodeId_t parent, NodeId_t child)
 		}
 	}
 
+	Error("Could not AddChild!\n");
+	return false;
+}
+
+bool Graph::AddParent(NodeId_t parent, NodeId_t child)
+{
+	// search for Child and add parent
+	for(Node_t &node: nodes_)
+	{
+		if(node.id == child)
+		{
+			node.parents.push_back(parent);
+			return AddChild(parent, child);
+		}
+	}
+
+	Error("Could not AddParent!\n");
 	return false;
 }
 
