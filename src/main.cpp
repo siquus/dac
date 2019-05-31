@@ -11,6 +11,7 @@
 #include "Module.h"
 #include "Ring.h"
 #include "Interface.h"
+#include "CodeGenerator.h"
 
 int main()
 {
@@ -47,7 +48,18 @@ int main()
 		return 1;
 	}
 
+	auto outpath = std::string("test.c");
+	CodeGenerator codeGenerator(&outpath);
+
+	bool GenSuccess = codeGenerator.Generate(&graph);
+	if(!GenSuccess)
+	{
+		printf("Could not generate Code");
+		return 1;
+	}
+
 	printf("Success!\n");
+	return 0;
 }
 
 
