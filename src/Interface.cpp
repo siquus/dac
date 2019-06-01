@@ -9,15 +9,15 @@
 
 using namespace Interface;
 
-Output::Output(Graph* graph, const std::string* fileName)
+Output::Output(Graph* graph, const std::string* name)
 {
-	if(nullptr == fileName)
+	if(nullptr == name)
 	{
 		Error("nullptr\n");
 		return;
 	}
 
-	fileName_ = *fileName;
+	name_ = *name;
 
 	if(nullptr == graph)
 	{
@@ -40,11 +40,17 @@ Output::Output(Graph* graph, const std::string* fileName)
 	}
 }
 
-bool Output::Add(const Algebra::Module::VectorSpace::Vector * vector)
+bool Output::Add(const std::string* name, const Algebra::Module::VectorSpace::Vector * vector)
 {
 	if(nullptr == vector)
 	{
 		Error("Nullptr\n");
+		return false;
+	}
+
+	if(graph_ != vector->__graph_)
+	{
+		Error("Not on same Graph");
 		return false;
 	}
 
@@ -54,6 +60,8 @@ bool Output::Add(const Algebra::Module::VectorSpace::Vector * vector)
 		Error("Could not AddParent to Output!\n");
 		return false;
 	}
+
+	outNames_[vector->__nodeId_] = *name;
 
 	return true;
 }

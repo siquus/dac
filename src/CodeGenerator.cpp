@@ -12,6 +12,26 @@
 #include <stdint.h>
 
 #include "GlobalDefines.h"
+#include "Ring.h"
+
+#define fprintProtect(ret) \
+	{if(0 > ret) \
+	{ \
+		Error("fprintf on File %s failed: %s\n", path_.c_str(), strerror(errno)); \
+		return false; \
+	} \
+	}
+
+#define SNPRINTF(pt, size, ...) \
+	{ \
+		int ret = snprintf(pt, size, __VA_ARGS__); \
+		if((0 > ret) || ((int) size <= ret)) \
+		{ \
+			Error("snprintf failed!\n"); \
+			return false; \
+		} \
+	}
+
 
 static const char includeFilesBrackets[][42] = {
 
@@ -55,6 +75,7 @@ CodeGenerator::~CodeGenerator() {
 
 bool CodeGenerator::Generate(const Graph* graph)
 {
+	graph_ = graph;
 	outfile_ = fopen(path_.c_str(), "w");
 
 	if(nullptr == outfile_)
@@ -63,7 +84,92 @@ bool CodeGenerator::Generate(const Graph* graph)
 		return false;
 	}
 
-	GenerateHeaderAndIncludes();
+	bool success;
+	success = GenerateHeaderAndIncludes();
+	if(!success)
+	{
+		Error("Could not generate Header");
+		return false;
+	}
+
+	success = GenerateConstants();
+	if(!success)
+	{
+		Error("Could not generate Constants");
+		return false;
+	}
+
+	return true;
+}
+
+bool CodeGenerator::GenerateConstants()
+{
+	auto nodes = graph_->GetNodes();
+	for(const Graph::Node_t &node: *nodes)
+	{
+		std::string declaration;
+		switch(node.objectType)
+		{
+		case Graph::ObjectType::MODULE_VECTORSPACE_VECTOR:
+		{
+			auto vector = (const Algebra::Module::VectorSpace::Vector*) node.object;
+			if(nullptr != vector->__value_)
+			{
+				declaration.append("static const ");
+				bool success = GetVariableDeclaration(&declaration, vector);
+				if(!success)
+				{
+					Error("Could not get Variable declaration");
+					return false;
+				}
+			}
+		}
+			break;
+
+		default: // no break intended
+		case Graph::ObjectType::INTERFACE_OUTPUT:
+			// No constants to allocate
+			break;
+		}
+
+		if(!declaration.empty())
+		{
+			fprintProtect(fprintf(outfile_, "%s\n", declaration.c_str()));
+		}
+	}
+
+	return true;
+}
+
+bool CodeGenerator::GetVariableDeclaration(std::string * declaration, const Algebra::Module::VectorSpace::Vector* vector)
+{
+	switch(vector->__space_->ring_)
+	{
+	case Algebra::Ring::Type::Float32:
+	{
+		char tmpBuffer[20];
+		SNPRINTF(tmpBuffer, sizeof(tmpBuffer), "%s %s%u[%u] = {", "float", "node", vector->__nodeId_, vector->__space_->dim_);
+		declaration->append(tmpBuffer);
+		float * dataPt = (float*) vector->__value_;
+		for(dimension_t dim = 0; dim < vector->__space_->dim_; dim++)
+		{
+			SNPRINTF(tmpBuffer, sizeof(tmpBuffer), "%f", dataPt[dim]);
+			declaration->append(tmpBuffer);
+			if(dim != vector->__space_->dim_ - 1)
+			{
+				declaration->append(", ");
+			}
+		}
+
+		declaration->append("};");
+	}
+		break;
+
+	case Algebra::Ring::Type::None: // no break intended
+	default:
+		Error("Unsupported Ring!\n");
+		return false;
+	}
 
 	return true;
 }
@@ -78,32 +184,17 @@ bool CodeGenerator::GenerateHeaderAndIncludes()
 
 	for(uint16_t line = 0; line < sizeof(headerLines) / sizeof(headerLines[0]); line++)
 	{
-		int err = fprintf(outfile_, "%s\n", headerLines[line]);
-		if(0 > err)
-		{
-			Error("fprintf on File %s failed: %s\n", path_.c_str(), strerror(errno));
-			return false;
-		}
+		fprintProtect(fprintf(outfile_, "%s\n", headerLines[line]));
 	}
 
 	for(uint16_t incl = 0; incl < sizeof(includeFilesBrackets) / sizeof(includeFilesBrackets[0]); incl++)
 	{
-		int err = fprintf(outfile_, "#include <%s>\n", includeFilesBrackets[incl]);
-		if(0 > err)
-		{
-			Error("fprintf on File %s failed: %s\n", path_.c_str(), strerror(errno));
-			return false;
-		}
+		fprintProtect(fprintf(outfile_, "#include <%s>\n", includeFilesBrackets[incl]));
 	}
 
 	 for(uint16_t incl = 0; incl < sizeof(includeFilesQuotes) / sizeof(includeFilesQuotes[0]); incl++)
 	 {
-		 int err = fprintf(outfile_, "#include ''%s''\n", includeFilesQuotes[incl]);
-		 if(0 > err)
-		 {
-			 Error("fprintf on File %s failed: %s\n", path_.c_str(), strerror(errno));
-			 return false;
-		 }
+		 fprintProtect(fprintf(outfile_, "#include ''%s''\n", includeFilesQuotes[incl]));
 	 }
 
 	return true;

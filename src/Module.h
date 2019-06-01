@@ -20,8 +20,6 @@ namespace Algebra {
 namespace Module {
 
 class VectorSpace {
-	Ring::Type ring_;
-	dimension_t dim_;
 
 public:
 	VectorSpace(Ring::Float32 f32, dimension_t dim);
@@ -36,6 +34,9 @@ public:
 		Vector* Add(const Vector* vec);
 		Vector* Multiply(const Vector* vec);
 	};
+
+	Ring::Type ring_;
+	dimension_t dim_;
 
 	template<typename T>
 	Vector * Element(Graph* graph, const std::vector<T>* initializer);

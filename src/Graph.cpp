@@ -57,6 +57,11 @@ bool Graph::AddChild(NodeId_t parent, NodeId_t child)
 	return false;
 }
 
+const std::vector<Graph::Node_t> * Graph::GetNodes() const
+{
+	return &nodes_;
+}
+
 bool Graph::AddParent(NodeId_t parent, NodeId_t child)
 {
 	// search for Child and add parent

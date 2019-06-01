@@ -43,6 +43,7 @@ public:
 
 	NodeId_t AddNode(Node_t * node);
 	bool AddParent(NodeId_t parent, NodeId_t child);
+	const std::vector<Node_t> * GetNodes() const;
 
 private:
 	std::vector<Node_t> nodes_;

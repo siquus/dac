@@ -38,10 +38,11 @@ int main()
 		return 1;
 	}
 
-	auto outFile = std::string("myOutput.txt");
+	auto outFile = std::string("Output");
 	auto output = Interface::Output(&graph, &outFile);
 
-	bool success = output.Add(prod);
+	auto outName = std::string("Product");
+	bool success = output.Add(&outName, prod);
 	if(!success)
 	{
 		printf("Could not add to Output\n");

@@ -146,6 +146,7 @@ VectorSpace::Vector* VectorSpace::Vector::Multiply(const Vector* vec)
 	node.parents.push_back(vec->__nodeId_);
 	node.nodeType = Graph::NodeType::VECTOR_SCALAR_MULTIPLICATION;
 	node.objectType = Graph::ObjectType::MODULE_VECTORSPACE_VECTOR;
+	node.object = retVec;
 
 	retVec->__nodeId_ = __graph_->AddNode(&node);
 
@@ -197,6 +198,7 @@ VectorSpace::Vector* VectorSpace::Vector::Add(const Vector* vec)
 	node.parents.push_back(vec->__nodeId_);
 	node.nodeType = Graph::NodeType::VECTOR_ADDITION;
 	node.objectType = Graph::ObjectType::MODULE_VECTORSPACE_VECTOR;
+	node.object = retVec;
 
 	retVec->__nodeId_ = __graph_->AddNode(&node);
 
