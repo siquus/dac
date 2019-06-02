@@ -13,6 +13,7 @@
 
 #include "GlobalDefines.h"
 #include "Ring.h"
+#include "Interface.h"
 
 #define fprintProtect(ret) \
 	{if(0 > ret) \
@@ -25,12 +26,26 @@
 #define SNPRINTF(pt, size, ...) \
 	{ \
 		int ret = snprintf(pt, size, __VA_ARGS__); \
-		if((0 > ret) || ((int) size <= ret)) \
+		if(0 > ret) \
 		{ \
-			Error("snprintf failed!\n"); \
+			Error("snprintf failed: %s!\n", strerror(errno)); \
+			return false; \
+		} \
+		else if((int) size <= ret) \
+		{ \
+			Error("snprintf failed: Buffer too small: Size %lu, need %u\n", size, ret + 1); \
 			return false; \
 		} \
 	}
+
+#define retFalseOnFalse(boolean, ...) \
+		{ \
+			if(!boolean) \
+			{ \
+				Error(__VA_ARGS__); \
+				return false; \
+			} \
+		}
 
 
 static const char includeFilesBrackets[][42] = {
@@ -62,11 +77,11 @@ static const char headerLines[][100] = {
 		" * The source code for the generator is available on GitHub",
 		" * https://github.com/siquus/dac",
 		" */",
+		"",
 };
 
 CodeGenerator::CodeGenerator(const std::string* path) {
 	path_ = *path;
-
 }
 
 CodeGenerator::~CodeGenerator() {
@@ -84,19 +99,98 @@ bool CodeGenerator::Generate(const Graph* graph)
 		return false;
 	}
 
-	bool success;
-	success = GenerateHeaderAndIncludes();
-	if(!success)
+	retFalseOnFalse(GenerateHeaderAndIncludes(), "Could not generate Header\n");
+
+	auto constHeading = std::string("Constant Variables");
+	retFalseOnFalse(GenerateHeading(&constHeading), "Constant Heading failed!\n");
+
+	retFalseOnFalse(GenerateConstants(), "Could not generate Constants\n");
+
+	auto staticHeading = std::string("Static Variables");
+	retFalseOnFalse(GenerateHeading(&staticHeading), "Static Heading failed!\n");
+
+	retFalseOnFalse(GenerateStatics(), "Could not generate Statics\n!");
+
+	return true;
+}
+
+bool CodeGenerator::GenerateHeading(const std::string * heading)
+{
+	const uint16_t headingWidth = 100;
+
+	std::string starSpangledHeading;
+	starSpangledHeading.reserve(headingWidth);
+
+	starSpangledHeading += "\n /* ";
+	starSpangledHeading += *heading;
+	starSpangledHeading += " ";
+
+	while(headingWidth > starSpangledHeading.length())
 	{
-		Error("Could not generate Header");
-		return false;
+		starSpangledHeading += "*";
 	}
 
-	success = GenerateConstants();
-	if(!success)
+	fprintProtect(fprintf(outfile_, "%s*/\n", starSpangledHeading.c_str()));
+
+	return true;
+}
+
+bool CodeGenerator::GenerateStatics()
+{
+	auto nodes = graph_->GetNodes();
+	for(const Graph::Node_t &node: *nodes)
 	{
-		Error("Could not generate Constants");
-		return false;
+		std::string declaration;
+		switch(node.nodeType)
+		{
+		case Graph::NodeType::OUTPUT:
+		{
+			auto output = (const Interface::Output *) node.object;
+			for(const Graph::Node_t &potparnode: *nodes)
+			{
+				for(const Graph::NodeId_t &parentNodeId: node.parents)
+				{
+					if(parentNodeId != potparnode.id)
+					{
+						continue;
+					}
+
+					switch(potparnode.objectType)
+					{
+					case Graph::ObjectType::MODULE_VECTORSPACE_VECTOR:
+					{
+						auto vector = (const Algebra::Module::VectorSpace::Vector*) potparnode.object;
+						declaration.append("static ");
+						const std::string * outName = output->GetOutputName(parentNodeId);
+						if(nullptr == outName)
+						{
+							Error("Could not get output name!\n");
+							return false;
+						}
+
+						retFalseOnFalse(GetVariableDeclaration(&declaration, vector, outName), "Could not get Variable declaration!\n");
+
+						fprintProtect(fprintf(outfile_, "%s\n", declaration.c_str()));
+					}
+					break;
+
+					default: // no break intended
+					case Graph::ObjectType::INTERFACE_OUTPUT:
+						// Handled in enclosing switch
+						break;
+					}
+				}
+			}
+		}
+			break;
+
+		default: // no break intended
+		case Graph::NodeType::VECTOR: // no break intended
+		case Graph::NodeType::VECTOR_ADDITION: // no break intended
+		case Graph::NodeType::VECTOR_SCALAR_MULTIPLICATION: // no break intended
+			// No statics to allocate
+			break;
+		}
 	}
 
 	return true;
@@ -116,12 +210,7 @@ bool CodeGenerator::GenerateConstants()
 			if(nullptr != vector->__value_)
 			{
 				declaration.append("static const ");
-				bool success = GetVariableDeclaration(&declaration, vector);
-				if(!success)
-				{
-					Error("Could not get Variable declaration");
-					return false;
-				}
+				retFalseOnFalse(GetVariableDeclaration(&declaration, vector), "Could not get Variable declaration\n");
 			}
 		}
 			break;
@@ -141,27 +230,42 @@ bool CodeGenerator::GenerateConstants()
 	return true;
 }
 
-bool CodeGenerator::GetVariableDeclaration(std::string * declaration, const Algebra::Module::VectorSpace::Vector* vector)
+bool CodeGenerator::GetVariableDeclaration(std::string * declaration, const Algebra::Module::VectorSpace::Vector* vector, const std::string * prefix)
 {
+	std::string varName;
+	if(nullptr != prefix)
+	{
+		varName += *prefix;
+	}
+	varName += "Node";
+
 	switch(vector->__space_->ring_)
 	{
 	case Algebra::Ring::Type::Float32:
 	{
-		char tmpBuffer[20];
-		SNPRINTF(tmpBuffer, sizeof(tmpBuffer), "%s %s%u[%u] = {", "float", "node", vector->__nodeId_, vector->__space_->dim_);
-		declaration->append(tmpBuffer);
-		float * dataPt = (float*) vector->__value_;
-		for(dimension_t dim = 0; dim < vector->__space_->dim_; dim++)
+		char tmpBuffer[40];
+		if(nullptr == vector->__value_)
 		{
-			SNPRINTF(tmpBuffer, sizeof(tmpBuffer), "%f", dataPt[dim]);
+			SNPRINTF(tmpBuffer, sizeof(tmpBuffer), "%s %s%u[%u];", "float", varName.c_str(), vector->__nodeId_, vector->__space_->dim_);
 			declaration->append(tmpBuffer);
-			if(dim != vector->__space_->dim_ - 1)
-			{
-				declaration->append(", ");
-			}
 		}
+		else
+		{
+			SNPRINTF(tmpBuffer, sizeof(tmpBuffer), "%s %s%u[%u] = {", "float", "node", vector->__nodeId_, vector->__space_->dim_);
+			declaration->append(tmpBuffer);
+			float * dataPt = (float*) vector->__value_;
+			for(dimension_t dim = 0; dim < vector->__space_->dim_; dim++)
+			{
+				SNPRINTF(tmpBuffer, sizeof(tmpBuffer), "%f", dataPt[dim]);
+				declaration->append(tmpBuffer);
+				if(dim != vector->__space_->dim_ - 1)
+				{
+					declaration->append(", ");
+				}
+			}
 
-		declaration->append("};");
+			declaration->append("};");
+		}
 	}
 		break;
 

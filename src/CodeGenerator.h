@@ -20,9 +20,10 @@ class CodeGenerator {
 	const Graph* graph_ = nullptr;
 
 	bool GenerateConstants();
+	bool GenerateStatics();
 	bool GenerateHeaderAndIncludes();
-
-	bool GetVariableDeclaration(std::string * declaration, const Algebra::Module::VectorSpace::Vector* vector);
+	bool GenerateHeading(const std::string * heading);
+	bool GetVariableDeclaration(std::string * declaration, const Algebra::Module::VectorSpace::Vector* vector, const std::string * prefix = nullptr);
 
 public:
 	CodeGenerator(const std::string* path);

@@ -26,6 +26,7 @@ class Output {
 public:
 	Output(Graph* graph, const std::string* name);
 	bool Add(const std::string* name, const Algebra::Module::VectorSpace::Vector * vector);
+	const std::string * GetOutputName(Graph::NodeId_t nodeId) const;
 };
 
 }

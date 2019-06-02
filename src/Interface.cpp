@@ -65,3 +65,14 @@ bool Output::Add(const std::string* name, const Algebra::Module::VectorSpace::Ve
 
 	return true;
 }
+
+const std::string * Output::GetOutputName(Graph::NodeId_t nodeId) const
+{
+	auto it = outNames_.find(nodeId);
+	if(outNames_.end() == it)
+	{
+		return nullptr;
+	}
+
+	return &it->second;
+}
