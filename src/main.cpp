@@ -49,7 +49,7 @@ int main()
 		return 1;
 	}
 
-	auto outpath = std::string("test.c");
+	auto outpath = std::string("");
 	CodeGenerator codeGenerator(&outpath);
 
 	bool GenSuccess = codeGenerator.Generate(&graph);
