@@ -31,6 +31,7 @@ public:
 		uint8_,
 		int8_,
 		float_,
+		nrOf,
 	};
 
 	Variable(const std::string* identifier, properties_t properties, Type type, size_t length = 1, const void* value = nullptr);
@@ -41,6 +42,7 @@ public:
 	size_t Length() const;
 	bool HasProperty(properties_t property) const;
 	bool AddProperty(properties_t property);
+	const char* GetTypeString() const;
 
 private:
 	properties_t properties_;

@@ -53,7 +53,7 @@ static const char fileName[] = "dac";
 
 
 static const char includeFilesBrackets[][42] = {
-
+		"stddef.h"
 };
 
 static const char includeFilesQuotes[][42] = {
@@ -139,6 +139,8 @@ bool CodeGenerator::Generate(const Graph* graph)
 	retFalseOnFalse(GenerateHeading(&staticHeading), "Static Heading failed!\n");
 
 	retFalseOnFalse(GenerateStaticDeclarations(), "Could not generate Statics\n!");
+
+	retFalseOnFalse(GenerateOutputFunctions(), "Could not generate Output Functions\n!");
 
 	return true;
 }
@@ -290,6 +292,69 @@ bool CodeGenerator::FetchVariables()
 
 bool CodeGenerator::GenerateOutputFunctions()
 {
+	std::string fctDefinitions;
+
+	auto nodes = graph_->GetNodes();
+	for(const Graph::Node_t &node: *nodes)
+	{
+		if(Graph::NodeType::OUTPUT != node.nodeType)
+		{
+			continue;
+		}
+
+		auto * output = (const Interface::Output* ) node.object;
+
+		for(const Graph::NodeId_t &nodeId: node.parents)
+		{
+			// Get Variable attached to node
+			const auto var = variables_.find(nodeId);
+			if(variables_.end() == var)
+			{
+				Error("Variable does not exist!\n");
+				return false;
+			}
+
+			std::string fctPtTypeId = "DacOutputCallback";
+			fctPtTypeId += *(output->GetOutputName(nodeId));
+
+			std::string callbackTypedef;
+			callbackTypedef += "typedef void (*";
+			callbackTypedef += fctPtTypeId;
+			callbackTypedef += "_t)(";
+			callbackTypedef += var->second.GetTypeString();
+			callbackTypedef += "* pt, size_t size);";
+
+			// Export function prototype
+			fprintProtect(fprintf(outHeaderFile_, "%s\n", callbackTypedef.c_str()));
+			fprintProtect(fprintf(outHeaderFile_, "extern void %s_Register(%s_t callback);\n",
+					fctPtTypeId.c_str(),
+					fctPtTypeId.c_str()));
+
+			// Declare Static Variables keeping the callback pointers
+			fprintProtect(fprintf(outfile_, "static %s_t %s = NULL;",
+					fctPtTypeId.c_str(),
+					fctPtTypeId.c_str()));
+
+			// Define Function
+			char tmpBuff[100];
+			SNPRINTF(tmpBuff, sizeof(tmpBuff), "void %s_Register(%s_t callback)\n{\n",
+					fctPtTypeId.c_str(),
+					fctPtTypeId.c_str());
+
+			fctDefinitions += tmpBuff;
+
+			SNPRINTF(tmpBuff, sizeof(tmpBuff), "\t %s = callback;\n", fctPtTypeId.c_str());
+			fctDefinitions += tmpBuff;
+			fctDefinitions += "}\n\n";
+		}
+	}
+
+	fprintProtect(fprintf(outfile_, "\n"));
+
+	auto exportedHeading = std::string("Exported Functions");
+	retFalseOnFalse(GenerateHeading(&exportedHeading), "Exported Heading failed!\n");
+
+	fprintProtect(fprintf(outfile_, "%s\n", fctDefinitions.c_str()));
 
 	return true;
 }
@@ -301,7 +366,7 @@ bool CodeGenerator::GenerateHeading(const std::string * heading)
 	std::string starSpangledHeading;
 	starSpangledHeading.reserve(headingWidth);
 
-	starSpangledHeading += "\n /* ";
+	starSpangledHeading += "\n/* ";
 	starSpangledHeading += *heading;
 	starSpangledHeading += " ";
 
@@ -344,6 +409,35 @@ inline bool Variable::HasProperty(properties_t property) const
 	}
 
 	return false;
+}
+
+const char* Variable::GetTypeString() const
+{
+	static const char typeStrings[(int) Type::nrOf][30] = {
+			"0000", // make sure it throws error
+			"uint8_t",
+			"int8_t",
+			"float",
+	};
+
+	switch(type_)
+	{
+	case Type::uint8_:
+		return typeStrings[(int) Type::uint8_];
+
+	case Type::int8_:
+		return typeStrings[(int) Type::int8_];
+
+	case Type::float_:
+		return typeStrings[(int) Type::float_];
+
+	default: // no break intended
+	case Type::none:
+		Error("Unknown Type!\n");
+		return nullptr;
+	}
+
+	return nullptr; // should not be reached
 }
 
 bool Variable::AddProperty(properties_t property)
@@ -400,24 +494,15 @@ bool Variable::GetDeclaration(std::string* decl) const
 		decl->append("const ");
 	}
 
-	switch(type_)
+	const char* typeStr = GetTypeString();
+	if(nullptr == typeStr)
 	{
-	case Type::float_:
-		decl->append("float ");
-		break;
-
-	case Type::int8_:
-		decl->append("int8_t ");
-		break;
-
-	case Type::uint8_:
-		decl->append("uint8_t ");
-		break;
-
-	default:
-		Error("Unknown Type!\n");
+		Error("Unknown type!\n");
 		return false;
 	}
+
+	decl->append(typeStr);
+	decl->append(" ");
 
 	if(0 == identifier_.length())
 	{
