@@ -65,9 +65,12 @@ class CodeGenerator {
 	bool GenerateOutputFunctions();
 	bool GenerateConstantDeclarations();
 	bool GenerateStaticDeclarations();
+	bool GenerateRunFunction();
+
 	bool FetchVariables();
 
 	std::map<Graph::NodeId_t, Variable> variables_;
+	std::map<Graph::NodeId_t, const Graph::Node_t*> nodeMap_;
 
 public:
 	CodeGenerator(const std::string* path);

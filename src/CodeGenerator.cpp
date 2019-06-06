@@ -10,10 +10,13 @@
 #include <iostream>
 #include <string.h>
 #include <stdint.h>
+#include <set>
 
 #include "GlobalDefines.h"
 #include "Ring.h"
 #include "Interface.h"
+
+#define DEBUG(...) printf(__VA_ARGS__)
 
 #define fprintProtect(ret) \
 	{if(0 > ret) \
@@ -104,6 +107,33 @@ bool CodeGenerator::Generate(const Graph* graph)
 {
 	graph_ = graph;
 
+	// From here on we assume that the graph will no longer change
+	// this means we may use pointers to nodes now!
+	auto nodes = graph_->GetNodes();
+	for(const Graph::Node_t &node: *nodes)
+	{
+		nodeMap_.insert(std::make_pair(node.id, &node));
+	}
+
+	for(const auto &nodePair: nodeMap_)
+	{
+		DEBUG("nodeMap Node%u: NodeType %u, Obj. Type %u,  Children ",
+				nodePair.first,
+				(unsigned int) nodePair.second->nodeType,
+				(unsigned int) nodePair.second->objectType);
+
+		for(Graph::NodeId_t nodeId: nodePair.second->children)
+		{
+			DEBUG("%u, ", nodeId);
+		}
+		DEBUG("Parents ");
+		for(Graph::NodeId_t nodeId: nodePair.second->parents)
+		{
+			DEBUG("%u, ", nodeId);
+		}
+		DEBUG("\n");
+	}
+
 	retFalseOnFalse(FetchVariables(), "Could not fetch variables\n");
 
 	std::string pathAndFileName = path_ + fileName;
@@ -141,6 +171,69 @@ bool CodeGenerator::Generate(const Graph* graph)
 	retFalseOnFalse(GenerateStaticDeclarations(), "Could not generate Statics\n!");
 
 	retFalseOnFalse(GenerateOutputFunctions(), "Could not generate Output Functions\n!");
+
+	retFalseOnFalse(GenerateRunFunction(), "Could not generate Run Function!\n");
+
+	return true;
+}
+
+bool CodeGenerator::GenerateRunFunction()
+{
+	// Add prototype to header
+	fprintProtect(fprintf(outHeaderFile_, "extern int DacRun(void);\n"));
+
+	// Define function
+	fprintProtect(fprintf(outfile_, "int DacRun(void)\n{\n"));
+
+	// Traverse the Graph and generate Code
+	// Find all nodes which do not have parents and create a set of their children
+	std::set<Graph::NodeId_t> roots;
+	std::set<Graph::NodeId_t> firstGenerationChildren;
+
+	auto nodes = graph_->GetNodes();
+	for(const Graph::Node_t &node: *nodes)
+	{
+		if(0 == node.parents.size())
+		{
+			roots.insert(node.id);
+			std::copy(
+					node.children.begin(), node.children.end(),
+					std::inserter(firstGenerationChildren, firstGenerationChildren.end()));
+		}
+	}
+
+	// delete all children which have non-root parents.
+	// i.e. these children may be executed right away.
+	std::vector<Graph::NodeId_t> nonFirstGenerationChildren;
+	for(Graph::NodeId_t childId: firstGenerationChildren)
+	{
+		const auto childNodeIt =  nodeMap_.find(childId);
+		if(nodeMap_.end() == childNodeIt)
+		{
+			Error("Unknown Child, NodeId = %u!\n", childId);
+			return false;
+		}
+
+		const Graph::Node_t* childNode = childNodeIt->second;
+
+		for(Graph::NodeId_t parentId: childNode->parents)
+		{
+			if(roots.end() == roots.find(parentId))
+			{
+				// Child has one non-first-generation parent.
+				nonFirstGenerationChildren.push_back(childId); // erase later
+				break;
+			}
+		}
+	}
+
+	for(Graph::NodeId_t childId: nonFirstGenerationChildren)
+	{
+		firstGenerationChildren.erase(childId);
+	}
+
+	// Return 0 to show success.
+	fprintProtect(fprintf(outfile_, "\treturn 0;\n}\n"));
 
 	return true;
 }
