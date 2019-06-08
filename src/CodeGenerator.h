@@ -12,6 +12,7 @@
 #include <fstream>
 #include <vector>
 #include <map>
+#include <set>
 
 #include "Graph.h"
 #include "Module.h"
@@ -38,7 +39,7 @@ public:
 
 	bool GetDeclaration(std::string* decl) const;
 	const std::string * GetIdentifier() const;
-	bool GetElement(std::string* elem, uint32_t elemIndex) const;
+	bool GetElement(std::string* elem,  const char *elemIndex) const;
 	size_t Length() const;
 	bool HasProperty(properties_t property) const;
 	bool AddProperty(properties_t property);
@@ -65,12 +66,18 @@ class CodeGenerator {
 	bool GenerateOutputFunctions();
 	bool GenerateConstantDeclarations();
 	bool GenerateStaticDeclarations();
+	bool GenerateLocalVariableDeclaration(const Variable * var);
 	bool GenerateRunFunction();
+	bool GenerateOperationCode(const Graph::Node_t* node);
+	bool OutputCode(const Graph::Node_t* node);
+	bool VectorAdditionCode(const Graph::Node_t* node);
+	bool VectorScalarMultiplicationCode(const Graph::Node_t* node);
 
 	bool FetchVariables();
 
 	std::map<Graph::NodeId_t, Variable> variables_;
 	std::map<Graph::NodeId_t, const Graph::Node_t*> nodeMap_;
+	std::set<Graph::NodeId_t> generatedNodes_;
 
 public:
 	CodeGenerator(const std::string* path);

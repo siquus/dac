@@ -10,7 +10,6 @@
 #include <iostream>
 #include <string.h>
 #include <stdint.h>
-#include <set>
 
 #include "GlobalDefines.h"
 #include "Ring.h"
@@ -50,13 +49,24 @@
 			} \
 		}
 
+#define retFalseIfNotFound(pair, map, key) \
+	const auto pair = map.find(key); \
+	if(map.end() == pair) \
+	{ \
+		Error("Unknown Key!\n"); \
+		return false; \
+	} \
+
+
 #define HEADER_NAME "dac.h"
 
 static const char fileName[] = "dac";
 
 
 static const char includeFilesBrackets[][42] = {
-		"stddef.h"
+		"stdint.h",
+		"stddef.h",
+		"linux/types.h"
 };
 
 static const char includeFilesQuotes[][42] = {
@@ -117,7 +127,7 @@ bool CodeGenerator::Generate(const Graph* graph)
 
 	for(const auto &nodePair: nodeMap_)
 	{
-		DEBUG("nodeMap Node%u: NodeType %u, Obj. Type %u,  Children ",
+		DEBUG("nodeMap Node%u: NodeType %u, ObjType %u,  Children ",
 				nodePair.first,
 				(unsigned int) nodePair.second->nodeType,
 				(unsigned int) nodePair.second->objectType);
@@ -232,8 +242,163 @@ bool CodeGenerator::GenerateRunFunction()
 		firstGenerationChildren.erase(childId);
 	}
 
+	std::set<Graph::NodeId_t> * children = &firstGenerationChildren;
+
+	std::set<Graph::NodeId_t> tmpSet;
+	std::set<Graph::NodeId_t> * nextGenChildren = &tmpSet;
+
+	while(1)
+	{
+		// Create Code for all children and create new set with the next generation
+		for(Graph::NodeId_t childId: *children)
+		{
+			retFalseIfNotFound(nodePair, nodeMap_, childId);
+
+			retFalseOnFalse(GenerateOperationCode(nodePair->second), "Could not generate Operation Code!\n");
+			std::copy(
+					nodePair->second->children.begin(), nodePair->second->children.end(),
+								std::inserter(*nextGenChildren, nextGenChildren->end()));
+
+			generatedNodes_.insert(childId);
+		}
+
+		// Remove all nextGen children who's parents have not been generated
+		std::vector<Graph::NodeId_t> childrenToBeRemoved;
+		for(Graph::NodeId_t childId: *nextGenChildren)
+		{
+			retFalseIfNotFound(childPair, nodeMap_, childId);
+			for(Graph::NodeId_t parentId: childPair->second->parents)
+			{
+				if(generatedNodes_.end() == generatedNodes_.find(parentId))
+				{
+					childrenToBeRemoved.push_back(childId);
+					break;
+				}
+			}
+		}
+
+		for(Graph::NodeId_t removeId: childrenToBeRemoved)
+		{
+			nextGenChildren->erase(removeId);
+		}
+
+		// Any children left to generate?
+		if(0 == nextGenChildren->size())
+		{
+			break;
+		}
+
+		// Prepare sets for next iteration
+		children->clear();
+		auto tmp = children;
+		children = nextGenChildren;
+		nextGenChildren = tmp;
+	}
+
 	// Return 0 to show success.
-	fprintProtect(fprintf(outfile_, "\treturn 0;\n}\n"));
+	fprintProtect(fprintf(outfile_, "\treturn 0;\n}\n\n"));
+
+	return true;
+}
+
+bool CodeGenerator::OutputCode(const Graph::Node_t* node)
+{
+	// Call corresponding function callbacks
+	for(Graph::NodeId_t outId: node->parents)
+	{
+		auto output = (const Interface::Output*) node->object;
+
+		fprintProtect(fprintf(outfile_, "\tDacOutputCallback%s(Node%u, sizeof(Node%u));\n",
+				output->GetOutputName(outId)->c_str(),
+				outId, outId));
+	}
+
+	fprintProtect(fprintf(outfile_, "\n"));
+
+	return true;
+}
+
+bool CodeGenerator::GenerateOperationCode(const Graph::Node_t* node)
+{
+	switch(node->nodeType)
+	{
+	case Graph::NodeType::VECTOR_ADDITION:
+		retFalseOnFalse(VectorAdditionCode(node), "Could not generate Vector Addition Code!\n");
+		break;
+
+	case Graph::NodeType::VECTOR_SCALAR_MULTIPLICATION:
+		retFalseOnFalse(VectorScalarMultiplicationCode(node),
+				"Could not generate Vector Scalar Multiplication Code!\n");
+		break;
+
+	case Graph::NodeType::OUTPUT:
+		retFalseOnFalse(OutputCode(node),
+				"Could not generate Output Code!\n");
+		break;
+
+	case Graph::NodeType::VECTOR:
+		Error("NodeType %i is no operation!\n", (int) node->nodeType);
+		return false;
+
+	default:
+		Error("Unknown NodeType %i!\n", (int) node->nodeType);
+		return false;
+	}
+
+	return true;
+}
+
+bool CodeGenerator::GenerateLocalVariableDeclaration(const Variable * var)
+{
+	if(!var->HasProperty(Variable::PROPERTY_GLOBAL))
+	{
+		std::string varDecl;
+		var->GetDeclaration(&varDecl);
+		varDecl += "\n";
+		fprintProtect(fprintf(outfile_, "\t%s\n", varDecl.c_str()));
+	}
+
+	return true;
+}
+
+bool CodeGenerator::VectorAdditionCode(const Graph::Node_t* node)
+{
+	retFalseIfNotFound(varOp, variables_, node->id);
+	retFalseIfNotFound(varSum1, variables_, node->parents[0]);
+	retFalseIfNotFound(varSum2, variables_, node->parents[1]);
+
+	GenerateLocalVariableDeclaration(&varOp->second);
+
+	auto vecOp = (const Algebra::Module::VectorSpace::Vector*) node->object;
+
+	fprintProtect(fprintf(outfile_, "\tfor(uint32_t dim = 0; dim < %u; dim++)\n\t{\n",
+			vecOp->__space_->dim_));
+
+	fprintProtect(fprintf(outfile_, "\t\t%s[dim] = %s[dim] + %s[dim];\n\t}\n\n",
+			varOp->second.GetIdentifier()->c_str(),
+			varSum1->second.GetIdentifier()->c_str(),
+			varSum2->second.GetIdentifier()->c_str()));
+
+	return true;
+}
+
+bool CodeGenerator::VectorScalarMultiplicationCode(const Graph::Node_t* node)
+{
+	retFalseIfNotFound(varOp, variables_, node->id);
+	retFalseIfNotFound(varVec, variables_, node->parents[0]);
+	retFalseIfNotFound(varScalar, variables_, node->parents[1]);
+
+	GenerateLocalVariableDeclaration(&varOp->second);
+
+	auto vecOp = (const Algebra::Module::VectorSpace::Vector*) node->object;
+
+	fprintProtect(fprintf(outfile_, "\tfor(uint32_t dim = 0; dim < %u; dim++)\n\t{\n",
+			vecOp->__space_->dim_));
+
+	fprintProtect(fprintf(outfile_, "\t\t%s[dim] = %s[dim] * %s;\n\t}\n\n",
+			varOp->second.GetIdentifier()->c_str(),
+			varVec->second.GetIdentifier()->c_str(),
+			varScalar->second.GetIdentifier()->c_str()));
 
 	return true;
 }
@@ -249,6 +414,8 @@ bool CodeGenerator::GenerateConstantDeclarations()
 			retFalseOnFalse(var->GetDeclaration(&decl), "Could not get declaration!\n");
 
 			fprintProtect(fprintf(outfile_, "%s\n", decl.c_str()));
+
+			generatedNodes_.insert(varPair.first);
 		}
 	}
 
@@ -272,6 +439,8 @@ bool CodeGenerator::GenerateStaticDeclarations()
 			retFalseOnFalse(var->GetDeclaration(&decl), "Could not get declaration!\n");
 
 			fprintProtect(fprintf(outfile_, "%s\n", decl.c_str()));
+
+			generatedNodes_.insert(varPair.first);
 		}
 	}
 
@@ -686,17 +855,11 @@ const std::string* Variable::GetIdentifier() const
 	return &identifier_;
 }
 
-bool Variable::GetElement(std::string* elem, uint32_t elemIndex) const
+bool Variable::GetElement(std::string* elem, const char * elemIndex) const
 {
 	if(1 >= length_)
 	{
 		Error("Variable %s not an Array!\n", identifier_.c_str());
-		return false;
-	}
-
-	if(length_ <= elemIndex)
-	{
-		Error("Element index %u out of array length %lu!\n", elemIndex, length_);
 		return false;
 	}
 
@@ -709,7 +872,7 @@ bool Variable::GetElement(std::string* elem, uint32_t elemIndex) const
 	elem->append(identifier_);
 
 	char tmpBuff[40];
-	SNPRINTF(tmpBuff, sizeof(tmpBuff), "[%u]", elemIndex);
+	SNPRINTF(tmpBuff, sizeof(tmpBuff), "[%s]", elemIndex);
 	elem->append(tmpBuff);
 
 	return true;
