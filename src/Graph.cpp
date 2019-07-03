@@ -62,6 +62,11 @@ const std::vector<Graph::Node_t> * Graph::GetNodes() const
 	return &nodes_;
 }
 
+std::vector<Graph::Node_t> * Graph::GetNodesModifyable()
+{
+	return &nodes_;
+}
+
 bool Graph::AddParent(NodeId_t parent, NodeId_t child)
 {
 	// search for Child and add parent

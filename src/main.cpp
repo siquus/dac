@@ -12,6 +12,7 @@
 #include "Ring.h"
 #include "Interface.h"
 #include "CodeGenerator.h"
+#include "Parallizer.h"
 
 int main()
 {
@@ -46,6 +47,14 @@ int main()
 	if(!success)
 	{
 		printf("Could not add to Output\n");
+		return 1;
+	}
+
+	Parallizer parallizer;
+	bool parSuccess = parallizer.Parallize(&graph);
+	if(!parSuccess)
+	{
+		printf("Could not run parallizer\n");
 		return 1;
 	}
 
