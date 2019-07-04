@@ -39,15 +39,8 @@ bool Parallizer::Parallize(Graph* graph)
 	return true;
 }
 
-const Parallizer::cpu_t * Parallizer::GetCpuInfo(Graph::HardwareIdentifier_t id)
+const std::map<Graph::HardwareIdentifier_t, Parallizer::cpu_t> * Parallizer::GetCpuInfo(void) const
 {
-	const auto cpuInfo = cpuInfo_.find(id);
-	if(cpuInfo_.end() == cpuInfo)
-	{
-		Error("Unknown CPU Identifier %u\n", id);
-		return nullptr;
-	}
-
-	return &cpuInfo->second;
+	return &cpuInfo_;
 }
 

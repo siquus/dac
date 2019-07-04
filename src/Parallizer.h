@@ -22,7 +22,7 @@ public:
 	typedef struct {
 		uint16_t coresNrOf;
 	} cpu_t;
-	const cpu_t * GetCpuInfo(Graph::HardwareIdentifier_t id);
+	const std::map<Graph::HardwareIdentifier_t, cpu_t> * GetCpuInfo() const;
 
 private:
 	std::map<Graph::HardwareIdentifier_t, cpu_t> cpuInfo_;

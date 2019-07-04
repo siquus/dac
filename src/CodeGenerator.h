@@ -16,6 +16,7 @@
 
 #include "Graph.h"
 #include "Module.h"
+#include "Parallizer.h"
 
 class Variable {
 public:
@@ -67,6 +68,7 @@ class CodeGenerator {
 	bool GenerateConstantDeclarations();
 	bool GenerateStaticDeclarations();
 	bool GenerateLocalVariableDeclaration(const Variable * var);
+	bool GenerateThreadIncludes();
 	bool GenerateRunFunction();
 	bool GenerateOperationCode(const Graph::Node_t* node);
 	bool OutputCode(const Graph::Node_t* node);
@@ -79,11 +81,19 @@ class CodeGenerator {
 	std::map<Graph::NodeId_t, const Graph::Node_t*> nodeMap_;
 	std::set<Graph::NodeId_t> generatedNodes_;
 
+	typedef struct {
+		char pthread[42];
+		char filePath[100];
+		FILE * fileDes;
+	} cpuThread_t;
+
+	std::map<Graph::HardwareIdentifier_t, std::vector<cpuThread_t>> cpuThreadsMap_;
+
 public:
 	CodeGenerator(const std::string* path);
 	virtual ~CodeGenerator();
 
-	bool Generate(const Graph* graph);
+	bool Generate(const Graph* graph, const Parallizer* parallizer);
 };
 
 #endif /* SRC_CODEGENERATOR_H_ */

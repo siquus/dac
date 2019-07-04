@@ -61,7 +61,7 @@ int main()
 	auto outpath = std::string("");
 	CodeGenerator codeGenerator(&outpath);
 
-	bool GenSuccess = codeGenerator.Generate(&graph);
+	bool GenSuccess = codeGenerator.Generate(&graph, &parallizer);
 	if(!GenSuccess)
 	{
 		printf("Could not generate Code");
