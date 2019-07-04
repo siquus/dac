@@ -548,8 +548,8 @@ bool CodeGenerator::FetchVariables()
 		break;
 
 		case Graph::ObjectType::INTERFACE_OUTPUT:
-			// No variables to create
-			break;
+			// No variable to create.
+			continue;
 
 		default:
 			Error("Unknown ObjectType!\n");
@@ -602,6 +602,13 @@ bool CodeGenerator::FetchVariables()
 	}
 
 	// TODO: Identify constant variables!
+
+	// TODO: Making all variables global and static so threads may use them easily for now
+	for(auto &var: variables_)
+	{
+		var.second.AddProperty(Variable::PROPERTY_GLOBAL);
+		var.second.AddProperty(Variable::PROPERTY_STATIC);
+	}
 
 	return true;
 }
@@ -749,7 +756,7 @@ const char* Variable::GetTypeString() const
 
 	default: // no break intended
 	case Type::none:
-		Error("Unknown Type!\n");
+		Error("Unknown Type %u!\n", (unsigned int) type_);
 		return nullptr;
 	}
 

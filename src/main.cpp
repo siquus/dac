@@ -64,7 +64,7 @@ int main()
 	bool GenSuccess = codeGenerator.Generate(&graph, &parallizer);
 	if(!GenSuccess)
 	{
-		printf("Could not generate Code");
+		printf("Could not generate Code\n");
 		return 1;
 	}
 
