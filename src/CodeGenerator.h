@@ -70,10 +70,10 @@ class CodeGenerator {
 	bool GenerateLocalVariableDeclaration(const Variable * var);
 	bool GenerateThreadIncludes();
 	bool GenerateRunFunction();
-	bool GenerateOperationCode(const Graph::Node_t* node);
-	bool OutputCode(const Graph::Node_t* node);
-	bool VectorAdditionCode(const Graph::Node_t* node);
-	bool VectorScalarMultiplicationCode(const Graph::Node_t* node);
+	bool GenerateOperationCode(const Graph::Node_t* node, FILE* file);
+	bool OutputCode(const Graph::Node_t* node, FILE* file);
+	bool VectorAdditionCode(const Graph::Node_t* node, FILE* file);
+	bool VectorScalarMultiplicationCode(const Graph::Node_t* node, FILE* file);
 
 	bool FetchVariables();
 

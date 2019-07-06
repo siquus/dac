@@ -308,7 +308,7 @@ bool CodeGenerator::GenerateRunFunction()
 		{
 			retFalseIfNotFound(nodePair, nodeMap_, childId);
 
-			retFalseOnFalse(GenerateOperationCode(nodePair->second), "Could not generate Operation Code!\n");
+			retFalseOnFalse(GenerateOperationCode(nodePair->second, outfile_), "Could not generate Operation Code!\n");
 			std::copy(
 					nodePair->second->children.begin(), nodePair->second->children.end(),
 								std::inserter(*nextGenChildren, nextGenChildren->end()));
@@ -355,38 +355,38 @@ bool CodeGenerator::GenerateRunFunction()
 	return true;
 }
 
-bool CodeGenerator::OutputCode(const Graph::Node_t* node)
+bool CodeGenerator::OutputCode(const Graph::Node_t* node, FILE* file)
 {
 	// Call corresponding function callbacks
 	for(Graph::NodeId_t outId: node->parents)
 	{
 		auto output = (const Interface::Output*) node->object;
 
-		fprintProtect(fprintf(outfile_, "\tDacOutputCallback%s(Node%u, sizeof(Node%u));\n",
+		fprintProtect(fprintf(file, "\tDacOutputCallback%s(Node%u, sizeof(Node%u));\n",
 				output->GetOutputName(outId)->c_str(),
 				outId, outId));
 	}
 
-	fprintProtect(fprintf(outfile_, "\n"));
+	fprintProtect(fprintf(file, "\n"));
 
 	return true;
 }
 
-bool CodeGenerator::GenerateOperationCode(const Graph::Node_t* node)
+bool CodeGenerator::GenerateOperationCode(const Graph::Node_t* node, FILE* file)
 {
 	switch(node->nodeType)
 	{
 	case Graph::NodeType::VECTOR_ADDITION:
-		retFalseOnFalse(VectorAdditionCode(node), "Could not generate Vector Addition Code!\n");
+		retFalseOnFalse(VectorAdditionCode(node, file), "Could not generate Vector Addition Code!\n");
 		break;
 
 	case Graph::NodeType::VECTOR_SCALAR_MULTIPLICATION:
-		retFalseOnFalse(VectorScalarMultiplicationCode(node),
+		retFalseOnFalse(VectorScalarMultiplicationCode(node, file),
 				"Could not generate Vector Scalar Multiplication Code!\n");
 		break;
 
 	case Graph::NodeType::OUTPUT:
-		retFalseOnFalse(OutputCode(node),
+		retFalseOnFalse(OutputCode(node, file),
 				"Could not generate Output Code!\n");
 		break;
 
@@ -415,7 +415,7 @@ bool CodeGenerator::GenerateLocalVariableDeclaration(const Variable * var)
 	return true;
 }
 
-bool CodeGenerator::VectorAdditionCode(const Graph::Node_t* node)
+bool CodeGenerator::VectorAdditionCode(const Graph::Node_t* node, FILE* file)
 {
 	retFalseIfNotFound(varOp, variables_, node->id);
 	retFalseIfNotFound(varSum1, variables_, node->parents[0]);
@@ -425,10 +425,10 @@ bool CodeGenerator::VectorAdditionCode(const Graph::Node_t* node)
 
 	auto vecOp = (const Algebra::Module::VectorSpace::Vector*) node->object;
 
-	fprintProtect(fprintf(outfile_, "\tfor(uint32_t dim = 0; dim < %u; dim++)\n\t{\n",
+	fprintProtect(fprintf(file, "\tfor(uint32_t dim = 0; dim < %u; dim++)\n\t{\n",
 			vecOp->__space_->dim_));
 
-	fprintProtect(fprintf(outfile_, "\t\t%s[dim] = %s[dim] + %s[dim];\n\t}\n\n",
+	fprintProtect(fprintf(file, "\t\t%s[dim] = %s[dim] + %s[dim];\n\t}\n\n",
 			varOp->second.GetIdentifier()->c_str(),
 			varSum1->second.GetIdentifier()->c_str(),
 			varSum2->second.GetIdentifier()->c_str()));
@@ -436,7 +436,7 @@ bool CodeGenerator::VectorAdditionCode(const Graph::Node_t* node)
 	return true;
 }
 
-bool CodeGenerator::VectorScalarMultiplicationCode(const Graph::Node_t* node)
+bool CodeGenerator::VectorScalarMultiplicationCode(const Graph::Node_t* node, FILE* file)
 {
 	retFalseIfNotFound(varOp, variables_, node->id);
 	retFalseIfNotFound(varVec, variables_, node->parents[0]);
@@ -446,10 +446,10 @@ bool CodeGenerator::VectorScalarMultiplicationCode(const Graph::Node_t* node)
 
 	auto vecOp = (const Algebra::Module::VectorSpace::Vector*) node->object;
 
-	fprintProtect(fprintf(outfile_, "\tfor(uint32_t dim = 0; dim < %u; dim++)\n\t{\n",
+	fprintProtect(fprintf(file, "\tfor(uint32_t dim = 0; dim < %u; dim++)\n\t{\n",
 			vecOp->__space_->dim_));
 
-	fprintProtect(fprintf(outfile_, "\t\t%s[dim] = %s[dim] * %s;\n\t}\n\n",
+	fprintProtect(fprintf(file, "\t\t%s[dim] = %s[dim] * %s;\n\t}\n\n",
 			varOp->second.GetIdentifier()->c_str(),
 			varVec->second.GetIdentifier()->c_str(),
 			varScalar->second.GetIdentifier()->c_str()));
