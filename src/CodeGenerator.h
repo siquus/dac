@@ -45,6 +45,9 @@ public:
 	bool HasProperty(properties_t property) const;
 	bool AddProperty(properties_t property);
 	const char* GetTypeString() const;
+	void GetMutexIdentifier(std::string * mutex) const;
+	void GetReadyIdentifier(std::string * readyId) const;
+	void GetConditionIdentifier(std::string * condId) const;
 
 private:
 	properties_t properties_;
@@ -66,7 +69,8 @@ class CodeGenerator {
 	bool GenerateHeading(const std::string * heading);
 	bool GenerateOutputFunctions();
 	bool GenerateConstantDeclarations();
-	bool GenerateStaticDeclarations();
+	bool GenerateStaticVariableDeclarations();
+	bool GenerateThreadSynchVariables();
 	bool GenerateLocalVariableDeclaration(const Variable * var);
 	bool GenerateThreadIncludes();
 	bool GenerateRunFunction();
@@ -87,7 +91,7 @@ class CodeGenerator {
 		FILE * fileDes;
 	} cpuThread_t;
 
-	std::map<Graph::HardwareIdentifier_t, std::vector<cpuThread_t>> cpuThreadsMap_;
+	std::vector<cpuThread_t> cpuThreads_;
 
 public:
 	CodeGenerator(const std::string* path);

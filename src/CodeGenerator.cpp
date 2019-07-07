@@ -66,7 +66,8 @@ static const char fileName[] = "dac";
 static const char includeFilesBrackets[][42] = {
 		"stdint.h",
 		"stddef.h",
-		"linux/types.h"
+		"linux/types.h",
+		"pthread.h"
 };
 
 static const char includeFilesQuotes[][42] = {
@@ -161,8 +162,7 @@ bool CodeGenerator::Generate(const Graph* graph, const Parallizer* parallizer)
 		return false;
 	}
 
-	// Create threads for all Cores
-	// TODO: Only works for one CPU
+	// Create threads
 	auto cpuInfo = parallizer->GetCpuInfo();
 	if(1 != cpuInfo->size())
 	{
@@ -184,19 +184,16 @@ bool CodeGenerator::Generate(const Graph* graph, const Parallizer* parallizer)
 			return false;
 		}
 
-		cpuThreadsMap_[cpuInfo->begin()->first].push_back(cpuThread);
+		cpuThreads_.push_back(cpuThread);
 	}
 
 	// Create headers
 	fprintProtect(fprintf(outfile_, "%s\n", fileHeader));
 	fprintProtect(fprintf(outHeaderFile_, "%s\n", fileHeader));
 
-	for(const auto &cpuThread: cpuThreadsMap_)
+	for(const auto &thread: cpuThreads_)
 	{
-		for(const auto &thread: cpuThread.second)
-		{
 			fprintProtect(fprintf(thread.fileDes, "%s\n", fileHeader));
-		}
 	}
 
 	retFalseOnFalse(GenerateIncludes(), "Could not generate Includes\n");
@@ -209,7 +206,15 @@ bool CodeGenerator::Generate(const Graph* graph, const Parallizer* parallizer)
 	auto staticHeading = std::string("Static Variables");
 	retFalseOnFalse(GenerateHeading(&staticHeading), "Static Heading failed!\n");
 
-	retFalseOnFalse(GenerateStaticDeclarations(), "Could not generate Statics\n!");
+	for(const auto &thread: cpuThreads_)
+	{
+		fprintProtect(fprintf(outfile_, "static pthread_t %s;\n", thread.pthread));
+	}
+	fprintProtect(fprintf(outfile_, "\n"));
+
+	retFalseOnFalse(GenerateThreadSynchVariables(), "Could not generate Thread Synch Variables!\n");
+
+	retFalseOnFalse(GenerateStaticVariableDeclarations(), "Could not generate Statics\n!");
 
 	retFalseOnFalse(GenerateOutputFunctions(), "Could not generate Output Functions\n!");
 
@@ -228,12 +233,9 @@ bool CodeGenerator::Generate(const Graph* graph, const Parallizer* parallizer)
 
 bool CodeGenerator::GenerateThreadIncludes()
 {
-	for(const auto &cpuThread: cpuThreadsMap_)
+	for(const auto &thread: cpuThreads_)
 	{
-		for(const auto &thread: cpuThread.second)
-		{
-			fprintProtect(fprintf(outfile_, "#include \"%s\"\n", thread.filePath));
-		}
+		fprintProtect(fprintf(outfile_, "#include \"%s\"\n", thread.filePath));
 	}
 
 	fprintProtect(fprintf(outfile_, "\n"));
@@ -476,7 +478,34 @@ bool CodeGenerator::GenerateConstantDeclarations()
 	return true;
 }
 
-bool CodeGenerator::GenerateStaticDeclarations()
+bool CodeGenerator::GenerateThreadSynchVariables()
+{
+	std::string tmpString;
+	for(const auto &var: variables_)
+	{
+		if(var.second.HasProperty(Variable::PROPERTY_CONST))
+		{
+			// Constant variables require no mutex
+			continue;
+		}
+
+		var.second.GetMutexIdentifier(&tmpString);
+		fprintProtect(fprintf(outfile_, "static pthread_mutex_t %s = PTHREAD_MUTEX_INITIALIZER;\n",
+				tmpString.c_str()));
+
+		var.second.GetConditionIdentifier(&tmpString);
+		fprintProtect(fprintf(outfile_, "static pthread_cond_t %s = PTHREAD_COND_INITIALIZER;\n",
+				tmpString.c_str()));
+
+		var.second.GetReadyIdentifier(&tmpString);
+		fprintProtect(fprintf(outfile_, "static uint8_t %s = 0;\n\n",
+				tmpString.c_str()));
+	}
+
+	return true;
+}
+
+bool CodeGenerator::GenerateStaticVariableDeclarations()
 {
 	for(const std::pair<Graph::NodeId_t, Variable> &varPair: variables_)
 	{
@@ -732,6 +761,32 @@ inline bool Variable::HasProperty(properties_t property) const
 	}
 
 	return false;
+}
+
+void Variable::GetMutexIdentifier(std::string * mutex) const
+{
+	*mutex = "isReady";
+	*mutex += identifier_;
+	*mutex += "Mutex";
+
+	return;
+}
+
+void Variable::GetConditionIdentifier(std::string * condId) const
+{
+	*condId = "isReady";
+	*condId += identifier_;
+	*condId += "Condition";
+
+	return;
+}
+
+void Variable::GetReadyIdentifier(std::string * readyId) const
+{
+	*readyId = "isReady";
+	*readyId += identifier_;
+
+	return;
 }
 
 const char* Variable::GetTypeString() const
