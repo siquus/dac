@@ -174,7 +174,7 @@ bool CodeGenerator::Generate(const Graph* graph, const Parallizer* parallizer)
 	for(uint16_t thread = 0; thread < cpu->coresNrOf; thread++)
 	{
 		cpuThread_t cpuThread;
-		SNPRINTF(cpuThread.filePath, sizeof(cpuThread.filePath), "thread%u.h", thread);
+		SNPRINTF(cpuThread.filePath, sizeof(cpuThread.filePath), "%sthread%u.h", path_.c_str(), thread);
 		SNPRINTF(cpuThread.pthread, sizeof(cpuThread.pthread), "pthread%u", thread);
 
 		cpuThread.fileDes = fopen(cpuThread.filePath, "w");
