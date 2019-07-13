@@ -13,3 +13,11 @@ Documentation/dac\.log
 /Debug/
 
 build/
+
+\.settings/
+
+\.cproject
+
+\.project
+
+UnitTests/Playground/Program/dac/
