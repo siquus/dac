@@ -6,6 +6,8 @@
  */
 
 #include <stdio.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #include "Graph.h"
 #include "Module.h"
@@ -58,7 +60,16 @@ int main()
 		return 1;
 	}
 
-	auto outpath = std::string("");
+	struct stat stCodePath = {0};
+
+	char path[] = "Program/dac";
+	// Test if folder already exsists
+	if (stat(path, &stCodePath) == -1)
+	{
+	    mkdir(path, 0700);
+	}
+
+	auto outpath = std::string(path) + "/";
 	CodeGenerator codeGenerator(&outpath);
 
 	bool GenSuccess = codeGenerator.Generate(&graph, &parallizer);

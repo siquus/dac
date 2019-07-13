@@ -1,9 +1,10 @@
 TARGET_EXEC ?= main.out
 
 BUILD_DIR ?= ./build
-SRC_DIRS ?= ./src
+DAC_DIR ?= $(shell realpath ../../src) # otherwise the *.o files end up anywhere
+SRC_DIRS ?= ./ $(DAC_DIR)
 
-SRCS := $(shell find $(SRC_DIRS) -name *.cpp -or -name *.c -or -name *.s)
+SRCS := $(shell find $(SRC_DIRS) -maxdepth 1 -name "*.cpp" -or -name "*.c" -or -name "*.s")
 OBJS := $(SRCS:%=$(BUILD_DIR)/%.o)
 DEPS := $(OBJS:.o=.d)
 
