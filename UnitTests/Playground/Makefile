@@ -7,7 +7,7 @@ DAC_DIR ?= $(shell realpath $(DAC_DIR_REL))# otherwise the *.o files end up anyw
 SRC_DIRS ?= ./ $(DAC_DIR)
 
 FILES := Helpers.c Helpers.h
-FILES_OBJ := $(FILES:%=$(BUILD_DIR)$(DAC_DIR)/%.file)
+FILES_OBJ := $(FILES:%=$(BUILD_DIR)/%.file)
 
 SRCS := $(shell find $(SRC_DIRS) -maxdepth 1 -name "*.cpp" -or -name "*.c" -or -name "*.s")
 
@@ -21,6 +21,7 @@ INC_FLAGS := $(addprefix -I,$(INC_DIRS))
 
 CPPFLAGS ?= $(INC_FLAGS) -MMD -MP
 
+LDFLAGS += -L$(BUILD_DIR)$(DAC_DIR)
 LDLIBS := -lstdc++ -pthread
 
 $(BUILD_DIR)/$(TARGET_EXEC): $(OBJS)
@@ -42,7 +43,7 @@ $(BUILD_DIR)/%.cpp.o: %.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
 # files
-$(BUILD_DIR)$(DAC_DIR)/%.file: $(DAC_DIR)/%
+$(BUILD_DIR)/%.file: $(DAC_DIR_REL)/%
 	ld -r -b binary $< -o $@
 
 .PHONY: clean

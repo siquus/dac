@@ -15,6 +15,44 @@
 #include "Ring.h"
 #include "Interface.h"
 
+// Files saved with this binary.
+// See https://csl.name/post/embedding-binary-data/
+extern "C" {
+extern const int _binary_______src_Helpers_c_size;
+extern const char _binary_______src_Helpers_c_start;
+extern const char _binary_______src_Helpers_c_end;
+
+extern const int _binary_______src_Helpers_h_size;
+extern const char _binary_______src_Helpers_h_start;
+extern const char _binary_______src_Helpers_h_end;
+}
+
+typedef enum {
+	EMBEDDED_FILES_HELPERS_C,
+	EMBEDDED_FILES_HELPERS_H,
+	EMBEDDED_FILES_NROF,
+} embeddedFiles_t;
+
+typedef struct {
+	int size;
+	const char* start;
+	const char* end;
+} embeddedFile_t;
+
+const embeddedFile_t embeddedFiles[] = {
+		[EMBEDDED_FILES_HELPERS_C] = {
+				_binary_______src_Helpers_c_size,
+				&_binary_______src_Helpers_c_start,
+				&_binary_______src_Helpers_c_end,
+		},
+		[EMBEDDED_FILES_HELPERS_H] = {
+				_binary_______src_Helpers_h_size,
+				&_binary_______src_Helpers_h_start,
+				&_binary_______src_Helpers_h_end,
+		}
+};
+
+
 #define DEBUG(...) printf(__VA_ARGS__)
 
 #define fprintProtect(ret) \
@@ -72,6 +110,7 @@ static const char includeFilesBrackets[][42] = {
 
 static const char includeFilesQuotes[][42] = {
 		HEADER_NAME,
+		"Helpers.h",
 };
 
 static const char fileHeader[] = \
