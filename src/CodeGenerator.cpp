@@ -18,11 +18,9 @@
 // Files saved with this binary.
 // See https://csl.name/post/embedding-binary-data/
 extern "C" {
-extern const int _binary_______src_Helpers_c_size;
 extern const char _binary_______src_Helpers_c_start;
 extern const char _binary_______src_Helpers_c_end;
 
-extern const int _binary_______src_Helpers_h_size;
 extern const char _binary_______src_Helpers_h_start;
 extern const char _binary_______src_Helpers_h_end;
 }
@@ -34,21 +32,21 @@ typedef enum {
 } embeddedFiles_t;
 
 typedef struct {
-	int size;
 	const char* start;
 	const char* end;
+	const char name[42];
 } embeddedFile_t;
 
 const embeddedFile_t embeddedFiles[] = {
 		[EMBEDDED_FILES_HELPERS_C] = {
-				_binary_______src_Helpers_c_size,
 				&_binary_______src_Helpers_c_start,
 				&_binary_______src_Helpers_c_end,
+				"Helpers.c"
 		},
 		[EMBEDDED_FILES_HELPERS_H] = {
-				_binary_______src_Helpers_h_size,
 				&_binary_______src_Helpers_h_start,
 				&_binary_______src_Helpers_h_end,
+				"Helpers.h"
 		}
 };
 
@@ -58,7 +56,7 @@ const embeddedFile_t embeddedFiles[] = {
 #define fprintProtect(ret) \
 	{if(0 > ret) \
 	{ \
-		Error("fprintf on File %s failed: %s\n", path_.c_str(), strerror(errno)); \
+		Error("fprintf failed: %s\n", strerror(errno)); \
 		return false; \
 	} \
 	}
@@ -143,12 +141,29 @@ CodeGenerator::CodeGenerator(const std::string* path) {
 CodeGenerator::~CodeGenerator() {
 	if(nullptr != outfile_)
 	{
-		fclose(outfile_);
+		if(fclose(outfile_))
+		{
+			Error("fclose failed: %s\n", strerror(errno));
+		}
 	}
 
 	if(nullptr != outHeaderFile_)
 	{
-		fclose(outHeaderFile_);
+		if(fclose(outHeaderFile_))
+		{
+			Error("fclose failed: %s\n", strerror(errno));
+		}
+	}
+
+	for(const auto &thread: cpuThreads_)
+	{
+		if(nullptr != thread.fileDes)
+		{
+			if(fclose(thread.fileDes))
+			{
+				Error("fclose failed: %s\n", strerror(errno));
+			}
+		}
 	}
 }
 
@@ -199,6 +214,28 @@ bool CodeGenerator::Generate(const Graph* graph, const Parallizer* parallizer)
 	{
 		Error("Open File %s failed: %s\n", (pathAndFileName + ".h").c_str(), strerror(errno));
 		return false;
+	}
+
+	// Copy files
+	for(uint8_t file = 0; file < sizeof(embeddedFiles) / sizeof(embeddedFiles[0]); file++)
+	{
+		std::string copyFilePath = path_ + embeddedFiles[file].name;
+		FILE* outFile = fopen(copyFilePath.c_str(), "w");
+		if(nullptr == outFile)
+		{
+			Error("Open File %s failed: %s\n", copyFilePath.c_str(), strerror(errno));
+			return false;
+		}
+
+		fwrite(embeddedFiles[file].start, sizeof(char),
+				embeddedFiles[file].end - embeddedFiles[file].start,
+				outFile);
+
+		if(fclose(outFile))
+		{
+			Error("fclose failed: %s\n", strerror(errno));
+			return false;
+		}
 	}
 
 	// Create threads
