@@ -6,7 +6,8 @@ DAC_DIR_REL ?= ../../src
 DAC_DIR ?= $(shell realpath $(DAC_DIR_REL))# otherwise the *.o files end up anywhere
 SRC_DIRS ?= ./ $(DAC_DIR)
 
-FILES := Helpers.c Helpers.h
+FILES := Helpers.c Helpers.h error_functions.c error_functions.h\
+	get_num.c get_num.h tlpi_hdr.h ename.c.inc
 FILES_OBJ := $(FILES:%=$(BUILD_DIR)/%.file)
 
 SRCS := $(shell find $(SRC_DIRS) -maxdepth 1 -name "*.cpp" -or -name "*.c" -or -name "*.s")
@@ -16,6 +17,10 @@ DEPS := $(OBJS:.o=.d)
 
 OBJS += $(FILES_OBJ)
 
+OBJS_DEP := ename.c.inc
+OBJS_DEP += $(OBJS)
+
+
 INC_DIRS := $(shell find $(SRC_DIRS) -type d)
 INC_FLAGS := $(addprefix -I,$(INC_DIRS))
 
@@ -24,7 +29,7 @@ CPPFLAGS ?= $(INC_FLAGS) -MMD -MP
 LDFLAGS += -L$(BUILD_DIR)$(DAC_DIR)
 LDLIBS := -lstdc++ -pthread
 
-$(BUILD_DIR)/$(TARGET_EXEC): $(OBJS)
+$(BUILD_DIR)/$(TARGET_EXEC): $(OBJS_DEP)
 	$(CC) $(OBJS) -o $@ $(LDFLAGS) $(LDLIBS)
 
 # assembly
@@ -45,6 +50,11 @@ $(BUILD_DIR)/%.cpp.o: %.cpp
 # files
 $(BUILD_DIR)/%.file: $(DAC_DIR_REL)/%
 	ld -r -b binary $< -o $@
+
+# ename
+ename.c.inc:
+	sh $(DAC_DIR_REL)/Build_ename.sh > $(DAC_DIR_REL)/ename.c.inc
+	echo 1>&2 "ename.c.inc built"
 
 .PHONY: clean
 

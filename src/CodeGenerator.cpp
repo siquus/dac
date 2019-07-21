@@ -14,42 +14,7 @@
 #include "GlobalDefines.h"
 #include "Ring.h"
 #include "Interface.h"
-
-// Files saved with this binary.
-// See https://csl.name/post/embedding-binary-data/
-extern "C" {
-extern const char _binary_______src_Helpers_c_start;
-extern const char _binary_______src_Helpers_c_end;
-
-extern const char _binary_______src_Helpers_h_start;
-extern const char _binary_______src_Helpers_h_end;
-}
-
-typedef enum {
-	EMBEDDED_FILES_HELPERS_C,
-	EMBEDDED_FILES_HELPERS_H,
-	EMBEDDED_FILES_NROF,
-} embeddedFiles_t;
-
-typedef struct {
-	const char* start;
-	const char* end;
-	const char name[42];
-} embeddedFile_t;
-
-const embeddedFile_t embeddedFiles[] = {
-		[EMBEDDED_FILES_HELPERS_C] = {
-				&_binary_______src_Helpers_c_start,
-				&_binary_______src_Helpers_c_end,
-				"Helpers.c"
-		},
-		[EMBEDDED_FILES_HELPERS_H] = {
-				&_binary_______src_Helpers_h_start,
-				&_binary_______src_Helpers_h_end,
-				"Helpers.h"
-		}
-};
-
+#include "embeddedFiles.h"
 
 #define DEBUG(...) printf(__VA_ARGS__)
 
@@ -217,26 +182,7 @@ bool CodeGenerator::Generate(const Graph* graph, const Parallizer* parallizer)
 	}
 
 	// Copy files
-	for(uint8_t file = 0; file < sizeof(embeddedFiles) / sizeof(embeddedFiles[0]); file++)
-	{
-		std::string copyFilePath = path_ + embeddedFiles[file].name;
-		FILE* outFile = fopen(copyFilePath.c_str(), "w");
-		if(nullptr == outFile)
-		{
-			Error("Open File %s failed: %s\n", copyFilePath.c_str(), strerror(errno));
-			return false;
-		}
-
-		fwrite(embeddedFiles[file].start, sizeof(char),
-				embeddedFiles[file].end - embeddedFiles[file].start,
-				outFile);
-
-		if(fclose(outFile))
-		{
-			Error("fclose failed: %s\n", strerror(errno));
-			return false;
-		}
-	}
+	GenerateEmbeddedFiles(&path_);
 
 	// Create threads
 	auto cpuInfo = parallizer->GetCpuInfo();
@@ -272,8 +218,10 @@ bool CodeGenerator::Generate(const Graph* graph, const Parallizer* parallizer)
 			fprintProtect(fprintf(thread.fileDes, "%s\n", fileHeader));
 	}
 
+	// Generate Includes
 	retFalseOnFalse(GenerateIncludes(), "Could not generate Includes\n");
 
+	// Generate global variables
 	auto constHeading = std::string("Constant Variables");
 	retFalseOnFalse(GenerateHeading(&constHeading), "Constant Heading failed!\n");
 
@@ -292,6 +240,7 @@ bool CodeGenerator::Generate(const Graph* graph, const Parallizer* parallizer)
 
 	retFalseOnFalse(GenerateStaticVariableDeclarations(), "Could not generate Statics\n!");
 
+	// Generate Functions
 	retFalseOnFalse(GenerateOutputFunctions(), "Could not generate Output Functions\n!");
 
 	auto threadIncludeHeading = std::string("Thread functions defined inside header files");
