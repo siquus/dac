@@ -74,6 +74,7 @@ static const char includeFilesBrackets[][42] = {
 static const char includeFilesQuotes[][42] = {
 		HEADER_NAME,
 		"Helpers.h",
+		"error_functions.h"
 };
 
 static const char fileHeader[] = \
@@ -275,6 +276,24 @@ bool CodeGenerator::GenerateRunFunction()
 
 	// Define function
 	fprintProtect(fprintf(outfile_, "int DacRun(void)\n{\n"));
+
+	// Fire up threads
+	fprintProtect(fprintf(outfile_, "pthread_attr_t pthreadAttr;\n"));
+	fprintProtect(fprintf(outfile_, "pthread_attr_init(&pthreadAttr);\n"));
+	fprintProtect(fprintf(outfile_, "pthread_attr_setdetachstate(&pthreadAttr, PTHREAD_CREATE_DETACHED);\n"));
+	fprintProtect(fprintf(outfile_, "int threadCreateRet;\n"));
+
+	for(const cpuThread_t &thread: cpuThreads_)
+	{
+		fprintProtect(fprintf(outfile_, "threadCreateRet = pthread_create(&%s, &pthreadAttr, %sStartRoutine, NULL);\n",
+				thread.pthread,
+				thread.pthread));
+		fprintProtect(fprintf(outfile_, "if(0 != threadCreateRet)\n"));
+		fprintProtect(fprintf(outfile_, "{\n\terrExitEN(threadCreateRet, \"pthread_create\");\n}\n\n"));
+
+		fprintProtect(fprintf(thread.fileDes, "static void * %sStartRoutine(void* arg)\n{return NULL;}\n",
+				thread.pthread));
+	}
 
 	// Traverse the Graph and generate Code
 	// Find all nodes which do not have parents and create a set of their children
