@@ -10,6 +10,7 @@
 #include <iostream>
 #include <string.h>
 #include <stdint.h>
+#include <cstdarg>
 
 #include "GlobalDefines.h"
 #include "Ring.h"
@@ -100,11 +101,8 @@ static const char fileHeader[] = \
 */\n\
 \n";
 
-CodeGenerator::CodeGenerator(const std::string* path) {
-	path_ = *path;
-}
-
-CodeGenerator::~CodeGenerator() {
+FileWriter::~FileWriter()
+{
 	if(nullptr != outfile_)
 	{
 		if(fclose(outfile_))
@@ -112,25 +110,70 @@ CodeGenerator::~CodeGenerator() {
 			Error("fclose failed: %s\n", strerror(errno));
 		}
 	}
+}
 
-	if(nullptr != outHeaderFile_)
+bool FileWriter::Init(const std::string * path)
+{
+	path_ = *path;
+	outfile_ = fopen(path_.c_str(), "w");
+	if(nullptr == outfile_)
 	{
-		if(fclose(outHeaderFile_))
-		{
-			Error("fclose failed: %s\n", strerror(errno));
-		}
+		Error("Open File %s failed: %s\n", path_.c_str(), strerror(errno));
+		return false;
 	}
 
-	for(const auto &thread: cpuThreads_)
+	// Print standard header
+	fprintProtect(fprintf(outfile_, "%s\n", fileHeader));
+
+	return true;
+}
+
+void FileWriter::Indent(uint8_t tabNumber)
+{
+	indentationLevel_ += tabNumber;
+}
+
+void FileWriter::Outdent(uint8_t tabNumber)
+{
+	if(indentationLevel_ < tabNumber)
 	{
-		if(nullptr != thread.fileDes)
-		{
-			if(fclose(thread.fileDes))
-			{
-				Error("fclose failed: %s\n", strerror(errno));
-			}
-		}
+		Error("Indentation %u does not allow outdent of %u",
+				indentationLevel_, tabNumber);
+
+		return;
 	}
+
+	indentationLevel_ -= tabNumber;
+}
+
+int FileWriter::PrintfLine(const char * format, ...)
+{
+	va_list argList;
+	va_start(argList, format);
+
+	std::string formatStr;
+	for(uint8_t tab = 0; tab < indentationLevel_; tab++)
+	{
+		formatStr += "\t";
+	}
+
+	formatStr += format;
+	formatStr += "\n";
+
+	return vfprintf(outfile_, formatStr.c_str(), argList);
+}
+
+const std::string * FileWriter::Path() const
+{
+	return &path_;
+}
+
+CodeGenerator::CodeGenerator(const std::string* path) {
+	path_ = *path;
+}
+
+CodeGenerator::~CodeGenerator() {
+
 }
 
 bool CodeGenerator::Generate(const Graph* graph, const Parallizer* parallizer)
@@ -167,18 +210,20 @@ bool CodeGenerator::Generate(const Graph* graph, const Parallizer* parallizer)
 	retFalseOnFalse(FetchVariables(), "Could not fetch variables\n");
 
 	std::string pathAndFileName = path_ + fileName;
+	std::string dacCPath = pathAndFileName + ".c";
 
-	outfile_ = fopen((pathAndFileName + ".c").c_str(), "w");
-	if(nullptr == outfile_)
+	bool success = fileDacC_.Init(&dacCPath);
+	if(!success)
 	{
-		Error("Open File %s failed: %s\n", (pathAndFileName + ".c").c_str(), strerror(errno));
+		Error("Could not initialize %s!", dacCPath.c_str());
 		return false;
 	}
 
-	outHeaderFile_ = fopen((pathAndFileName + ".h").c_str(), "w");
-	if(nullptr == outfile_)
+	std::string dacHPath = pathAndFileName + ".h";
+	success = fileDacH_.Init(&dacHPath);
+	if(!success)
 	{
-		Error("Open File %s failed: %s\n", (pathAndFileName + ".h").c_str(), strerror(errno));
+		Error("Could not initialize %s!", dacHPath.c_str());
 		return false;
 	}
 
@@ -196,27 +241,17 @@ bool CodeGenerator::Generate(const Graph* graph, const Parallizer* parallizer)
 	const Parallizer::cpu_t * cpu = &cpuInfo->begin()->second;
 	for(uint16_t thread = 0; thread < cpu->coresNrOf; thread++)
 	{
-		cpuThread_t cpuThread;
-		SNPRINTF(cpuThread.filePath, sizeof(cpuThread.filePath), "%sthread%u.h", path_.c_str(), thread);
-		SNPRINTF(cpuThread.pthread, sizeof(cpuThread.pthread), "pthread%u", thread);
-
-		cpuThread.fileDes = fopen(cpuThread.filePath, "w");
-		if(nullptr == cpuThread.fileDes)
+		cpuThreads_.push_back(cpuThread_t());
+		cpuThreads_.back().fileWriter = std::make_unique<FileWriter>();
+		std::string filePath = path_ + "thread" + std::to_string(thread) + ".h";
+		bool success = cpuThreads_.back().fileWriter->Init(&filePath);
+		if(!success)
 		{
-			Error("Open File %s failed: %s\n", cpuThread.filePath, strerror(errno));
+			Error("Failed to initialize thread%u fileWriter", thread);
 			return false;
 		}
 
-		cpuThreads_.push_back(cpuThread);
-	}
-
-	// Create headers
-	fprintProtect(fprintf(outfile_, "%s\n", fileHeader));
-	fprintProtect(fprintf(outHeaderFile_, "%s\n", fileHeader));
-
-	for(const auto &thread: cpuThreads_)
-	{
-			fprintProtect(fprintf(thread.fileDes, "%s\n", fileHeader));
+		SNPRINTF(cpuThreads_.back().pthread, sizeof(cpuThreads_.back().pthread), "pthread%u", thread);
 	}
 
 	// Generate Includes
@@ -233,9 +268,9 @@ bool CodeGenerator::Generate(const Graph* graph, const Parallizer* parallizer)
 
 	for(const auto &thread: cpuThreads_)
 	{
-		fprintProtect(fprintf(outfile_, "static pthread_t %s;\n", thread.pthread));
+		fprintProtect(fileDacC_.PrintfLine("static pthread_t %s;", thread.pthread));
 	}
-	fprintProtect(fprintf(outfile_, "\n"));
+	fprintProtect(fileDacC_.PrintfLine(""));
 
 	retFalseOnFalse(GenerateThreadSynchVariables(), "Could not generate Thread Synch Variables!\n");
 
@@ -261,10 +296,9 @@ bool CodeGenerator::GenerateThreadIncludes()
 {
 	for(const auto &thread: cpuThreads_)
 	{
-		fprintProtect(fprintf(outfile_, "#include \"%s\"\n", thread.filePath));
+		fprintProtect(fileDacC_.PrintfLine("#include \"%s\"", thread.fileWriter->Path()->c_str()));
 	}
-
-	fprintProtect(fprintf(outfile_, "\n"));
+	fprintProtect(fileDacC_.PrintfLine(""));
 
 	return true;
 }
@@ -272,27 +306,31 @@ bool CodeGenerator::GenerateThreadIncludes()
 bool CodeGenerator::GenerateRunFunction()
 {
 	// Add prototype to header
-	fprintProtect(fprintf(outHeaderFile_, "extern int DacRun(void);\n"));
+	fprintProtect(fileDacH_.PrintfLine("extern int DacRun(void);"));
 
 	// Define function
-	fprintProtect(fprintf(outfile_, "int DacRun(void)\n{\n"));
+	fprintProtect(fileDacC_.PrintfLine("int DacRun(void)\n{"));
+	fileDacC_.Indent();
 
 	// Fire up threads
-	fprintProtect(fprintf(outfile_, "pthread_attr_t pthreadAttr;\n"));
-	fprintProtect(fprintf(outfile_, "pthread_attr_init(&pthreadAttr);\n"));
-	fprintProtect(fprintf(outfile_, "pthread_attr_setdetachstate(&pthreadAttr, PTHREAD_CREATE_DETACHED);\n"));
-	fprintProtect(fprintf(outfile_, "int threadCreateRet;\n"));
+	fprintProtect(fileDacC_.PrintfLine("pthread_attr_t pthreadAttr;"));
+	fprintProtect(fileDacC_.PrintfLine("pthread_attr_init(&pthreadAttr);"));
+	fprintProtect(fileDacC_.PrintfLine("pthread_attr_setdetachstate(&pthreadAttr, PTHREAD_CREATE_DETACHED);"));
+	fprintProtect(fileDacC_.PrintfLine("int threadCreateRet;"));
 
 	for(const cpuThread_t &thread: cpuThreads_)
 	{
-		fprintProtect(fprintf(outfile_, "threadCreateRet = pthread_create(&%s, &pthreadAttr, %sStartRoutine, NULL);\n",
+		fprintProtect(fileDacC_.PrintfLine("threadCreateRet = pthread_create(&%s, &pthreadAttr, %sStartRoutine, NULL);",
 				thread.pthread,
 				thread.pthread));
-		fprintProtect(fprintf(outfile_, "if(0 != threadCreateRet)\n"));
-		fprintProtect(fprintf(outfile_, "{\n\terrExitEN(threadCreateRet, \"pthread_create\");\n}\n\n"));
+		fprintProtect(fileDacC_.PrintfLine("if(0 != threadCreateRet)"));
+		fprintProtect(fileDacC_.PrintfLine("{"));
+		fprintProtect(fileDacC_.PrintfLine("\terrExitEN(threadCreateRet, \"pthread_create\");"));
+		fprintProtect(fileDacC_.PrintfLine("}\n"));
 
-		fprintProtect(fprintf(thread.fileDes, "static void * %sStartRoutine(void* arg)\n{return NULL;}\n",
+		fprintProtect(thread.fileWriter->PrintfLine("static void * %sStartRoutine(void* arg)\n{",
 				thread.pthread));
+		thread.fileWriter->Indent();
 	}
 
 	// Traverse the Graph and generate Code
@@ -354,7 +392,9 @@ bool CodeGenerator::GenerateRunFunction()
 		{
 			retFalseIfNotFound(nodePair, nodeMap_, childId);
 
-			retFalseOnFalse(GenerateOperationCode(nodePair->second, outfile_), "Could not generate Operation Code!\n");
+			retFalseOnFalse(GenerateOperationCode(nodePair->second, &fileDacC_),
+					"Could not generate Operation Code!\n");
+
 			std::copy(
 					nodePair->second->children.begin(), nodePair->second->children.end(),
 								std::inserter(*nextGenChildren, nextGenChildren->end()));
@@ -395,30 +435,38 @@ bool CodeGenerator::GenerateRunFunction()
 		nextGenChildren = tmp;
 	}
 
+	// Create return values and closing brackets
+	for(const cpuThread_t &thread: cpuThreads_)
+	{
+		fprintProtect(thread.fileWriter->PrintfLine("return NULL;"));
+		thread.fileWriter->Outdent();
+		fprintProtect(thread.fileWriter->PrintfLine("}"));
+	}
+
 	// Return 0 to show success.
-	fprintProtect(fprintf(outfile_, "\treturn 0;\n}\n\n"));
+	fprintProtect(fileDacC_.PrintfLine("return 0;\n}\n"));
 
 	return true;
 }
 
-bool CodeGenerator::OutputCode(const Graph::Node_t* node, FILE* file)
+bool CodeGenerator::OutputCode(const Graph::Node_t* node, FileWriter* file)
 {
 	// Call corresponding function callbacks
 	for(Graph::NodeId_t outId: node->parents)
 	{
 		auto output = (const Interface::Output*) node->object;
 
-		fprintProtect(fprintf(file, "\tDacOutputCallback%s(Node%u, sizeof(Node%u));\n",
+		fprintProtect(file->PrintfLine("DacOutputCallback%s(Node%u, sizeof(Node%u));",
 				output->GetOutputName(outId)->c_str(),
 				outId, outId));
 	}
 
-	fprintProtect(fprintf(file, "\n"));
+	fprintProtect(file->PrintfLine(""));
 
 	return true;
 }
 
-bool CodeGenerator::GenerateOperationCode(const Graph::Node_t* node, FILE* file)
+bool CodeGenerator::GenerateOperationCode(const Graph::Node_t* node, FileWriter* file)
 {
 	switch(node->nodeType)
 	{
@@ -455,13 +503,13 @@ bool CodeGenerator::GenerateLocalVariableDeclaration(const Variable * var)
 		std::string varDecl;
 		var->GetDeclaration(&varDecl);
 		varDecl += "\n";
-		fprintProtect(fprintf(outfile_, "\t%s\n", varDecl.c_str()));
+		fprintProtect(fileDacC_.PrintfLine("\t%s", varDecl.c_str()));
 	}
 
 	return true;
 }
 
-bool CodeGenerator::VectorAdditionCode(const Graph::Node_t* node, FILE* file)
+bool CodeGenerator::VectorAdditionCode(const Graph::Node_t* node, FileWriter* file)
 {
 	retFalseIfNotFound(varOp, variables_, node->id);
 	retFalseIfNotFound(varSum1, variables_, node->parents[0]);
@@ -471,18 +519,22 @@ bool CodeGenerator::VectorAdditionCode(const Graph::Node_t* node, FILE* file)
 
 	auto vecOp = (const Algebra::Module::VectorSpace::Vector*) node->object;
 
-	fprintProtect(fprintf(file, "\tfor(uint32_t dim = 0; dim < %u; dim++)\n\t{\n",
+	fprintProtect(file->PrintfLine("for(uint32_t dim = 0; dim < %u; dim++)",
 			vecOp->__space_->dim_));
 
-	fprintProtect(fprintf(file, "\t\t%s[dim] = %s[dim] + %s[dim];\n\t}\n\n",
+	fprintProtect(file->PrintfLine("{"));
+
+	fprintProtect(file->PrintfLine("\t%s[dim] = %s[dim] + %s[dim];",
 			varOp->second.GetIdentifier()->c_str(),
 			varSum1->second.GetIdentifier()->c_str(),
 			varSum2->second.GetIdentifier()->c_str()));
 
+	fprintProtect(file->PrintfLine("}\n"));
+
 	return true;
 }
 
-bool CodeGenerator::VectorScalarMultiplicationCode(const Graph::Node_t* node, FILE* file)
+bool CodeGenerator::VectorScalarMultiplicationCode(const Graph::Node_t* node, FileWriter* file)
 {
 	retFalseIfNotFound(varOp, variables_, node->id);
 	retFalseIfNotFound(varVec, variables_, node->parents[0]);
@@ -492,13 +544,17 @@ bool CodeGenerator::VectorScalarMultiplicationCode(const Graph::Node_t* node, FI
 
 	auto vecOp = (const Algebra::Module::VectorSpace::Vector*) node->object;
 
-	fprintProtect(fprintf(file, "\tfor(uint32_t dim = 0; dim < %u; dim++)\n\t{\n",
+	fprintProtect(file->PrintfLine("for(uint32_t dim = 0; dim < %u; dim++)",
 			vecOp->__space_->dim_));
 
-	fprintProtect(fprintf(file, "\t\t%s[dim] = %s[dim] * %s;\n\t}\n\n",
+	fprintProtect(file->PrintfLine("{"));
+
+	fprintProtect(file->PrintfLine("\t%s[dim] = %s[dim] * %s;",
 			varOp->second.GetIdentifier()->c_str(),
 			varVec->second.GetIdentifier()->c_str(),
 			varScalar->second.GetIdentifier()->c_str()));
+
+	fprintProtect(file->PrintfLine("}\n"));
 
 	return true;
 }
@@ -513,7 +569,7 @@ bool CodeGenerator::GenerateConstantDeclarations()
 			std::string decl;
 			retFalseOnFalse(var->GetDeclaration(&decl), "Could not get declaration!\n");
 
-			fprintProtect(fprintf(outfile_, "%s\n", decl.c_str()));
+			fprintProtect(fileDacC_.PrintfLine("%s", decl.c_str()));
 
 			generatedNodes_.insert(varPair.first);
 		}
@@ -534,15 +590,15 @@ bool CodeGenerator::GenerateThreadSynchVariables()
 		}
 
 		var.second.GetMutexIdentifier(&tmpString);
-		fprintProtect(fprintf(outfile_, "static pthread_mutex_t %s = PTHREAD_MUTEX_INITIALIZER;\n",
+		fprintProtect(fileDacC_.PrintfLine("static pthread_mutex_t %s = PTHREAD_MUTEX_INITIALIZER;",
 				tmpString.c_str()));
 
 		var.second.GetConditionIdentifier(&tmpString);
-		fprintProtect(fprintf(outfile_, "static pthread_cond_t %s = PTHREAD_COND_INITIALIZER;\n",
+		fprintProtect(fileDacC_.PrintfLine("static pthread_cond_t %s = PTHREAD_COND_INITIALIZER;",
 				tmpString.c_str()));
 
 		var.second.GetReadyIdentifier(&tmpString);
-		fprintProtect(fprintf(outfile_, "static uint8_t %s = 0;\n\n",
+		fprintProtect(fileDacC_.PrintfLine("static uint8_t %s = 0;\n",
 				tmpString.c_str()));
 	}
 
@@ -565,7 +621,7 @@ bool CodeGenerator::GenerateStaticVariableDeclarations()
 			std::string decl;
 			retFalseOnFalse(var->GetDeclaration(&decl), "Could not get declaration!\n");
 
-			fprintProtect(fprintf(outfile_, "%s\n", decl.c_str()));
+			fprintProtect(fileDacC_.PrintfLine("%s", decl.c_str()));
 
 			generatedNodes_.insert(varPair.first);
 		}
@@ -721,13 +777,13 @@ bool CodeGenerator::GenerateOutputFunctions()
 			callbackTypedef += "* pt, size_t size);";
 
 			// Export function prototype
-			fprintProtect(fprintf(outHeaderFile_, "%s\n", callbackTypedef.c_str()));
-			fprintProtect(fprintf(outHeaderFile_, "extern void %s_Register(%s_t callback);\n",
+			fprintProtect(fileDacH_.PrintfLine("%s", callbackTypedef.c_str()));
+			fprintProtect(fileDacH_.PrintfLine("extern void %s_Register(%s_t callback);",
 					fctPtTypeId.c_str(),
 					fctPtTypeId.c_str()));
 
 			// Declare Static Variables keeping the callback pointers
-			fprintProtect(fprintf(outfile_, "static %s_t %s = NULL;",
+			fprintProtect(fileDacC_.PrintfLine("static %s_t %s = NULL;",
 					fctPtTypeId.c_str(),
 					fctPtTypeId.c_str()));
 
@@ -745,12 +801,12 @@ bool CodeGenerator::GenerateOutputFunctions()
 		}
 	}
 
-	fprintProtect(fprintf(outfile_, "\n"));
+	fprintProtect(fileDacC_.PrintfLine(""));
 
 	auto exportedHeading = std::string("Exported Functions");
 	retFalseOnFalse(GenerateHeading(&exportedHeading), "Exported Heading failed!\n");
 
-	fprintProtect(fprintf(outfile_, "%s\n", fctDefinitions.c_str()));
+	fprintProtect(fileDacC_.PrintfLine("%s", fctDefinitions.c_str()));
 
 	return true;
 }
@@ -771,27 +827,21 @@ bool CodeGenerator::GenerateHeading(const std::string * heading)
 		starSpangledHeading += "*";
 	}
 
-	fprintProtect(fprintf(outfile_, "%s*/\n", starSpangledHeading.c_str()));
+	fprintProtect(fileDacC_.PrintfLine("%s*/", starSpangledHeading.c_str()));
 
 	return true;
 }
 
 bool CodeGenerator::GenerateIncludes()
 {
-	if(nullptr == outfile_)
-	{
-		Error("Output file is not open!\n");
-		return false;
-	}
-
 	for(uint16_t incl = 0; incl < sizeof(includeFilesBrackets) / sizeof(includeFilesBrackets[0]); incl++)
 	{
-		fprintProtect(fprintf(outfile_, "#include <%s>\n", includeFilesBrackets[incl]));
+		fprintProtect(fileDacC_.PrintfLine("#include <%s>", includeFilesBrackets[incl]));
 	}
 
 	for(uint16_t incl = 0; incl < sizeof(includeFilesQuotes) / sizeof(includeFilesQuotes[0]); incl++)
 	{
-		fprintProtect(fprintf(outfile_, "#include \"%s\"\n", includeFilesQuotes[incl]));
+		fprintProtect(fileDacC_.PrintfLine("#include \"%s\"", includeFilesQuotes[incl]));
 	}
 
 	return true;

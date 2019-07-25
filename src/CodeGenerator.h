@@ -12,6 +12,7 @@
 #include <fstream>
 #include <vector>
 #include <map>
+#include <memory>
 #include <set>
 
 #include "Graph.h"
@@ -57,10 +58,26 @@ private:
 	const void* value_;
 };
 
+class FileWriter {
+	std::string path_;
+	FILE * outfile_ = nullptr;
+	uint8_t indentationLevel_ = 0;
+
+public:
+	bool Init(const std::string* path);
+	~FileWriter();
+	int PrintfLine(const char * format, ...);
+	void Indent(uint8_t tabNubmer = 1);
+	void Outdent(uint8_t tabNumber = 1);
+	const std::string* Path() const;
+};
+
 class CodeGenerator {
 	std::string path_;
-	FILE *outfile_ = nullptr;
-	FILE *outHeaderFile_ = nullptr;
+
+	FileWriter fileDacC_;
+	FileWriter fileDacH_;
+
 	const Graph* graph_ = nullptr;
 
 	bool GenerateConstants();
@@ -74,10 +91,10 @@ class CodeGenerator {
 	bool GenerateLocalVariableDeclaration(const Variable * var);
 	bool GenerateThreadIncludes();
 	bool GenerateRunFunction();
-	bool GenerateOperationCode(const Graph::Node_t* node, FILE* file);
-	bool OutputCode(const Graph::Node_t* node, FILE* file);
-	bool VectorAdditionCode(const Graph::Node_t* node, FILE* file);
-	bool VectorScalarMultiplicationCode(const Graph::Node_t* node, FILE* file);
+	bool GenerateOperationCode(const Graph::Node_t* node, FileWriter* file);
+	bool OutputCode(const Graph::Node_t* node, FileWriter* file);
+	bool VectorAdditionCode(const Graph::Node_t* node, FileWriter* file);
+	bool VectorScalarMultiplicationCode(const Graph::Node_t* node, FileWriter* file);
 
 	bool FetchVariables();
 
@@ -87,8 +104,7 @@ class CodeGenerator {
 
 	typedef struct {
 		char pthread[42];
-		char filePath[100];
-		FILE * fileDes;
+		std::unique_ptr<FileWriter> fileWriter;
 	} cpuThread_t;
 
 	std::vector<cpuThread_t> cpuThreads_;
