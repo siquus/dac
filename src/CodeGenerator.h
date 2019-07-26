@@ -91,10 +91,10 @@ class CodeGenerator {
 	bool GenerateLocalVariableDeclaration(const Variable * var);
 	bool GenerateThreadIncludes();
 	bool GenerateRunFunction();
-	bool GenerateOperationCode(const Graph::Node_t* node, FileWriter* file);
-	bool OutputCode(const Graph::Node_t* node, FileWriter* file);
-	bool VectorAdditionCode(const Graph::Node_t* node, FileWriter* file);
-	bool VectorScalarMultiplicationCode(const Graph::Node_t* node, FileWriter* file);
+	bool GenerateOperationCode(const Graph::Node_t* node, std::unique_ptr<FileWriter> &file);
+	bool OutputCode(const Graph::Node_t* node, std::unique_ptr<FileWriter> &file);
+	bool VectorAdditionCode(const Graph::Node_t* node, std::unique_ptr<FileWriter> &file);
+	bool VectorScalarMultiplicationCode(const Graph::Node_t* node, std::unique_ptr<FileWriter> &file);
 
 	bool FetchVariables();
 

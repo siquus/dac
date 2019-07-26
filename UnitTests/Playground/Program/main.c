@@ -14,6 +14,7 @@ static void resultCallback(float* pt, size_t size)
 	}
 
 	printf("\n");
+	fflush(stdout);
 }
 
 int main() {

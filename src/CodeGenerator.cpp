@@ -313,14 +313,11 @@ bool CodeGenerator::GenerateRunFunction()
 	fileDacC_.Indent();
 
 	// Fire up threads
-	fprintProtect(fileDacC_.PrintfLine("pthread_attr_t pthreadAttr;"));
-	fprintProtect(fileDacC_.PrintfLine("pthread_attr_init(&pthreadAttr);"));
-	fprintProtect(fileDacC_.PrintfLine("pthread_attr_setdetachstate(&pthreadAttr, PTHREAD_CREATE_DETACHED);"));
 	fprintProtect(fileDacC_.PrintfLine("int threadCreateRet;"));
 
 	for(const cpuThread_t &thread: cpuThreads_)
 	{
-		fprintProtect(fileDacC_.PrintfLine("threadCreateRet = pthread_create(&%s, &pthreadAttr, %sStartRoutine, NULL);",
+		fprintProtect(fileDacC_.PrintfLine("threadCreateRet = pthread_create(&%s, NULL, %sStartRoutine, NULL);",
 				thread.pthread,
 				thread.pthread));
 		fprintProtect(fileDacC_.PrintfLine("if(0 != threadCreateRet)"));
@@ -388,16 +385,21 @@ bool CodeGenerator::GenerateRunFunction()
 	while(1)
 	{
 		// Create Code for all children and create new set with the next generation
+		uint16_t currentThread = 0;
 		for(Graph::NodeId_t childId: *children)
 		{
 			retFalseIfNotFound(nodePair, nodeMap_, childId);
 
-			retFalseOnFalse(GenerateOperationCode(nodePair->second, &fileDacC_),
+			retFalseOnFalse(GenerateOperationCode(
+					nodePair->second, cpuThreads_[currentThread].fileWriter),
 					"Could not generate Operation Code!\n");
+
+			currentThread++;
+			currentThread %= cpuThreads_.size();
 
 			std::copy(
 					nodePair->second->children.begin(), nodePair->second->children.end(),
-								std::inserter(*nextGenChildren, nextGenChildren->end()));
+					std::inserter(*nextGenChildren, nextGenChildren->end()));
 
 			generatedNodes_.insert(childId);
 		}
@@ -435,12 +437,22 @@ bool CodeGenerator::GenerateRunFunction()
 		nextGenChildren = tmp;
 	}
 
-	// Create return values and closing brackets
+	// Join threads, create return values and closing brackets
+	fprintProtect(fileDacC_.PrintfLine("int joinRet;"));
 	for(const cpuThread_t &thread: cpuThreads_)
 	{
 		fprintProtect(thread.fileWriter->PrintfLine("return NULL;"));
 		thread.fileWriter->Outdent();
 		fprintProtect(thread.fileWriter->PrintfLine("}"));
+
+
+		fprintProtect(fileDacC_.PrintfLine("joinRet = pthread_join(%s, NULL);",
+				thread.pthread));
+
+		fprintProtect(fileDacC_.PrintfLine("if(0 != joinRet)"));
+		fprintProtect(fileDacC_.PrintfLine("{"));
+		fprintProtect(fileDacC_.PrintfLine("\terrExitEN(joinRet, \"pthread_join\");"));
+		fprintProtect(fileDacC_.PrintfLine("}\n"));
 	}
 
 	// Return 0 to show success.
@@ -449,7 +461,7 @@ bool CodeGenerator::GenerateRunFunction()
 	return true;
 }
 
-bool CodeGenerator::OutputCode(const Graph::Node_t* node, FileWriter* file)
+bool CodeGenerator::OutputCode(const Graph::Node_t* node, std::unique_ptr<FileWriter> &file)
 {
 	// Call corresponding function callbacks
 	for(Graph::NodeId_t outId: node->parents)
@@ -466,7 +478,7 @@ bool CodeGenerator::OutputCode(const Graph::Node_t* node, FileWriter* file)
 	return true;
 }
 
-bool CodeGenerator::GenerateOperationCode(const Graph::Node_t* node, FileWriter* file)
+bool CodeGenerator::GenerateOperationCode(const Graph::Node_t* node, std::unique_ptr<FileWriter> &file)
 {
 	switch(node->nodeType)
 	{
@@ -509,7 +521,7 @@ bool CodeGenerator::GenerateLocalVariableDeclaration(const Variable * var)
 	return true;
 }
 
-bool CodeGenerator::VectorAdditionCode(const Graph::Node_t* node, FileWriter* file)
+bool CodeGenerator::VectorAdditionCode(const Graph::Node_t* node, std::unique_ptr<FileWriter> &file)
 {
 	retFalseIfNotFound(varOp, variables_, node->id);
 	retFalseIfNotFound(varSum1, variables_, node->parents[0]);
@@ -534,7 +546,7 @@ bool CodeGenerator::VectorAdditionCode(const Graph::Node_t* node, FileWriter* fi
 	return true;
 }
 
-bool CodeGenerator::VectorScalarMultiplicationCode(const Graph::Node_t* node, FileWriter* file)
+bool CodeGenerator::VectorScalarMultiplicationCode(const Graph::Node_t* node, std::unique_ptr<FileWriter> &file)
 {
 	retFalseIfNotFound(varOp, variables_, node->id);
 	retFalseIfNotFound(varVec, variables_, node->parents[0]);
@@ -598,7 +610,7 @@ bool CodeGenerator::GenerateThreadSynchVariables()
 				tmpString.c_str()));
 
 		var.second.GetReadyIdentifier(&tmpString);
-		fprintProtect(fileDacC_.PrintfLine("static uint8_t %s = 0;\n",
+		fprintProtect(fileDacC_.PrintfLine("static uint32_t %s = 0;\n",
 				tmpString.c_str()));
 	}
 
