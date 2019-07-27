@@ -303,6 +303,32 @@ bool CodeGenerator::GenerateThreadIncludes()
 	return true;
 }
 
+bool CodeGenerator::GenerateCallbackPtCheck(FileWriter* file) const
+{
+	auto nodes = graph_->GetNodes();
+	for(const Graph::Node_t &node: *nodes)
+	{
+		if(Graph::NodeType::OUTPUT != node.nodeType)
+		{
+			continue;
+		}
+
+		for(Graph::NodeId_t outId: node.parents)
+		{
+			auto output = (const Interface::Output*) node.object;
+
+			fprintProtect(file->PrintfLine("if(NULL == DacOutputCallback%s)",
+					output->GetOutputName(outId)->c_str()));
+			fprintProtect(file->PrintfLine("{"));
+			fprintProtect(file->PrintfLine("\tfatal(\"DacOutputCallback%s == NULL\");",
+					output->GetOutputName(outId)->c_str()));
+			fprintProtect(file->PrintfLine("}\n"));
+		}
+	}
+
+	return true;
+}
+
 bool CodeGenerator::GenerateRunFunction()
 {
 	// Add prototype to header
@@ -311,6 +337,9 @@ bool CodeGenerator::GenerateRunFunction()
 	// Define function
 	fprintProtect(fileDacC_.PrintfLine("int DacRun(void)\n{"));
 	fileDacC_.Indent();
+
+	// Check that callbacks have been set
+	GenerateCallbackPtCheck(&fileDacC_);
 
 	// Fire up threads
 	fprintProtect(fileDacC_.PrintfLine("int threadCreateRet;"));
@@ -443,31 +472,42 @@ bool CodeGenerator::GenerateRunFunction()
 			currentThread++;
 			currentThread %= cpuThreads_.size();
 
-			std::copy(
-					nodePair->second->children.begin(), nodePair->second->children.end(),
-					std::inserter(*nextGenChildren, nextGenChildren->end()));
-
+			// Add node to nodes executed
 			generatedNodes_.insert(childId);
-		}
 
-		// Remove all nextGen children who's parents have not been generated
-		std::vector<Graph::NodeId_t> childrenToBeRemoved;
-		for(Graph::NodeId_t childId: *nextGenChildren)
-		{
-			retFalseIfNotFound(childPair, nodeMap_, childId);
-			for(Graph::NodeId_t parentId: childPair->second->parents)
+			// Add its children to the next generation
+			for(Graph::NodeId_t childsChildId: nodePair->second->children)
 			{
-				if(generatedNodes_.end() == generatedNodes_.find(parentId))
+				// Make sure it hasn't been generated already
+				if(generatedNodes_.end() == generatedNodes_.find(childsChildId))
 				{
-					childrenToBeRemoved.push_back(childId);
-					break;
+					nextGenChildren->insert(childsChildId);
 				}
 			}
 		}
 
-		for(Graph::NodeId_t removeId: childrenToBeRemoved)
+		// Remove all nextGen children who's parents have not been generated
+		for(auto childIt = nextGenChildren->begin(); childIt != nextGenChildren->end();)
 		{
-			nextGenChildren->erase(removeId);
+			retFalseIfNotFound(childPair, nodeMap_, *childIt);
+			bool removeChild = false;
+			for(Graph::NodeId_t parentId: childPair->second->parents)
+			{
+				if(generatedNodes_.end() == generatedNodes_.find(parentId))
+				{
+					removeChild = true;
+					break;
+				}
+			}
+
+			if(removeChild)
+			{
+				childIt = nextGenChildren->erase(childIt);
+			}
+			else
+			{
+				childIt++;
+			}
 		}
 
 		// Any children left to generate?
@@ -510,11 +550,22 @@ bool CodeGenerator::OutputCode(const Graph::Node_t* node, std::unique_ptr<FileWr
 	// Call corresponding function callbacks
 	for(Graph::NodeId_t outId: node->parents)
 	{
+		auto var = variables_.find(outId);
+		if(variables_.end() == var)
+		{
+			Error("Output variable does not exist!\n");
+			return false;
+		}
+
+		var->second.GenerateLock(file);
+
 		auto output = (const Interface::Output*) node->object;
 
-		fprintProtect(file->PrintfLine("DacOutputCallback%s(Node%u, sizeof(Node%u));",
+		fprintProtect(file->PrintfLine("DacOutputCallback%s(Node%u, sizeof(Node%u));\n",
 				output->GetOutputName(outId)->c_str(),
 				outId, outId));
+
+		var->second.GenerateUnlock(file);
 	}
 
 	fprintProtect(file->PrintfLine(""));
@@ -678,8 +729,6 @@ bool CodeGenerator::GenerateStaticVariableDeclarations()
 			retFalseOnFalse(var->GetDeclaration(&decl), "Could not get declaration!\n");
 
 			fprintProtect(fileDacC_.PrintfLine("%s", decl.c_str()));
-
-			generatedNodes_.insert(varPair.first);
 		}
 	}
 
@@ -1060,12 +1109,16 @@ bool Variable::GenerateConditionWait(std::unique_ptr<FileWriter> &file, const st
 	std::string condId;
 	GetConditionIdentifier(&condId);
 
+	std::string readyId;
+	GetReadyIdentifier(&readyId);
+
 	std::string retId = condId.c_str() + std::string("Ret") + std::to_string(runningNumber_);
 		runningNumber_++;
 
-	fprintProtect(file->PrintfLine("while(%s < %s)", condId.c_str(), iteration->c_str()));
+	fprintProtect(file->PrintfLine("while(%s < %s)", readyId.c_str(), iteration->c_str()));
 	fprintProtect(file->PrintfLine("{"));
-	fprintProtect(file->PrintfLine("\t%s = pthread_cond_wait(%s, %s);",
+	fprintProtect(file->PrintfLine("\tint %s;", retId.c_str()));
+	fprintProtect(file->PrintfLine("\t%s = pthread_cond_wait(&%s, &%s);",
 			retId.c_str(),
 			condId.c_str(),
 			mutexId.c_str()));
@@ -1074,7 +1127,9 @@ bool Variable::GenerateConditionWait(std::unique_ptr<FileWriter> &file, const st
 	fprintProtect(file->PrintfLine("\t\terrExitEN(%s, \"pthread_cond_wait\");",
 			retId.c_str()));
 	fprintProtect(file->PrintfLine("\t}"));
-	fprintProtect(file->PrintfLine("}"));
+	fprintProtect(file->PrintfLine("}\n"));
+
+	retFalseOnFalse(GenerateUnlock(file), "Could not generate Unlock");
 
 	return true;
 }
@@ -1086,7 +1141,6 @@ bool Variable::GenerateConditionBroadcast(std::unique_ptr<FileWriter> &file)
 
 	std::string retId = condId.c_str() + std::string("Ret") + std::to_string(runningNumber_);
 	runningNumber_++;
-
 
 	fprintProtect(file->PrintfLine("int %s;", retId.c_str()));
 	fprintProtect(file->PrintfLine("%s = pthread_cond_broadcast(&%s);",

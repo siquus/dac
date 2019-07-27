@@ -34,12 +34,22 @@ int main()
 	auto vec3_init = std::vector<float>{42};
 	auto vec3 = myScalarSpace.Element(&graph, &vec3_init);
 
+	auto vec4_init = std::vector<float>{10, 20, 30};
+	auto vec5_init = std::vector<float>{1, 1, 1};
+
+	auto vec4 = myVs.Element(&graph, &vec4_init);
+	auto vec5 = myVs.Element(&graph, &vec5_init);
+
+	auto sum45 = vec4->Add(vec5);
+
 	auto prod = sum->Multiply(vec3);
 	if(nullptr == prod)
 	{
 		printf("Could not create product\n");
 		return 1;
 	}
+
+	auto sum2 = sum45->Add(prod);
 
 	auto outFile = std::string("Output");
 	auto output = Interface::Output(&graph, &outFile);
@@ -49,6 +59,14 @@ int main()
 	if(!success)
 	{
 		printf("Could not add to Output\n");
+		return 1;
+	}
+
+	auto outName2 = std::string("Sum");
+	success = output.Add(&outName2, sum2);
+	if(!success)
+	{
+		printf("Could not add to Output2\n");
 		return 1;
 	}
 

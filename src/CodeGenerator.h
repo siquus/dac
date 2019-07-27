@@ -99,6 +99,7 @@ class CodeGenerator {
 	bool GenerateRunFunction();
 	bool GenerateOperationCode(const Graph::Node_t* node, std::unique_ptr<FileWriter> &file);
 	bool OutputCode(const Graph::Node_t* node, std::unique_ptr<FileWriter> &file);
+	bool GenerateCallbackPtCheck(FileWriter* file) const;
 	bool VectorAdditionCode(const Graph::Node_t* node, std::unique_ptr<FileWriter> &file);
 	bool VectorScalarMultiplicationCode(const Graph::Node_t* node, std::unique_ptr<FileWriter> &file);
 

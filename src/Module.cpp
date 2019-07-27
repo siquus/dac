@@ -84,7 +84,7 @@ VectorSpace::Vector * VectorSpace::Element(Graph * graph, const std::vector<inTy
 	Graph::NodeId_t nodeId = graph->AddNode(&node);
 	if(Graph::NODE_ID_NONE == nodeId)
 	{
-		Error("Could not add node!");
+		Error("Could not add node!\n");
 		return nullptr;
 	}
 
@@ -100,13 +100,13 @@ VectorSpace::Vector* VectorSpace::Vector::Multiply(const Vector* vec)
 {
 	if(1 != vec->__space_->dim_)
 	{
-		Error("Dimension Mismatch!");
+		Error("Dimension Mismatch!\n");
 		return nullptr;
 	}
 
 	if(__graph_ != vec->__graph_)
 	{
-		Error("Not on the same Graph!");
+		Error("Not on the same Graph!\n");
 		return nullptr;
 	}
 
@@ -114,7 +114,7 @@ VectorSpace::Vector* VectorSpace::Vector::Multiply(const Vector* vec)
 	Ring::Type inferredRing = Ring::GetSuperiorRing(__space_->ring_, vec->__space_->ring_);
 	if(Ring::Type::None == inferredRing)
 	{
-		Error("Incompatible Rings");
+		Error("Incompatible Rings\n");
 		return nullptr;
 	}
 
@@ -129,7 +129,7 @@ VectorSpace::Vector* VectorSpace::Vector::Multiply(const Vector* vec)
 	break;
 
 	default:
-		Error("Unknown Ring!");
+		Error("Unknown Ring!\n");
 		return nullptr;
 	}
 
@@ -163,13 +163,13 @@ VectorSpace::Vector* VectorSpace::Vector::Add(const Vector* vec)
 {
 	if(__space_->dim_ != vec->__space_->dim_)
 	{
-		Error("Dimension Mismatch!");
+		Error("Dimension Mismatch!\n");
 		return nullptr;
 	}
 
 	if(__graph_ != vec->__graph_)
 	{
-		Error("Not on the same Graph!");
+		Error("Not on the same Graph!\n");
 		return nullptr;
 	}
 
@@ -177,7 +177,7 @@ VectorSpace::Vector* VectorSpace::Vector::Add(const Vector* vec)
 	Ring::Type inferredRing = Ring::GetSuperiorRing(__space_->ring_, vec->__space_->ring_);
 	if(Ring::Type::None == inferredRing)
 	{
-		Error("Incompatible Rings");
+		Error("Incompatible Rings\n");
 		return nullptr;
 	}
 
