@@ -19,6 +19,20 @@
 #include "Module.h"
 #include "Parallizer.h"
 
+class FileWriter {
+	std::string path_;
+	FILE * outfile_ = nullptr;
+	uint8_t indentationLevel_ = 0;
+
+public:
+	bool Init(const std::string* path);
+	~FileWriter();
+	int PrintfLine(const char * format, ...);
+	void Indent(uint8_t tabNubmer = 1);
+	void Outdent(uint8_t tabNumber = 1);
+	const std::string* Path() const;
+};
+
 class Variable {
 public:
 	typedef enum {
@@ -49,6 +63,11 @@ public:
 	void GetMutexIdentifier(std::string * mutex) const;
 	void GetReadyIdentifier(std::string * readyId) const;
 	void GetConditionIdentifier(std::string * condId) const;
+	bool GenerateLock(std::unique_ptr<FileWriter> &file);
+	bool GenerateUnlock(std::unique_ptr<FileWriter> &file);
+	bool GenerateConditionWait(std::unique_ptr<FileWriter> &file, const std::string* iteration);
+	bool GenerateConditionIncrement(std::unique_ptr<FileWriter> &file) const;
+	bool GenerateConditionBroadcast(std::unique_ptr<FileWriter> &file);
 
 private:
 	properties_t properties_;
@@ -56,20 +75,7 @@ private:
 	size_t length_;
 	std::string identifier_;
 	const void* value_;
-};
-
-class FileWriter {
-	std::string path_;
-	FILE * outfile_ = nullptr;
-	uint8_t indentationLevel_ = 0;
-
-public:
-	bool Init(const std::string* path);
-	~FileWriter();
-	int PrintfLine(const char * format, ...);
-	void Indent(uint8_t tabNubmer = 1);
-	void Outdent(uint8_t tabNumber = 1);
-	const std::string* Path() const;
+	uint32_t runningNumber_ = 0; // To make declarations unique
 };
 
 class CodeGenerator {
