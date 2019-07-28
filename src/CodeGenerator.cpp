@@ -964,8 +964,7 @@ inline bool Variable::HasProperty(properties_t property) const
 
 void Variable::GetMutexIdentifier(std::string * mutex) const
 {
-	*mutex = "isReady";
-	*mutex += identifier_;
+	*mutex = identifier_;
 	*mutex += "Mutex";
 
 	return;
@@ -973,8 +972,7 @@ void Variable::GetMutexIdentifier(std::string * mutex) const
 
 void Variable::GetConditionIdentifier(std::string * condId) const
 {
-	*condId = "isReady";
-	*condId += identifier_;
+	*condId = identifier_;
 	*condId += "Condition";
 
 	return;
@@ -982,8 +980,8 @@ void Variable::GetConditionIdentifier(std::string * condId) const
 
 void Variable::GetReadyIdentifier(std::string * readyId) const
 {
-	*readyId = "isReady";
-	*readyId += identifier_;
+	*readyId = identifier_;
+	*readyId += "Iteration";
 
 	return;
 }
