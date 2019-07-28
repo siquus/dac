@@ -557,15 +557,11 @@ bool CodeGenerator::OutputCode(const Graph::Node_t* node, std::unique_ptr<FileWr
 			return false;
 		}
 
-		var->second.GenerateLock(file);
-
 		auto output = (const Interface::Output*) node->object;
 
 		fprintProtect(file->PrintfLine("DacOutputCallback%s(Node%u, sizeof(Node%u));\n",
 				output->GetOutputName(outId)->c_str(),
 				outId, outId));
-
-		var->second.GenerateUnlock(file);
 	}
 
 	fprintProtect(file->PrintfLine(""));
