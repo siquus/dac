@@ -28,7 +28,7 @@ int main()
 	auto vec1 = myVs.Element(&graph, &vec1_init);
 	auto vec2 = myVs.Element(&graph, &vec2_init);
 
-	auto sum = vec1->Add(vec2);
+	auto sum = vec1->Add(vec2); // {5, 7, 9}
 
 	auto myScalarSpace = Algebra::Module::VectorSpace(Algebra::Ring::Float32(), 1);
 	auto vec3_init = std::vector<float>{42};
@@ -40,16 +40,16 @@ int main()
 	auto vec4 = myVs.Element(&graph, &vec4_init);
 	auto vec5 = myVs.Element(&graph, &vec5_init);
 
-	auto sum45 = vec4->Add(vec5);
+	auto sum45 = vec4->Add(vec5); // {11, 21, 31}
 
-	auto prod = sum->Multiply(vec3);
+	auto prod = sum->Multiply(vec3); // {210, 294, 378}
 	if(nullptr == prod)
 	{
 		printf("Could not create product\n");
 		return 1;
 	}
 
-	auto sum2 = sum45->Add(prod);
+	auto sum2 = sum45->Add(prod); // {221, 315, 409}
 
 	auto outFile = std::string("Output");
 	auto output = Interface::Output(&graph, &outFile);

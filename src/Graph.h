@@ -67,4 +67,10 @@ private:
 	bool AddChild(Node::Id_t parent, Node::Id_t child);
 };
 
+class NodeRef {
+public:
+	Node::Id_t nodeId_ = Node::ID_NONE;
+	Graph* graph_ = nullptr;
+};
+
 #endif /* SRC_GRAPH_H_ */

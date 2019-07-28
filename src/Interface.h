@@ -17,10 +17,8 @@
 
 namespace Interface {
 
-class Output {
+class Output : public NodeRef {
 	std::string name_;
-	Graph* graph_ = nullptr;
-	Node::Id_t nodeId_ = Node::ID_NONE;
 	std::map<Node::Id_t, std::string> outNames_;
 
 public:

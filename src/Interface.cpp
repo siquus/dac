@@ -48,20 +48,20 @@ bool Output::Add(const std::string* name, const Algebra::Module::VectorSpace::Ve
 		return false;
 	}
 
-	if(graph_ != vector->__graph_)
+	if(graph_ != vector->graph_)
 	{
 		Error("Not on same Graph");
 		return false;
 	}
 
-	bool success = graph_->AddParent(vector->__nodeId_, nodeId_);
+	bool success = graph_->AddParent(vector->nodeId_, nodeId_);
 	if(!success)
 	{
 		Error("Could not AddParent to Output!\n");
 		return false;
 	}
 
-	outNames_[vector->__nodeId_] = *name;
+	outNames_[vector->nodeId_] = *name;
 
 	return true;
 }

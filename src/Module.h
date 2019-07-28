@@ -24,12 +24,10 @@ class VectorSpace {
 public:
 	VectorSpace(Ring::Float32 f32, dimension_t dim);
 
-	class Vector {
+	class Vector : public NodeRef {
 	public:
 		const VectorSpace* __space_;
 		const void* __value_ = nullptr;
-		Graph* __graph_ = nullptr;
-		Node::Id_t __nodeId_ = Node::ID_NONE;
 
 		Vector* Add(const Vector* vec);
 		Vector* Multiply(const Vector* vec);

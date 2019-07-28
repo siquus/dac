@@ -1,34 +1,42 @@
 #include <stdio.h>
-#include <pthread.h>
+#include <string.h>
+#include <stdlib.h>
 
 #include "dac.h"
 
-static pthread_mutex_t stdoutMutex = PTHREAD_MUTEX_INITIALIZER;
+const float expectedProduct[] = {210, 294, 378};
+const float expectedSum[] = {221, 315, 409};
 
 // typedef void (*DacOutputCallbackProduct_t)(float* pt, size_t size);
-static void resultCallback(float* pt, size_t size)
+static void productCallback(float* pt, size_t size)
 {
-	pthread_mutex_lock(&stdoutMutex);
-
-	printf("Result = ");
-
-	int nrOfFloats = size / sizeof(float);
-	for(int elem = 0; elem < nrOfFloats; elem++)
+	if(memcmp(pt, expectedProduct, sizeof(expectedProduct)) || (size != sizeof(expectedProduct)))
 	{
-		printf("%f ", pt[elem]);
+		fprintf(stderr, "Unexpected product result!\n");
+		fflush(stderr);
+		exit(1);
 	}
-
-	printf("\n");
-	fflush(stdout);
-
-	pthread_mutex_unlock(&stdoutMutex);
 }
 
+static void sumCallback(float* pt, size_t size)
+{
+	if(memcmp(pt, expectedSum, sizeof(expectedSum)) || (size != sizeof(expectedSum)))
+	{
+		fprintf(stderr, "Unexpected sum result!\n");
+		fflush(stderr);
+		exit(1);
+	}
+}
+
+
 int main() {
-	DacOutputCallbackProduct_Register(resultCallback);
-	DacOutputCallbackSum_Register(resultCallback);
+	DacOutputCallbackProduct_Register(productCallback);
+	DacOutputCallbackSum_Register(sumCallback);
 
 	DacRun();
+
+	fprintf(stdout, "SUCCESS!!\n");
+	fflush(stdout);
 
 	return 0;
 }

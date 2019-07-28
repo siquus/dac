@@ -90,8 +90,8 @@ VectorSpace::Vector * VectorSpace::Element(Graph * graph, const std::vector<inTy
 
 	retVec->__value_ = dataPt;
 	retVec->__space_ = this;
-	retVec->__graph_ = graph;
-	retVec->__nodeId_ = nodeId;
+	retVec->graph_ = graph;
+	retVec->nodeId_ = nodeId;
 
 	return retVec;
 }
@@ -104,7 +104,7 @@ VectorSpace::Vector* VectorSpace::Vector::Multiply(const Vector* vec)
 		return nullptr;
 	}
 
-	if(__graph_ != vec->__graph_)
+	if(graph_ != vec->graph_)
 	{
 		Error("Not on the same Graph!\n");
 		return nullptr;
@@ -119,7 +119,7 @@ VectorSpace::Vector* VectorSpace::Vector::Multiply(const Vector* vec)
 	}
 
 	Vector* retVec = new Vector;
-	retVec->__graph_ = __graph_;
+	retVec->graph_ = graph_;
 
 	VectorSpace * retSpace = nullptr;
 	switch(inferredRing)
@@ -142,15 +142,15 @@ VectorSpace::Vector* VectorSpace::Vector::Multiply(const Vector* vec)
 	retVec->__space_ = retSpace;
 
 	Node node;
-	node.parents.push_back(__nodeId_);
-	node.parents.push_back(vec->__nodeId_);
+	node.parents.push_back(nodeId_);
+	node.parents.push_back(vec->nodeId_);
 	node.Type = Node::Type::VECTOR_SCALAR_MULTIPLICATION;
 	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
 	node.object = retVec;
 
-	retVec->__nodeId_ = __graph_->AddNode(&node);
+	retVec->nodeId_ = graph_->AddNode(&node);
 
-	if(Node::ID_NONE == retVec->__nodeId_)
+	if(Node::ID_NONE == retVec->nodeId_)
 	{
 		Error("Could not add Node!\n");
 		return nullptr;
@@ -167,7 +167,7 @@ VectorSpace::Vector* VectorSpace::Vector::Add(const Vector* vec)
 		return nullptr;
 	}
 
-	if(__graph_ != vec->__graph_)
+	if(graph_ != vec->graph_)
 	{
 		Error("Not on the same Graph!\n");
 		return nullptr;
@@ -182,7 +182,7 @@ VectorSpace::Vector* VectorSpace::Vector::Add(const Vector* vec)
 	}
 
 	Vector* retVec = new Vector;
-	retVec->__graph_ = __graph_;
+	retVec->graph_ = graph_;
 
 	if(inferredRing == __space_->ring_)
 	{
@@ -194,15 +194,15 @@ VectorSpace::Vector* VectorSpace::Vector::Add(const Vector* vec)
 	}
 
 	Node node;
-	node.parents.push_back(__nodeId_);
-	node.parents.push_back(vec->__nodeId_);
+	node.parents.push_back(nodeId_);
+	node.parents.push_back(vec->nodeId_);
 	node.Type = Node::Type::VECTOR_ADDITION;
 	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
 	node.object = retVec;
 
-	retVec->__nodeId_ = __graph_->AddNode(&node);
+	retVec->nodeId_ = graph_->AddNode(&node);
 
-	if(Node::ID_NONE == retVec->__nodeId_)
+	if(Node::ID_NONE == retVec->nodeId_)
 	{
 		Error("Could not add Node!\n");
 		return nullptr;
