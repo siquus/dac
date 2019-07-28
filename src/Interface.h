@@ -20,13 +20,13 @@ namespace Interface {
 class Output {
 	std::string name_;
 	Graph* graph_ = nullptr;
-	Graph::NodeId_t nodeId_ = Graph::NODE_ID_NONE;
-	std::map<Graph::NodeId_t, std::string> outNames_;
+	Node::Id_t nodeId_ = Node::ID_NONE;
+	std::map<Node::Id_t, std::string> outNames_;
 
 public:
 	Output(Graph* graph, const std::string* name);
 	bool Add(const std::string* name, const Algebra::Module::VectorSpace::Vector * vector);
-	const std::string * GetOutputName(Graph::NodeId_t nodeId) const;
+	const std::string * GetOutputName(Node::Id_t nodeId) const;
 };
 
 }

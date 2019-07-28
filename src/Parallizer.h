@@ -22,10 +22,10 @@ public:
 	typedef struct {
 		uint16_t coresNrOf;
 	} cpu_t;
-	const std::map<Graph::HardwareIdentifier_t, cpu_t> * GetCpuInfo() const;
+	const std::map<Node::HardwareIdentifier_t, cpu_t> * GetCpuInfo() const;
 
 private:
-	std::map<Graph::HardwareIdentifier_t, cpu_t> cpuInfo_;
+	std::map<Node::HardwareIdentifier_t, cpu_t> cpuInfo_;
 };
 
 #endif /* SRC_PARALLIZER_H_ */

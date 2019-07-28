@@ -76,13 +76,13 @@ VectorSpace::Vector * VectorSpace::Element(Graph * graph, const std::vector<inTy
 		return nullptr;
 	}
 
-	Graph::Node_t node;
-	node.nodeType = Graph::NodeType::VECTOR;
-	node.objectType = Graph::ObjectType::MODULE_VECTORSPACE_VECTOR;
+	Node node;
+	node.Type = Node::Type::VECTOR;
+	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
 	node.object = retVec;
 
-	Graph::NodeId_t nodeId = graph->AddNode(&node);
-	if(Graph::NODE_ID_NONE == nodeId)
+	Node::Id_t nodeId = graph->AddNode(&node);
+	if(Node::ID_NONE == nodeId)
 	{
 		Error("Could not add node!\n");
 		return nullptr;
@@ -141,16 +141,16 @@ VectorSpace::Vector* VectorSpace::Vector::Multiply(const Vector* vec)
 
 	retVec->__space_ = retSpace;
 
-	Graph::Node_t node;
+	Node node;
 	node.parents.push_back(__nodeId_);
 	node.parents.push_back(vec->__nodeId_);
-	node.nodeType = Graph::NodeType::VECTOR_SCALAR_MULTIPLICATION;
-	node.objectType = Graph::ObjectType::MODULE_VECTORSPACE_VECTOR;
+	node.Type = Node::Type::VECTOR_SCALAR_MULTIPLICATION;
+	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
 	node.object = retVec;
 
 	retVec->__nodeId_ = __graph_->AddNode(&node);
 
-	if(Graph::NODE_ID_NONE == retVec->__nodeId_)
+	if(Node::ID_NONE == retVec->__nodeId_)
 	{
 		Error("Could not add Node!\n");
 		return nullptr;
@@ -193,16 +193,16 @@ VectorSpace::Vector* VectorSpace::Vector::Add(const Vector* vec)
 		retVec->__space_ = vec->__space_;
 	}
 
-	Graph::Node_t node;
+	Node node;
 	node.parents.push_back(__nodeId_);
 	node.parents.push_back(vec->__nodeId_);
-	node.nodeType = Graph::NodeType::VECTOR_ADDITION;
-	node.objectType = Graph::ObjectType::MODULE_VECTORSPACE_VECTOR;
+	node.Type = Node::Type::VECTOR_ADDITION;
+	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
 	node.object = retVec;
 
 	retVec->__nodeId_ = __graph_->AddNode(&node);
 
-	if(Graph::NODE_ID_NONE == retVec->__nodeId_)
+	if(Node::ID_NONE == retVec->__nodeId_)
 	{
 		Error("Could not add Node!\n");
 		return nullptr;

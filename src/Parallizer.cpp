@@ -27,19 +27,19 @@ Parallizer::~Parallizer()
 bool Parallizer::Parallize(Graph* graph)
 {
 	// TODO: Parallize among available hardware (GPU, other computers, ...)
-	std::vector<Graph::Node_t> * nodes = graph->GetNodesModifyable();
+	std::vector<Node> * nodes = graph->GetNodesModifyable();
 
-	for(Graph::Node_t &node: *nodes)
+	for(Node &node: *nodes)
 	{
 		// All run on the same CPU
 		node.hardware.identifier = 0;
-		node.hardware.type = Graph::HARDWARE_TYPE_CPU;
+		node.hardware.type = Node::HARDWARE_TYPE_CPU;
 	}
 
 	return true;
 }
 
-const std::map<Graph::HardwareIdentifier_t, Parallizer::cpu_t> * Parallizer::GetCpuInfo(void) const
+const std::map<Node::HardwareIdentifier_t, Parallizer::cpu_t> * Parallizer::GetCpuInfo(void) const
 {
 	return &cpuInfo_;
 }

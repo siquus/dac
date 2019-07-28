@@ -29,7 +29,7 @@ public:
 		const VectorSpace* __space_;
 		const void* __value_ = nullptr;
 		Graph* __graph_ = nullptr;
-		Graph::NodeId_t __nodeId_ = Graph::NODE_ID_NONE;
+		Node::Id_t __nodeId_ = Node::ID_NONE;
 
 		Vector* Add(const Vector* vec);
 		Vector* Multiply(const Vector* vec);

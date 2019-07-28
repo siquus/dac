@@ -183,24 +183,24 @@ bool CodeGenerator::Generate(const Graph* graph, const Parallizer* parallizer)
 	// From here on we assume that the graph will no longer change
 	// this means we may use pointers to nodes now!
 	auto nodes = graph_->GetNodes();
-	for(const Graph::Node_t &node: *nodes)
+	for(const Node &node: *nodes)
 	{
 		nodeMap_.insert(std::make_pair(node.id, &node));
 	}
 
 	for(const auto &nodePair: nodeMap_)
 	{
-		DEBUG("nodeMap Node%u: NodeType %u, ObjType %u,  Children ",
+		DEBUG("nodeMap Node%u: Type %u, ObjType %u,  Children ",
 				nodePair.first,
-				(unsigned int) nodePair.second->nodeType,
+				(unsigned int) nodePair.second->Type,
 				(unsigned int) nodePair.second->objectType);
 
-		for(Graph::NodeId_t nodeId: nodePair.second->children)
+		for(Node::Id_t nodeId: nodePair.second->children)
 		{
 			DEBUG("%u, ", nodeId);
 		}
 		DEBUG("Parents ");
-		for(Graph::NodeId_t nodeId: nodePair.second->parents)
+		for(Node::Id_t nodeId: nodePair.second->parents)
 		{
 			DEBUG("%u, ", nodeId);
 		}
@@ -306,14 +306,14 @@ bool CodeGenerator::GenerateThreadIncludes()
 bool CodeGenerator::GenerateCallbackPtCheck(FileWriter* file) const
 {
 	auto nodes = graph_->GetNodes();
-	for(const Graph::Node_t &node: *nodes)
+	for(const Node &node: *nodes)
 	{
-		if(Graph::NodeType::OUTPUT != node.nodeType)
+		if(Node::Type::OUTPUT != node.Type)
 		{
 			continue;
 		}
 
-		for(Graph::NodeId_t outId: node.parents)
+		for(Node::Id_t outId: node.parents)
 		{
 			auto output = (const Interface::Output*) node.object;
 
@@ -361,11 +361,11 @@ bool CodeGenerator::GenerateRunFunction()
 
 	// Traverse the Graph and generate Code
 	// Find all nodes which do not have parents and create a set of their children
-	std::set<Graph::NodeId_t> roots;
-	std::set<Graph::NodeId_t> firstGenerationChildren;
+	std::set<Node::Id_t> roots;
+	std::set<Node::Id_t> firstGenerationChildren;
 
 	auto nodes = graph_->GetNodes();
-	for(const Graph::Node_t &node: *nodes)
+	for(const Node &node: *nodes)
 	{
 		if(0 == node.parents.size())
 		{
@@ -378,8 +378,8 @@ bool CodeGenerator::GenerateRunFunction()
 
 	// delete all children which have non-root parents.
 	// i.e. these children may be executed right away.
-	std::vector<Graph::NodeId_t> nonFirstGenerationChildren;
-	for(Graph::NodeId_t childId: firstGenerationChildren)
+	std::vector<Node::Id_t> nonFirstGenerationChildren;
+	for(Node::Id_t childId: firstGenerationChildren)
 	{
 		const auto childNodeIt =  nodeMap_.find(childId);
 		if(nodeMap_.end() == childNodeIt)
@@ -388,9 +388,9 @@ bool CodeGenerator::GenerateRunFunction()
 			return false;
 		}
 
-		const Graph::Node_t* childNode = childNodeIt->second;
+		const Node* childNode = childNodeIt->second;
 
-		for(Graph::NodeId_t parentId: childNode->parents)
+		for(Node::Id_t parentId: childNode->parents)
 		{
 			if(roots.end() == roots.find(parentId))
 			{
@@ -401,22 +401,22 @@ bool CodeGenerator::GenerateRunFunction()
 		}
 	}
 
-	for(Graph::NodeId_t childId: nonFirstGenerationChildren)
+	for(Node::Id_t childId: nonFirstGenerationChildren)
 	{
 		firstGenerationChildren.erase(childId);
 	}
 
-	std::set<Graph::NodeId_t> * children = &firstGenerationChildren;
+	std::set<Node::Id_t> * children = &firstGenerationChildren;
 
-	std::set<Graph::NodeId_t> tmpSet;
-	std::set<Graph::NodeId_t> * nextGenChildren = &tmpSet;
-	std::vector<std::set<Graph::NodeId_t>> threadExeNodes(cpuThreads_.size());
+	std::set<Node::Id_t> tmpSet;
+	std::set<Node::Id_t> * nextGenChildren = &tmpSet;
+	std::vector<std::set<Node::Id_t>> threadExeNodes(cpuThreads_.size());
 
 	while(1)
 	{
 		// Create Code for all children and create new set with the next generation
 		uint16_t currentThread = 0;
-		for(Graph::NodeId_t childId: *children)
+		for(Node::Id_t childId: *children)
 		{
 			retFalseIfNotFound(nodePair, nodeMap_, childId);
 
@@ -428,7 +428,7 @@ bool CodeGenerator::GenerateRunFunction()
 			}
 
 			// Thread Synch: Do we need to wait for parent node or is it in this thread?
-			for(Graph::NodeId_t parentId: nodePair->second->parents)
+			for(Node::Id_t parentId: nodePair->second->parents)
 			{
 				auto nodeVarPair = variables_.find(parentId);
 				if(variables_.end() == nodeVarPair)
@@ -476,7 +476,7 @@ bool CodeGenerator::GenerateRunFunction()
 			generatedNodes_.insert(childId);
 
 			// Add its children to the next generation
-			for(Graph::NodeId_t childsChildId: nodePair->second->children)
+			for(Node::Id_t childsChildId: nodePair->second->children)
 			{
 				// Make sure it hasn't been generated already
 				if(generatedNodes_.end() == generatedNodes_.find(childsChildId))
@@ -491,7 +491,7 @@ bool CodeGenerator::GenerateRunFunction()
 		{
 			retFalseIfNotFound(childPair, nodeMap_, *childIt);
 			bool removeChild = false;
-			for(Graph::NodeId_t parentId: childPair->second->parents)
+			for(Node::Id_t parentId: childPair->second->parents)
 			{
 				if(generatedNodes_.end() == generatedNodes_.find(parentId))
 				{
@@ -545,10 +545,10 @@ bool CodeGenerator::GenerateRunFunction()
 	return true;
 }
 
-bool CodeGenerator::OutputCode(const Graph::Node_t* node, std::unique_ptr<FileWriter> &file)
+bool CodeGenerator::OutputCode(const Node* node, std::unique_ptr<FileWriter> &file)
 {
 	// Call corresponding function callbacks
-	for(Graph::NodeId_t outId: node->parents)
+	for(Node::Id_t outId: node->parents)
 	{
 		auto var = variables_.find(outId);
 		if(variables_.end() == var)
@@ -569,30 +569,30 @@ bool CodeGenerator::OutputCode(const Graph::Node_t* node, std::unique_ptr<FileWr
 	return true;
 }
 
-bool CodeGenerator::GenerateOperationCode(const Graph::Node_t* node, std::unique_ptr<FileWriter> &file)
+bool CodeGenerator::GenerateOperationCode(const Node* node, std::unique_ptr<FileWriter> &file)
 {
-	switch(node->nodeType)
+	switch(node->Type)
 	{
-	case Graph::NodeType::VECTOR_ADDITION:
+	case Node::Type::VECTOR_ADDITION:
 		retFalseOnFalse(VectorAdditionCode(node, file), "Could not generate Vector Addition Code!\n");
 		break;
 
-	case Graph::NodeType::VECTOR_SCALAR_MULTIPLICATION:
+	case Node::Type::VECTOR_SCALAR_MULTIPLICATION:
 		retFalseOnFalse(VectorScalarMultiplicationCode(node, file),
 				"Could not generate Vector Scalar Multiplication Code!\n");
 		break;
 
-	case Graph::NodeType::OUTPUT:
+	case Node::Type::OUTPUT:
 		retFalseOnFalse(OutputCode(node, file),
 				"Could not generate Output Code!\n");
 		break;
 
-	case Graph::NodeType::VECTOR:
-		Error("NodeType %i is no operation!\n", (int) node->nodeType);
+	case Node::Type::VECTOR:
+		Error("Type %i is no operation!\n", (int) node->Type);
 		return false;
 
 	default:
-		Error("Unknown NodeType %i!\n", (int) node->nodeType);
+		Error("Unknown Type %i!\n", (int) node->Type);
 		return false;
 	}
 
@@ -612,7 +612,7 @@ bool CodeGenerator::GenerateLocalVariableDeclaration(const Variable * var)
 	return true;
 }
 
-bool CodeGenerator::VectorAdditionCode(const Graph::Node_t* node, std::unique_ptr<FileWriter> &file)
+bool CodeGenerator::VectorAdditionCode(const Node* node, std::unique_ptr<FileWriter> &file)
 {
 	retFalseIfNotFound(varOp, variables_, node->id);
 	retFalseIfNotFound(varSum1, variables_, node->parents[0]);
@@ -637,7 +637,7 @@ bool CodeGenerator::VectorAdditionCode(const Graph::Node_t* node, std::unique_pt
 	return true;
 }
 
-bool CodeGenerator::VectorScalarMultiplicationCode(const Graph::Node_t* node, std::unique_ptr<FileWriter> &file)
+bool CodeGenerator::VectorScalarMultiplicationCode(const Node* node, std::unique_ptr<FileWriter> &file)
 {
 	retFalseIfNotFound(varOp, variables_, node->id);
 	retFalseIfNotFound(varVec, variables_, node->parents[0]);
@@ -664,7 +664,7 @@ bool CodeGenerator::VectorScalarMultiplicationCode(const Graph::Node_t* node, st
 
 bool CodeGenerator::GenerateConstantDeclarations()
 {
-	for(const std::pair<Graph::NodeId_t, Variable> &varPair: variables_)
+	for(const std::pair<Node::Id_t, Variable> &varPair: variables_)
 	{
 		const Variable * var = &varPair.second;
 		if(var->HasProperty(Variable::PROPERTY_GLOBAL) && var->HasProperty(Variable::PROPERTY_CONST))
@@ -710,7 +710,7 @@ bool CodeGenerator::GenerateThreadSynchVariables()
 
 bool CodeGenerator::GenerateStaticVariableDeclarations()
 {
-	for(const std::pair<Graph::NodeId_t, Variable> &varPair: variables_)
+	for(const std::pair<Node::Id_t, Variable> &varPair: variables_)
 	{
 		const Variable * var = &varPair.second;
 		if(var->HasProperty(Variable::PROPERTY_CONST))
@@ -735,7 +735,7 @@ bool CodeGenerator::FetchVariables()
 {
 	// Fetch all variables
 	auto nodes = graph_->GetNodes();
-	for(const Graph::Node_t &node: *nodes)
+	for(const Node &node: *nodes)
 	{
 		std::string identifier;
 		Variable::properties_t properties = Variable::PROPERTY_NONE;
@@ -749,7 +749,7 @@ bool CodeGenerator::FetchVariables()
 
 		switch(node.objectType)
 		{
-		case Graph::ObjectType::MODULE_VECTORSPACE_VECTOR:
+		case Node::ObjectType::MODULE_VECTORSPACE_VECTOR:
 		{
 			auto vector = (const Algebra::Module::VectorSpace::Vector*) node.object;
 			value = vector->__value_;
@@ -777,7 +777,7 @@ bool CodeGenerator::FetchVariables()
 		}
 		break;
 
-		case Graph::ObjectType::INTERFACE_OUTPUT:
+		case Node::ObjectType::INTERFACE_OUTPUT:
 			// No variable to create.
 			continue;
 
@@ -799,18 +799,18 @@ bool CodeGenerator::FetchVariables()
 	}
 
 	// Identify Outputs and mark output variables as such
-	for(const Graph::Node_t &node: *nodes)
+	for(const Node &node: *nodes)
 	{
-		if(Graph::NodeType::OUTPUT != node.nodeType)
+		if(Node::Type::OUTPUT != node.Type)
 		{
 			continue;
 		}
 
 		// Find all variables of the output's parents, i.e. the nodes that
 		// shall be output
-		for(const Graph::Node_t &potparnode: *nodes)
+		for(const Node &potparnode: *nodes)
 		{
-			for(const Graph::NodeId_t &parentNodeId: node.parents)
+			for(const Node::Id_t &parentNodeId: node.parents)
 			{
 				if(parentNodeId != potparnode.id)
 				{
@@ -848,16 +848,16 @@ bool CodeGenerator::GenerateOutputFunctions()
 	std::string fctDefinitions;
 
 	auto nodes = graph_->GetNodes();
-	for(const Graph::Node_t &node: *nodes)
+	for(const Node &node: *nodes)
 	{
-		if(Graph::NodeType::OUTPUT != node.nodeType)
+		if(Node::Type::OUTPUT != node.Type)
 		{
 			continue;
 		}
 
 		auto * output = (const Interface::Output* ) node.object;
 
-		for(const Graph::NodeId_t &nodeId: node.parents)
+		for(const Node::Id_t &nodeId: node.parents)
 		{
 			// Get Variable attached to node
 			const auto var = variables_.find(nodeId);

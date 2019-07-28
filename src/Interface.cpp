@@ -27,13 +27,13 @@ Output::Output(Graph* graph, const std::string* name)
 
 	graph_ = graph;
 
-	Graph::Node_t node;
-	node.nodeType = Graph::NodeType::OUTPUT;
-	node.objectType = Graph::ObjectType::INTERFACE_OUTPUT;
+	Node node;
+	node.Type = Node::Type::OUTPUT;
+	node.objectType = Node::ObjectType::INTERFACE_OUTPUT;
 	node.object = this;
 
 	nodeId_ = graph->AddNode(&node);
-	if(Graph::NODE_ID_NONE == nodeId_)
+	if(Node::ID_NONE == nodeId_)
 	{
 		Error("Could not add node!\n");
 		return;
@@ -66,7 +66,7 @@ bool Output::Add(const std::string* name, const Algebra::Module::VectorSpace::Ve
 	return true;
 }
 
-const std::string * Output::GetOutputName(Graph::NodeId_t nodeId) const
+const std::string * Output::GetOutputName(Node::Id_t nodeId) const
 {
 	auto it = outNames_.find(nodeId);
 	if(outNames_.end() == it)

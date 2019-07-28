@@ -97,17 +97,17 @@ class CodeGenerator {
 	bool GenerateLocalVariableDeclaration(const Variable * var);
 	bool GenerateThreadIncludes();
 	bool GenerateRunFunction();
-	bool GenerateOperationCode(const Graph::Node_t* node, std::unique_ptr<FileWriter> &file);
-	bool OutputCode(const Graph::Node_t* node, std::unique_ptr<FileWriter> &file);
+	bool GenerateOperationCode(const Node* node, std::unique_ptr<FileWriter> &file);
+	bool OutputCode(const Node* node, std::unique_ptr<FileWriter> &file);
 	bool GenerateCallbackPtCheck(FileWriter* file) const;
-	bool VectorAdditionCode(const Graph::Node_t* node, std::unique_ptr<FileWriter> &file);
-	bool VectorScalarMultiplicationCode(const Graph::Node_t* node, std::unique_ptr<FileWriter> &file);
+	bool VectorAdditionCode(const Node* node, std::unique_ptr<FileWriter> &file);
+	bool VectorScalarMultiplicationCode(const Node* node, std::unique_ptr<FileWriter> &file);
 
 	bool FetchVariables();
 
-	std::map<Graph::NodeId_t, Variable> variables_;
-	std::map<Graph::NodeId_t, const Graph::Node_t*> nodeMap_;
-	std::set<Graph::NodeId_t> generatedNodes_;
+	std::map<Node::Id_t, Variable> variables_;
+	std::map<Node::Id_t, const Node*> nodeMap_;
+	std::set<Node::Id_t> generatedNodes_;
 
 	typedef struct {
 		char pthread[42];
