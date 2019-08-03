@@ -22,7 +22,7 @@ namespace Module {
 class VectorSpace {
 
 public:
-	VectorSpace(Ring::Float32 f32, dimension_t dim);
+	VectorSpace(Ring::type_t ring, dimension_t dim);
 
 	class Vector : public NodeRef {
 	public:
@@ -33,7 +33,7 @@ public:
 		Vector* Multiply(const Vector* vec);
 	};
 
-	Ring::Type ring_;
+	Ring::type_t ring_;
 	dimension_t dim_;
 
 	template<typename T>

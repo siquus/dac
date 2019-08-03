@@ -20,7 +20,7 @@ int main()
 {
 	Graph graph;
 
-	auto myVs = Algebra::Module::VectorSpace(Algebra::Ring::Float32(), 3);
+	auto myVs = Algebra::Module::VectorSpace(Algebra::Ring::Float32, 3);
 
 	auto vec1_init = std::vector<float>{1, 2, 3};
 	auto vec2_init = std::vector<float>{4, 5, 6};
@@ -30,7 +30,7 @@ int main()
 
 	auto sum = vec1->Add(vec2); // {5, 7, 9}
 
-	auto myScalarSpace = Algebra::Module::VectorSpace(Algebra::Ring::Float32(), 1);
+	auto myScalarSpace = Algebra::Module::VectorSpace(Algebra::Ring::Float32, 1);
 	auto vec3_init = std::vector<float>{42};
 	auto vec3 = myScalarSpace.Element(&graph, &vec3_init);
 

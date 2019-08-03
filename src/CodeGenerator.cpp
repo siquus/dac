@@ -756,11 +756,11 @@ bool CodeGenerator::FetchVariables()
 			length = vector->__space_->dim_;
 			switch(vector->__space_->ring_)
 			{
-			case Algebra::Ring::Type::Float32:
+			case Algebra::Ring::Float32:
 				type = Variable::Type::float_;
 				break;
 
-			case Algebra::Ring::Type::None: // no break intended
+			case Algebra::Ring::None: // no break intended
 			default:
 				Error("Unknown Ring!\n");
 				return false;

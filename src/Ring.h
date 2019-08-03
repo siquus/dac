@@ -11,15 +11,14 @@
 namespace Algebra {
 namespace Ring {
 
-enum class Type {
+// Below Type ordering matters: Larger enum value means superior ring
+typedef enum {
 	None,
+	Int32,
 	Float32,
-};
+} type_t;
 
-class Float32 {
-};
-
-extern Type GetSuperiorRing(Type t1, Type t2);
+extern type_t GetSuperiorRing(type_t t1, type_t t2);
 
 }
 }
