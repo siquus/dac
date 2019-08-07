@@ -559,9 +559,19 @@ bool CodeGenerator::OutputCode(const Node* node, std::unique_ptr<FileWriter> &fi
 
 		auto output = (const Interface::Output*) node->object;
 
-		fprintProtect(file->PrintfLine("DacOutputCallback%s(Node%u, sizeof(Node%u));\n",
+		std::string NodeStr;
+
+		// If node is not an array, we need to take address
+		if(2 > var->second.Length())
+		{
+			NodeStr += "&";
+		}
+		NodeStr += "Node";
+
+		fprintProtect(file->PrintfLine("DacOutputCallback%s(%s%u, sizeof(Node%u));\n",
 				output->GetOutputName(outId)->c_str(),
-				outId, outId));
+				NodeStr.c_str(), outId,
+				outId));
 	}
 
 	fprintProtect(file->PrintfLine(""));
