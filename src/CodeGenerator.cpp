@@ -1069,8 +1069,7 @@ bool Variable::GenerateLock(std::unique_ptr<FileWriter> &file)
 	std::string mutexId;
 	GetMutexIdentifier(&mutexId);
 
-	std::string retId = mutexId.c_str() + std::string("Ret") + std::to_string(runningNumber_);
-	runningNumber_++;
+	std::string retId = mutexId.c_str() + std::string("Ret") + std::to_string(GetNewRunningNumber());
 
 	fprintProtect(file->PrintfLine("int %s;", retId.c_str()));
 	fprintProtect(file->PrintfLine("%s = pthread_mutex_lock(&%s);",
@@ -1089,8 +1088,7 @@ bool Variable::GenerateUnlock(std::unique_ptr<FileWriter> &file)
 	std::string mutexId;
 	GetMutexIdentifier(&mutexId);
 
-	std::string retId = mutexId.c_str() + std::string("Ret") + std::to_string(runningNumber_);
-	runningNumber_++;
+	std::string retId = mutexId.c_str() + std::string("Ret") + std::to_string(GetNewRunningNumber());
 
 	fprintProtect(file->PrintfLine("int %s;", retId.c_str()));
 	fprintProtect(file->PrintfLine("%s = pthread_mutex_unlock(&%s);",
@@ -1117,8 +1115,7 @@ bool Variable::GenerateConditionWait(std::unique_ptr<FileWriter> &file, const st
 	std::string readyId;
 	GetReadyIdentifier(&readyId);
 
-	std::string retId = condId.c_str() + std::string("Ret") + std::to_string(runningNumber_);
-		runningNumber_++;
+	std::string retId = condId.c_str() + std::string("Ret") + std::to_string(GetNewRunningNumber());
 
 	fprintProtect(file->PrintfLine("while(%s < %s)", readyId.c_str(), iteration->c_str()));
 	fprintProtect(file->PrintfLine("{"));
@@ -1144,8 +1141,7 @@ bool Variable::GenerateConditionBroadcast(std::unique_ptr<FileWriter> &file)
 	std::string condId;
 	GetConditionIdentifier(&condId);
 
-	std::string retId = condId.c_str() + std::string("Ret") + std::to_string(runningNumber_);
-	runningNumber_++;
+	std::string retId = condId.c_str() + std::string("Ret") + std::to_string(GetNewRunningNumber());
 
 	fprintProtect(file->PrintfLine("int %s;", retId.c_str()));
 	fprintProtect(file->PrintfLine("%s = pthread_cond_broadcast(&%s);",
@@ -1278,6 +1274,12 @@ const std::string* Variable::GetIdentifier() const
 	}
 
 	return &identifier_;
+}
+
+uint32_t Variable:: GetNewRunningNumber()
+{
+	runningNumber_++;
+	return runningNumber_;
 }
 
 bool Variable::GetElement(std::string* elem, const char * elemIndex) const

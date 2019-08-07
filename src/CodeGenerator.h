@@ -68,6 +68,7 @@ public:
 	bool GenerateConditionWait(std::unique_ptr<FileWriter> &file, const std::string* iteration);
 	bool GenerateConditionIncrement(std::unique_ptr<FileWriter> &file) const;
 	bool GenerateConditionBroadcast(std::unique_ptr<FileWriter> &file);
+	uint32_t GetNewRunningNumber();
 
 private:
 	properties_t properties_;
