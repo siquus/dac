@@ -884,6 +884,7 @@ bool CodeGenerator::GenerateOutputFunctions()
 			callbackTypedef += "typedef void (*";
 			callbackTypedef += fctPtTypeId;
 			callbackTypedef += "_t)(";
+			callbackTypedef += "const ";
 			callbackTypedef += var->second.GetTypeString();
 			callbackTypedef += "* pt, size_t size);";
 
