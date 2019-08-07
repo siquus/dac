@@ -47,6 +47,7 @@ public:
 		none,
 		uint8_,
 		int8_,
+		int32_,
 		float_,
 		nrOf,
 	};

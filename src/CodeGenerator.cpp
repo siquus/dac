@@ -770,6 +770,10 @@ bool CodeGenerator::FetchVariables()
 				type = Variable::Type::float_;
 				break;
 
+			case Algebra::Ring::Int32:
+				type = Variable::Type::int32_;
+				break;
+
 			case Algebra::Ring::None: // no break intended
 			default:
 				Error("Unknown Ring!\n");
@@ -999,6 +1003,7 @@ const char* Variable::GetTypeString() const
 			"0000", // make sure it throws error
 			"uint8_t",
 			"int8_t",
+			"int32_t",
 			"float",
 	};
 
@@ -1009,6 +1014,10 @@ const char* Variable::GetTypeString() const
 
 	case Type::int8_:
 		return typeStrings[(int) Type::int8_];
+
+	case Type::int32_:
+		return typeStrings[(int) Type::int32_];
+		break;
 
 	case Type::float_:
 		return typeStrings[(int) Type::float_];
@@ -1239,6 +1248,13 @@ bool Variable::GetDeclaration(std::string* decl) const
 		{
 			float* valuePt = (float*) value_;
 			SNPRINTF(tmpBuff, sizeof(tmpBuff), "%f", valuePt[elem]);
+		}
+		break;
+
+		case Type::int32_:
+		{
+			int32_t* valuePt = (int32_t*) value_;
+			SNPRINTF(tmpBuff, sizeof(tmpBuff), "%i", valuePt[elem]);
 		}
 		break;
 
