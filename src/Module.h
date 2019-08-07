@@ -31,6 +31,7 @@ public:
 
 		Vector* Add(const Vector* vec);
 		Vector* Multiply(const Vector* vec);
+		Vector* IsSmaller(const Vector* vec);
 	};
 
 	Ring::type_t ring_;

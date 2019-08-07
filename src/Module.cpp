@@ -162,6 +162,42 @@ VectorSpace::Vector* VectorSpace::Vector::Multiply(const Vector* vec)
 	return retVec;
 }
 
+VectorSpace::Vector* VectorSpace::Vector::IsSmaller(const Vector* vec)
+{
+	if(__space_->dim_ != vec->__space_->dim_)
+	{
+		Error("Dimension Mismatch!\n");
+		return nullptr;
+	}
+
+	if(graph_ != vec->graph_)
+	{
+		Error("Not on the same Graph!\n");
+		return nullptr;
+	}
+
+	Vector* retVec = new Vector;
+	retVec->graph_ = graph_;
+	retVec->__space_ = new VectorSpace(Ring::Int32, 1);
+
+	Node node;
+	node.parents.push_back(nodeId_);
+	node.parents.push_back(vec->nodeId_);
+	node.Type = Node::Type::VECTOR_COMPARISON_IS_SMALLER;
+	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
+	node.object = retVec;
+
+	retVec->nodeId_ = graph_->AddNode(&node);
+
+	if(Node::ID_NONE == retVec->nodeId_)
+	{
+		Error("Could not add Node!\n");
+		return nullptr;
+	}
+
+	return retVec;
+}
+
 VectorSpace::Vector* VectorSpace::Vector::Add(const Vector* vec)
 {
 	if(__space_->dim_ != vec->__space_->dim_)

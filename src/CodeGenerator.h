@@ -104,6 +104,7 @@ class CodeGenerator {
 	bool GenerateCallbackPtCheck(FileWriter* file) const;
 	bool VectorAdditionCode(const Node* node, std::unique_ptr<FileWriter> &file);
 	bool VectorScalarMultiplicationCode(const Node* node, std::unique_ptr<FileWriter> &file);
+	bool VectorComparisonIsSmallerCode(const Node* node, std::unique_ptr<FileWriter> &file);
 
 	bool FetchVariables();
 

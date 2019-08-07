@@ -51,6 +51,8 @@ int main()
 
 	auto sum2 = sum45->Add(prod); // {221, 315, 409}
 
+	auto isSmaller = sum2->IsSmaller(prod); // false
+
 	auto outFile = std::string("Output");
 	auto output = Interface::Output(&graph, &outFile);
 
@@ -67,6 +69,14 @@ int main()
 	if(!success)
 	{
 		printf("Could not add to Output2\n");
+		return 1;
+	}
+
+	auto outName3 = std::string("SmallerThan");
+	success = output.Add(&outName3, isSmaller);
+	if(!success)
+	{
+		printf("Could not add to Output3\n");
 		return 1;
 	}
 

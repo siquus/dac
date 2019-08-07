@@ -592,6 +592,11 @@ bool CodeGenerator::GenerateOperationCode(const Node* node, std::unique_ptr<File
 				"Could not generate Vector Scalar Multiplication Code!\n");
 		break;
 
+	case Node::Type::VECTOR_COMPARISON_IS_SMALLER:
+		retFalseOnFalse(VectorComparisonIsSmallerCode(node, file),
+				"Could not generate Vector Comparison <= Code!\n");
+		break;
+
 	case Node::Type::OUTPUT:
 		retFalseOnFalse(OutputCode(node, file),
 				"Could not generate Output Code!\n");
@@ -647,13 +652,75 @@ bool CodeGenerator::VectorAdditionCode(const Node* node, std::unique_ptr<FileWri
 	return true;
 }
 
+bool CodeGenerator::VectorComparisonIsSmallerCode(const Node* node, std::unique_ptr<FileWriter> &file)
+{
+	// TODO: Create extra Norm-Nodes for this.
+	retFalseIfNotFound(varOp, variables_, node->id);
+	retFalseIfNotFound(varLVec, variables_, node->parents[0]);
+	retFalseIfNotFound(varRVec, variables_, node->parents[1]);
+
+	std::string lNormId;
+	lNormId += *(varLVec->second.GetIdentifier());
+	lNormId += "Norm";
+	lNormId += std::to_string(varLVec->second.GetNewRunningNumber());
+	fprintProtect(file->PrintfLine("%s %s = 0;",
+			varLVec->second.GetTypeString(),
+			lNormId.c_str()));
+
+	std::string rNormId;
+	rNormId += *(varRVec->second.GetIdentifier());
+	rNormId += "Norm";
+	rNormId += std::to_string(varRVec->second.GetNewRunningNumber());
+	fprintProtect(file->PrintfLine("%s %s = 0;",
+			varRVec->second.GetTypeString(),
+			rNormId.c_str()));
+
+	std::string lArrayElem;
+	varLVec->second.GetElement(&lArrayElem, "dim");
+
+	fprintProtect(file->PrintfLine("for(uint32_t dim = 0; dim < %u; dim++)",
+			varLVec->second.Length()));
+	fprintProtect(file->PrintfLine("{"));
+	fprintProtect(file->PrintfLine("\t %s += %s * %s;",
+			lNormId.c_str(),
+			lArrayElem.c_str(), lArrayElem.c_str()));
+	fprintProtect(file->PrintfLine("}\n"));
+
+	std::string rArrayElem;
+	varRVec->second.GetElement(&rArrayElem, "dim");
+
+	fprintProtect(file->PrintfLine("for(uint32_t dim = 0; dim < %u; dim++)",
+			varRVec->second.Length()));
+	fprintProtect(file->PrintfLine("{"));
+	fprintProtect(file->PrintfLine("\t %s += %s * %s;",
+			rNormId.c_str(),
+			rArrayElem.c_str(), rArrayElem.c_str()));
+	fprintProtect(file->PrintfLine("}\n"));
+
+	retFalseOnFalse(GenerateLocalVariableDeclaration(&varOp->second), "Could not generate Var. Decl.\n");
+
+	fprintProtect(file->PrintfLine("if(%s < %s)",
+			lNormId.c_str(), rNormId.c_str()));
+	fprintProtect(file->PrintfLine("{"));
+	fprintProtect(file->PrintfLine("\t %s = 1;",
+			varOp->second.GetIdentifier()->c_str()));
+	fprintProtect(file->PrintfLine("}"));
+	fprintProtect(file->PrintfLine("else"));
+	fprintProtect(file->PrintfLine("{"));
+	fprintProtect(file->PrintfLine("\t %s = 0;",
+			varOp->second.GetIdentifier()->c_str()));
+	fprintProtect(file->PrintfLine("}\n"));
+
+	return true;
+}
+
 bool CodeGenerator::VectorScalarMultiplicationCode(const Node* node, std::unique_ptr<FileWriter> &file)
 {
 	retFalseIfNotFound(varOp, variables_, node->id);
 	retFalseIfNotFound(varVec, variables_, node->parents[0]);
 	retFalseIfNotFound(varScalar, variables_, node->parents[1]);
 
-	GenerateLocalVariableDeclaration(&varOp->second);
+	retFalseOnFalse(GenerateLocalVariableDeclaration(&varOp->second), "Could not generate Var. Decl.\n");
 
 	auto vecOp = (const Algebra::Module::VectorSpace::Vector*) node->object;
 
