@@ -53,8 +53,8 @@ int main()
 
 	auto isSmaller = sum2->IsSmaller(prod); // false
 
-	auto outFile = std::string("Output");
-	auto output = Interface::Output(&graph, &outFile);
+	auto outPutName = std::string("Output");
+	auto output = Interface::Output(&graph, &outPutName);
 
 	auto outName = std::string("Product");
 	bool success = output.Add(&outName, prod);

@@ -13,6 +13,10 @@
 
 #define Error(...) \
 	fprintf(stderr, "File %s, Line %i: ", __FILE__, __LINE__); \
+	fprintf(stderr, __VA_ARGS__); \
+	fflush(stderr)
+
+#define ErrorContinued(...) \
 	fprintf(stderr, __VA_ARGS__)
 
 typedef uint16_t dimension_t;

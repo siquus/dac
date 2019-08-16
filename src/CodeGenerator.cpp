@@ -74,7 +74,6 @@ static const char includeFilesBrackets[][42] = {
 
 static const char includeFilesQuotes[][42] = {
 		HEADER_NAME,
-		"Helpers.h",
 		"error_functions.h"
 };
 
@@ -100,6 +99,9 @@ static const char fileHeader[] = \
 * https://github.com/siquus/dac\n\
 */\n\
 \n";
+
+static const char pcMutexId[] = "programCounterMutex";
+static const char pcId[] = "programCounter";
 
 FileWriter::~FileWriter()
 {
@@ -227,6 +229,24 @@ bool CodeGenerator::Generate(const Graph* graph, const Parallizer* parallizer)
 		return false;
 	}
 
+	std::string InstructionListPath = path_;
+	InstructionListPath += "InstructionList.h";
+	success = fileInstructionList_.Init(&InstructionListPath);
+	if(!success)
+	{
+		Error("Could not initialize %s!", InstructionListPath.c_str());
+		return false;
+	}
+
+	std::string InstructionsPath = path_;
+	InstructionsPath += "Instructions.h";
+	success = fileInstructions_.Init(&InstructionsPath);
+	if(!success)
+	{
+		Error("Could not initialize %s!", InstructionsPath.c_str());
+		return false;
+	}
+
 	// Copy files
 	GenerateEmbeddedFiles(&path_);
 
@@ -242,15 +262,6 @@ bool CodeGenerator::Generate(const Graph* graph, const Parallizer* parallizer)
 	for(uint16_t thread = 0; thread < cpu->coresNrOf; thread++)
 	{
 		cpuThreads_.push_back(cpuThread_t());
-		cpuThreads_.back().fileWriter = std::make_unique<FileWriter>();
-		std::string filePath = path_ + "thread" + std::to_string(thread) + ".h";
-		bool success = cpuThreads_.back().fileWriter->Init(&filePath);
-		if(!success)
-		{
-			Error("Failed to initialize thread%u fileWriter", thread);
-			return false;
-		}
-
 		SNPRINTF(cpuThreads_.back().pthread, sizeof(cpuThreads_.back().pthread), "pthread%u", thread);
 	}
 
@@ -266,6 +277,11 @@ bool CodeGenerator::Generate(const Graph* graph, const Parallizer* parallizer)
 	auto staticHeading = std::string("Static Variables");
 	retFalseOnFalse(GenerateHeading(&staticHeading), "Static Heading failed!\n");
 
+	fprintProtect(fileDacC_.PrintfLine("static pthread_mutex_t %s = PTHREAD_MUTEX_INITIALIZER;",
+			pcMutexId));
+
+	fprintProtect(fileDacC_.PrintfLine("static int %s = 0;\n", pcId));
+
 	for(const auto &thread: cpuThreads_)
 	{
 		fprintProtect(fileDacC_.PrintfLine("static pthread_t %s;", thread.pthread));
@@ -279,86 +295,32 @@ bool CodeGenerator::Generate(const Graph* graph, const Parallizer* parallizer)
 	// Generate Functions
 	retFalseOnFalse(GenerateOutputFunctions(), "Could not generate Output Functions\n!");
 
-	auto threadIncludeHeading = std::string("Thread functions defined inside header files");
-	retFalseOnFalse(GenerateHeading(&threadIncludeHeading), "Thread Include Heading failed!\n");
+	auto threadIncludeHeading = std::string("Instructions defined inside header files");
+	retFalseOnFalse(GenerateHeading(&threadIncludeHeading), "Instructions Include Heading failed!\n");
 
-	retFalseOnFalse(GenerateThreadIncludes(), "Could not generate Thread Includes\n!");
+	fprintProtect(fileDacC_.PrintfLine("#include \"Instructions.h\""));
+	fprintProtect(fileDacC_.PrintfLine("#include \"InstructionList.h\""));
+	fprintProtect(fileDacC_.PrintfLine("#include \"Helpers.h\""));
 
 	auto runHeading = std::string("The main run routine");
 	retFalseOnFalse(GenerateHeading(&runHeading), "Run Heading failed!\n");
 
 	retFalseOnFalse(GenerateRunFunction(), "Could not generate Run Function!\n");
 
-	return true;
-}
+	fprintProtect(fileInstructionList_.PrintfLine("typedef void (*instruction_t)(void);\n"));
+	fprintProtect(fileInstructionList_.PrintfLine("static instruction_t instructionList[] = {"));
+	fileInstructionList_.Indent();
 
-bool CodeGenerator::GenerateThreadIncludes()
-{
-	for(const auto &thread: cpuThreads_)
-	{
-		fprintProtect(fileDacC_.PrintfLine("#include \"%s\"", thread.fileWriter->Path()->c_str()));
-	}
-	fprintProtect(fileDacC_.PrintfLine(""));
+	retFalseOnFalse(GenerateInstructions(), "Could not generate Instructions!\n");
+
+	fileInstructionList_.Outdent();
+	fprintProtect(fileInstructionList_.PrintfLine("};"));
 
 	return true;
 }
 
-bool CodeGenerator::GenerateCallbackPtCheck(FileWriter* file) const
+bool CodeGenerator::GenerateInstructions()
 {
-	auto nodes = graph_->GetNodes();
-	for(const Node &node: *nodes)
-	{
-		if(Node::Type::OUTPUT != node.Type)
-		{
-			continue;
-		}
-
-		for(Node::Id_t outId: node.parents)
-		{
-			auto output = (const Interface::Output*) node.object;
-
-			fprintProtect(file->PrintfLine("if(NULL == DacOutputCallback%s)",
-					output->GetOutputName(outId)->c_str()));
-			fprintProtect(file->PrintfLine("{"));
-			fprintProtect(file->PrintfLine("\tfatal(\"DacOutputCallback%s == NULL\");",
-					output->GetOutputName(outId)->c_str()));
-			fprintProtect(file->PrintfLine("}\n"));
-		}
-	}
-
-	return true;
-}
-
-bool CodeGenerator::GenerateRunFunction()
-{
-	// Add prototype to header
-	fprintProtect(fileDacH_.PrintfLine("extern int DacRun(void);"));
-
-	// Define function
-	fprintProtect(fileDacC_.PrintfLine("int DacRun(void)\n{"));
-	fileDacC_.Indent();
-
-	// Check that callbacks have been set
-	GenerateCallbackPtCheck(&fileDacC_);
-
-	// Fire up threads
-	fprintProtect(fileDacC_.PrintfLine("int threadCreateRet;"));
-
-	for(const cpuThread_t &thread: cpuThreads_)
-	{
-		fprintProtect(fileDacC_.PrintfLine("threadCreateRet = pthread_create(&%s, NULL, %sStartRoutine, NULL);",
-				thread.pthread,
-				thread.pthread));
-		fprintProtect(fileDacC_.PrintfLine("if(0 != threadCreateRet)"));
-		fprintProtect(fileDacC_.PrintfLine("{"));
-		fprintProtect(fileDacC_.PrintfLine("\terrExitEN(threadCreateRet, \"pthread_create\");"));
-		fprintProtect(fileDacC_.PrintfLine("}\n"));
-
-		fprintProtect(thread.fileWriter->PrintfLine("static void * %sStartRoutine(void* arg)\n{",
-				thread.pthread));
-		thread.fileWriter->Indent();
-	}
-
 	// Traverse the Graph and generate Code
 	// Find all nodes which do not have parents and create a set of their children
 	std::set<Node::Id_t> roots;
@@ -410,24 +372,28 @@ bool CodeGenerator::GenerateRunFunction()
 
 	std::set<Node::Id_t> tmpSet;
 	std::set<Node::Id_t> * nextGenChildren = &tmpSet;
-	std::vector<std::set<Node::Id_t>> threadExeNodes(cpuThreads_.size());
 
 	while(1)
 	{
 		// Create Code for all children and create new set with the next generation
-		uint16_t currentThread = 0;
 		for(Node::Id_t childId: *children)
 		{
 			retFalseIfNotFound(nodePair, nodeMap_, childId);
+
+			// Create function identifier
+			std::string fctId = "Node" + std::to_string(childId) + "Instruction";
+			fileInstructions_.PrintfLine("void %s()", fctId.c_str());
+			fileInstructions_.PrintfLine("{");
+			fileInstructions_.Indent();
 
 			// Lock mutex for node's variable
 			auto opNodeVarPair = variables_.find(childId);
 			if(variables_.end() != opNodeVarPair)
 			{
-				opNodeVarPair->second.GenerateLock(cpuThreads_[currentThread].fileWriter);
+				opNodeVarPair->second.GenerateLock(&fileInstructions_);
 			}
 
-			// Thread Synch: Do we need to wait for parent node or is it in this thread?
+			// Do we need to wait for parent node?
 			for(Node::Id_t parentId: nodePair->second->parents)
 			{
 				auto nodeVarPair = variables_.find(parentId);
@@ -441,19 +407,16 @@ bool CodeGenerator::GenerateRunFunction()
 					continue; // Nothing to wait for in this node
 				}
 
-				// Node already in this thread?
-				if(threadExeNodes[currentThread].end() == threadExeNodes[currentThread].find(parentId))
-				{
-					// We need to make sure parent node was executed
-					std::string one = std::to_string(1);
-					nodeVarPair->second.GenerateConditionWait(
-							cpuThreads_[currentThread].fileWriter,
-							&one);
-				}
+				// We need to make sure parent node was executed
+				std::string one = std::to_string(1);
+				nodeVarPair->second.GenerateConditionWait(
+						&fileInstructions_,
+						&one);
 			}
 
 			retFalseOnFalse(GenerateOperationCode(
-					nodePair->second, cpuThreads_[currentThread].fileWriter),
+					nodePair->second,
+					&fileInstructions_),
 					"Could not generate Operation Code!\n");
 
 			// Increment the variable Iteration Counter (in case of loops)
@@ -461,16 +424,17 @@ bool CodeGenerator::GenerateRunFunction()
 			// Signal that this node is ready
 			if(variables_.end() != opNodeVarPair)
 			{
-				opNodeVarPair->second.GenerateConditionIncrement(cpuThreads_[currentThread].fileWriter);
-				opNodeVarPair->second.GenerateUnlock(cpuThreads_[currentThread].fileWriter);
-				opNodeVarPair->second.GenerateConditionBroadcast(cpuThreads_[currentThread].fileWriter);
+				opNodeVarPair->second.GenerateConditionIncrement(&fileInstructions_);
+				opNodeVarPair->second.GenerateUnlock(&fileInstructions_);
+				opNodeVarPair->second.GenerateConditionBroadcast(&fileInstructions_);
 			}
 
-			// Add node to set of nodes executed by this thread
-			threadExeNodes[currentThread].insert(childId);
+			// End function
+			fileInstructions_.Outdent();
+			fileInstructions_.PrintfLine("}\n");
 
-			currentThread++;
-			currentThread %= cpuThreads_.size();
+			// Add function to instruction list
+			fileInstructionList_.PrintfLine("%s,", fctId.c_str());
 
 			// Add node to nodes executed
 			generatedNodes_.insert(childId);
@@ -513,6 +477,20 @@ bool CodeGenerator::GenerateRunFunction()
 		// Any children left to generate?
 		if(0 == nextGenChildren->size())
 		{
+			// Have all nodes been generated? Otherwise we are stuck here..
+			if(generatedNodes_.size() != nodeMap_.size())
+			{
+				Error("Not all Nodes were generated! Missing ");
+				for(auto &node: nodeMap_)
+				{
+					if(generatedNodes_.end() == generatedNodes_.find(node.second->id))
+					{
+						ErrorContinued("Node%u, ", node.second->id);
+					}
+				}
+				ErrorContinued("\n");
+				return false;
+			}
 			break;
 		}
 
@@ -523,14 +501,65 @@ bool CodeGenerator::GenerateRunFunction()
 		nextGenChildren = tmp;
 	}
 
+	return true;
+}
+
+bool CodeGenerator::GenerateCallbackPtCheck(FileWriter* file) const
+{
+	auto nodes = graph_->GetNodes();
+	for(const Node &node: *nodes)
+	{
+		if(Node::Type::OUTPUT != node.Type)
+		{
+			continue;
+		}
+
+		for(Node::Id_t outId: node.parents)
+		{
+			auto output = (const Interface::Output*) node.object;
+
+			fprintProtect(file->PrintfLine("if(NULL == DacOutputCallback%s)",
+					output->GetOutputName(outId)->c_str()));
+			fprintProtect(file->PrintfLine("{"));
+			fprintProtect(file->PrintfLine("\tfatal(\"DacOutputCallback%s == NULL\");",
+					output->GetOutputName(outId)->c_str()));
+			fprintProtect(file->PrintfLine("}\n"));
+		}
+	}
+
+	return true;
+}
+
+bool CodeGenerator::GenerateRunFunction()
+{
+	// Add prototype to header
+	fprintProtect(fileDacH_.PrintfLine("extern int DacRun(void);"));
+
+	// Define function
+	fprintProtect(fileDacC_.PrintfLine("int DacRun(void)\n{"));
+	fileDacC_.Indent();
+
+	// Check that callbacks have been set
+	GenerateCallbackPtCheck(&fileDacC_);
+
+	// Fire up threads
+	fprintProtect(fileDacC_.PrintfLine("int threadCreateRet;"));
+
+	for(const cpuThread_t &thread: cpuThreads_)
+	{
+		fprintProtect(fileDacC_.PrintfLine("threadCreateRet = pthread_create(&%s, NULL, threadFunction, NULL);",
+				thread.pthread,
+				thread.pthread));
+		fprintProtect(fileDacC_.PrintfLine("if(0 != threadCreateRet)"));
+		fprintProtect(fileDacC_.PrintfLine("{"));
+		fprintProtect(fileDacC_.PrintfLine("\terrExitEN(threadCreateRet, \"pthread_create\");"));
+		fprintProtect(fileDacC_.PrintfLine("}\n"));
+	}
+
 	// Join threads, create return values and closing brackets
 	fprintProtect(fileDacC_.PrintfLine("int joinRet;"));
 	for(const cpuThread_t &thread: cpuThreads_)
 	{
-		fprintProtect(thread.fileWriter->PrintfLine("return NULL;"));
-		thread.fileWriter->Outdent();
-		fprintProtect(thread.fileWriter->PrintfLine("}"));
-
 		fprintProtect(fileDacC_.PrintfLine("joinRet = pthread_join(%s, NULL);",
 				thread.pthread));
 		fprintProtect(fileDacC_.PrintfLine("if(0 != joinRet)"));
@@ -545,7 +574,7 @@ bool CodeGenerator::GenerateRunFunction()
 	return true;
 }
 
-bool CodeGenerator::OutputCode(const Node* node, std::unique_ptr<FileWriter> &file)
+bool CodeGenerator::OutputCode(const Node* node, FileWriter * file)
 {
 	// Call corresponding function callbacks
 	for(Node::Id_t outId: node->parents)
@@ -579,7 +608,7 @@ bool CodeGenerator::OutputCode(const Node* node, std::unique_ptr<FileWriter> &fi
 	return true;
 }
 
-bool CodeGenerator::GenerateOperationCode(const Node* node, std::unique_ptr<FileWriter> &file)
+bool CodeGenerator::GenerateOperationCode(const Node* node, FileWriter * file)
 {
 	switch(node->Type)
 	{
@@ -627,7 +656,7 @@ bool CodeGenerator::GenerateLocalVariableDeclaration(const Variable * var)
 	return true;
 }
 
-bool CodeGenerator::VectorAdditionCode(const Node* node, std::unique_ptr<FileWriter> &file)
+bool CodeGenerator::VectorAdditionCode(const Node* node, FileWriter * file)
 {
 	retFalseIfNotFound(varOp, variables_, node->id);
 	retFalseIfNotFound(varSum1, variables_, node->parents[0]);
@@ -652,7 +681,7 @@ bool CodeGenerator::VectorAdditionCode(const Node* node, std::unique_ptr<FileWri
 	return true;
 }
 
-bool CodeGenerator::VectorComparisonIsSmallerCode(const Node* node, std::unique_ptr<FileWriter> &file)
+bool CodeGenerator::VectorComparisonIsSmallerCode(const Node* node, FileWriter * file)
 {
 	// TODO: Create extra Norm-Nodes for this.
 	retFalseIfNotFound(varOp, variables_, node->id);
@@ -714,7 +743,7 @@ bool CodeGenerator::VectorComparisonIsSmallerCode(const Node* node, std::unique_
 	return true;
 }
 
-bool CodeGenerator::VectorScalarMultiplicationCode(const Node* node, std::unique_ptr<FileWriter> &file)
+bool CodeGenerator::VectorScalarMultiplicationCode(const Node* node, FileWriter * file)
 {
 	retFalseIfNotFound(varOp, variables_, node->id);
 	retFalseIfNotFound(varVec, variables_, node->parents[0]);
@@ -858,6 +887,7 @@ bool CodeGenerator::FetchVariables()
 		}
 		break;
 
+		case Node::ObjectType::NONE: // no break intended
 		case Node::ObjectType::INTERFACE_OUTPUT:
 			// No variable to create.
 			continue;
@@ -1140,7 +1170,7 @@ Variable::Variable(const std::string* identifier, properties_t properties, Type 
 	identifier_ = *identifier;
 }
 
-bool Variable::GenerateLock(std::unique_ptr<FileWriter> &file)
+bool Variable::GenerateLock(FileWriter * file)
 {
 	std::string mutexId;
 	GetMutexIdentifier(&mutexId);
@@ -1159,7 +1189,7 @@ bool Variable::GenerateLock(std::unique_ptr<FileWriter> &file)
 		return true;
 }
 
-bool Variable::GenerateUnlock(std::unique_ptr<FileWriter> &file)
+bool Variable::GenerateUnlock(FileWriter * file)
 {
 	std::string mutexId;
 	GetMutexIdentifier(&mutexId);
@@ -1178,7 +1208,7 @@ bool Variable::GenerateUnlock(std::unique_ptr<FileWriter> &file)
 	return true;
 }
 
-bool Variable::GenerateConditionWait(std::unique_ptr<FileWriter> &file, const std::string* iteration)
+bool Variable::GenerateConditionWait(FileWriter * file, const std::string* iteration)
 {
 	retFalseOnFalse(GenerateLock(file), "Could not generate Lock");
 
@@ -1212,7 +1242,7 @@ bool Variable::GenerateConditionWait(std::unique_ptr<FileWriter> &file, const st
 	return true;
 }
 
-bool Variable::GenerateConditionBroadcast(std::unique_ptr<FileWriter> &file)
+bool Variable::GenerateConditionBroadcast(FileWriter * file)
 {
 	std::string condId;
 	GetConditionIdentifier(&condId);
@@ -1231,7 +1261,7 @@ bool Variable::GenerateConditionBroadcast(std::unique_ptr<FileWriter> &file)
 	return true;
 }
 
-bool Variable::GenerateConditionIncrement(std::unique_ptr<FileWriter> &file) const
+bool Variable::GenerateConditionIncrement(FileWriter * file) const
 {
 	std::string condId;
 	GetReadyIdentifier(&condId);

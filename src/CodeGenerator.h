@@ -64,11 +64,11 @@ public:
 	void GetMutexIdentifier(std::string * mutex) const;
 	void GetReadyIdentifier(std::string * readyId) const;
 	void GetConditionIdentifier(std::string * condId) const;
-	bool GenerateLock(std::unique_ptr<FileWriter> &file);
-	bool GenerateUnlock(std::unique_ptr<FileWriter> &file);
-	bool GenerateConditionWait(std::unique_ptr<FileWriter> &file, const std::string* iteration);
-	bool GenerateConditionIncrement(std::unique_ptr<FileWriter> &file) const;
-	bool GenerateConditionBroadcast(std::unique_ptr<FileWriter> &file);
+	bool GenerateLock(FileWriter * file);
+	bool GenerateUnlock(FileWriter * file);
+	bool GenerateConditionWait(FileWriter * file, const std::string* iteration);
+	bool GenerateConditionIncrement(FileWriter * file) const;
+	bool GenerateConditionBroadcast(FileWriter * file);
 	uint32_t GetNewRunningNumber();
 
 private:
@@ -85,6 +85,8 @@ class CodeGenerator {
 
 	FileWriter fileDacC_;
 	FileWriter fileDacH_;
+	FileWriter fileInstructionList_;
+	FileWriter fileInstructions_;
 
 	const Graph* graph_ = nullptr;
 
@@ -97,14 +99,14 @@ class CodeGenerator {
 	bool GenerateStaticVariableDeclarations();
 	bool GenerateThreadSynchVariables();
 	bool GenerateLocalVariableDeclaration(const Variable * var);
-	bool GenerateThreadIncludes();
 	bool GenerateRunFunction();
-	bool GenerateOperationCode(const Node* node, std::unique_ptr<FileWriter> &file);
-	bool OutputCode(const Node* node, std::unique_ptr<FileWriter> &file);
+	bool GenerateInstructions();
+	bool GenerateOperationCode(const Node* node, FileWriter * file);
+	bool OutputCode(const Node* node, FileWriter * file);
 	bool GenerateCallbackPtCheck(FileWriter* file) const;
-	bool VectorAdditionCode(const Node* node, std::unique_ptr<FileWriter> &file);
-	bool VectorScalarMultiplicationCode(const Node* node, std::unique_ptr<FileWriter> &file);
-	bool VectorComparisonIsSmallerCode(const Node* node, std::unique_ptr<FileWriter> &file);
+	bool VectorAdditionCode(const Node* node, FileWriter* file);
+	bool VectorScalarMultiplicationCode(const Node* node, FileWriter * file);
+	bool VectorComparisonIsSmallerCode(const Node* node, FileWriter * file);
 
 	bool FetchVariables();
 
@@ -114,7 +116,6 @@ class CodeGenerator {
 
 	typedef struct {
 		char pthread[42];
-		std::unique_ptr<FileWriter> fileWriter;
 	} cpuThread_t;
 
 	std::vector<cpuThread_t> cpuThreads_;
