@@ -103,6 +103,8 @@ static const char fileHeader[] = \
 static const char pcMutexId[] = "programCounterMutex";
 static const char pcId[] = "programCounter";
 
+static const char nodesId[] = "nodes";
+
 FileWriter::~FileWriter()
 {
 	if(nullptr != outfile_)
@@ -229,12 +231,12 @@ bool CodeGenerator::Generate(const Graph* graph, const Parallizer* parallizer)
 		return false;
 	}
 
-	std::string InstructionListPath = path_;
-	InstructionListPath += "InstructionList.h";
-	success = fileInstructionList_.Init(&InstructionListPath);
+	std::string nodesPath = path_;
+	nodesPath += "Nodes.h";
+	success = fileNodes_.Init(&nodesPath);
 	if(!success)
 	{
-		Error("Could not initialize %s!", InstructionListPath.c_str());
+		Error("Could not initialize %s!", nodesPath.c_str());
 		return false;
 	}
 
@@ -299,7 +301,7 @@ bool CodeGenerator::Generate(const Graph* graph, const Parallizer* parallizer)
 	retFalseOnFalse(GenerateHeading(&threadIncludeHeading), "Instructions Include Heading failed!\n");
 
 	fprintProtect(fileDacC_.PrintfLine("#include \"Instructions.h\""));
-	fprintProtect(fileDacC_.PrintfLine("#include \"InstructionList.h\""));
+	fprintProtect(fileDacC_.PrintfLine("#include \"Nodes.h\""));
 	fprintProtect(fileDacC_.PrintfLine("#include \"Helpers.h\""));
 
 	auto runHeading = std::string("The main run routine");
@@ -307,14 +309,76 @@ bool CodeGenerator::Generate(const Graph* graph, const Parallizer* parallizer)
 
 	retFalseOnFalse(GenerateRunFunction(), "Could not generate Run Function!\n");
 
-	fprintProtect(fileInstructionList_.PrintfLine("typedef void (*instruction_t)(void);\n"));
-	fprintProtect(fileInstructionList_.PrintfLine("static instruction_t instructionList[] = {"));
-	fileInstructionList_.Indent();
+	// Define Node_t // TODO: Move into file
+	fprintProtect(fileNodes_.PrintfLine("#define NODE_T_MAX_EDGE_NUMBER 42u\n"))
+	fprintProtect(fileNodes_.PrintfLine("typedef void (*instruction_t)(void);\n"));
+	fprintProtect(fileNodes_.PrintfLine("typedef struct node_s {"));
+	fileNodes_.Indent();
+	fprintProtect(fileNodes_.PrintfLine("instruction_t instruction;"));
+	fprintProtect(fileNodes_.PrintfLine("const struct node_s * parents[NODE_T_MAX_EDGE_NUMBER];"));
+	fprintProtect(fileNodes_.PrintfLine("const struct node_s * children[NODE_T_MAX_EDGE_NUMBER];"));
+	fprintProtect(fileNodes_.PrintfLine("uint32_t exeCnt;"));
+	fprintProtect(fileNodes_.PrintfLine("const uint16_t parentsNrOf;"));
+	fprintProtect(fileNodes_.PrintfLine("const uint16_t childrenNrOf;"));
+	fprintProtect(fileNodes_.PrintfLine("const uint16_t id;"));
+	fileNodes_.Outdent();
+	fprintProtect(fileNodes_.PrintfLine("} node_t;\n"));
 
 	retFalseOnFalse(GenerateInstructions(), "Could not generate Instructions!\n");
 
-	fileInstructionList_.Outdent();
-	fprintProtect(fileInstructionList_.PrintfLine("};"));
+	retFalseOnFalse(GenerateNodesArray(), "Could not generate Nodes Array");
+
+	return true;
+}
+
+bool CodeGenerator::GenerateNodesArray()
+{
+	fprintProtect(fileNodes_.PrintfLine("static node_t %s[] = {", nodesId));
+	fileNodes_.Indent();
+
+	// Pre-Determine array positions
+	std::map<Node::Id_t, uint32_t> nodeArrayPos;
+	Node::Id_t arrayPos = 0;
+	for(const auto &nodePair: nodesInstructionMap_)
+	{
+		nodeArrayPos.insert(std::pair<Node::Id_t, uint32_t>(nodePair.first, arrayPos));
+		arrayPos++;
+	}
+
+	// Write array
+	for(const auto &nodePair: nodesInstructionMap_)
+	{
+		// Only include parents/children which require an instruction
+		std::vector<uint32_t> parentsArrayPosition;
+		for(const Node::Id_t &parent: nodePair.second->parents)
+		{
+			if(nodesInstructionMap_.end() != nodesInstructionMap_.find(parent))
+			{
+				const auto &arrayPos = nodeArrayPos.find(parent);
+				parentsArrayPosition.push_back(arrayPos->second);
+			}
+		}
+
+		std::vector<uint32_t> childrenArrayPosition;
+		for(const Node::Id_t &child: nodePair.second->children)
+		{
+			if(nodesInstructionMap_.end() != nodesInstructionMap_.find(child))
+			{
+				const auto &arrayPos = nodeArrayPos.find(child);
+				childrenArrayPosition.push_back(arrayPos->second);
+			}
+		}
+
+		retFalseOnFalse(
+				GenerateNodesElem(
+						nodePair.first,
+						&parentsArrayPosition,
+						&childrenArrayPosition),
+				"Could not generate Nodes Element!");
+	}
+
+	fileNodes_.Outdent();
+	fprintProtect(fileNodes_.PrintfLine("};"));
 
 	return true;
 }
@@ -381,7 +445,9 @@ bool CodeGenerator::GenerateInstructions()
 			retFalseIfNotFound(nodePair, nodeMap_, childId);
 
 			// Create function identifier
-			std::string fctId = "Node" + std::to_string(childId) + "Instruction";
+			std::string fctId;
+			GenerateInstructionId(&fctId, childId);
+
 			fileInstructions_.PrintfLine("void %s()", fctId.c_str());
 			fileInstructions_.PrintfLine("{");
 			fileInstructions_.Indent();
@@ -433,8 +499,8 @@ bool CodeGenerator::GenerateInstructions()
 			fileInstructions_.Outdent();
 			fileInstructions_.PrintfLine("}\n");
 
-			// Add function to instruction list
-			fileInstructionList_.PrintfLine("%s,", fctId.c_str());
+			// Add node to "nodes with instruction"
+			nodesInstructionMap_.insert(std::pair<Node::Id_t, const Node*>(childId, nodePair->second));
 
 			// Add node to nodes executed
 			generatedNodes_.insert(childId);
@@ -526,6 +592,75 @@ bool CodeGenerator::GenerateCallbackPtCheck(FileWriter* file) const
 			fprintProtect(file->PrintfLine("}\n"));
 		}
 	}
+
+	return true;
+}
+
+bool CodeGenerator::GenerateInstructionId(std::string * InstrId, const Node::Id_t NodeId)
+{
+	if(nullptr == InstrId)
+	{
+		Error("nullptr");
+		return false;
+	}
+
+	*InstrId = "Node";
+	*InstrId += std::to_string(NodeId);
+	*InstrId += "Instruction";
+
+	return true;
+}
+
+bool CodeGenerator::GenerateNodesElem(
+		const Node::Id_t nodeId,
+		const std::vector<uint32_t> * parentsArrayPosition,
+		const std::vector<uint32_t> * childrenArrayPosition)
+{
+	std::string instrId;
+	GenerateInstructionId(&instrId, nodeId);
+
+	std::string buffer;
+	buffer += instrId;
+	buffer += ", {";
+
+	for(uint32_t parent = 0; parent < parentsArrayPosition->size(); parent++)
+	{
+		buffer += "&";
+		buffer += nodesId;
+		buffer += "[";
+		buffer += std::to_string((*parentsArrayPosition)[parent]);
+		buffer += "]";
+
+		if(parentsArrayPosition->size() - 1 > parent)
+		{
+			buffer += ", ";
+		}
+	}
+
+	buffer += "}, {";
+
+	for(uint32_t child = 0; child < childrenArrayPosition->size(); child++)
+	{
+		buffer += "&";
+		buffer += nodesId;
+		buffer += "[";
+		buffer += std::to_string((*childrenArrayPosition)[child]);
+		buffer += "]";
+
+		if(childrenArrayPosition->size() - 1 > child)
+		{
+			buffer += ", ";
+		}
+	}
+
+	buffer += "}, 0, ";
+	buffer += std::to_string(parentsArrayPosition->size());
+	buffer += ", ";
+	buffer += std::to_string(childrenArrayPosition->size());
+	buffer += ", ";
+	buffer += std::to_string(nodeId);
+
+	fprintProtect(fileNodes_.PrintfLine("{%s},", buffer.c_str()));
 
 	return true;
 }

@@ -85,7 +85,7 @@ class CodeGenerator {
 
 	FileWriter fileDacC_;
 	FileWriter fileDacH_;
-	FileWriter fileInstructionList_;
+	FileWriter fileNodes_;
 	FileWriter fileInstructions_;
 
 	const Graph* graph_ = nullptr;
@@ -101,6 +101,13 @@ class CodeGenerator {
 	bool GenerateLocalVariableDeclaration(const Variable * var);
 	bool GenerateRunFunction();
 	bool GenerateInstructions();
+	bool GenerateNodesArray();
+	bool GenerateInstructionId(std::string * instrId, const Node::Id_t nodeId);
+	bool GenerateNodesElem(
+			const Node::Id_t nodeId,
+			const std::vector<Node::Id_t> * parents,
+			const std::vector<Node::Id_t> * children);
+
 	bool GenerateOperationCode(const Node* node, FileWriter * file);
 	bool OutputCode(const Node* node, FileWriter * file);
 	bool GenerateCallbackPtCheck(FileWriter* file) const;
@@ -113,6 +120,7 @@ class CodeGenerator {
 	std::map<Node::Id_t, Variable> variables_;
 	std::map<Node::Id_t, const Node*> nodeMap_;
 	std::set<Node::Id_t> generatedNodes_;
+	std::map<Node::Id_t, const Node*> nodesInstructionMap_;
 
 	typedef struct {
 		char pthread[42];
