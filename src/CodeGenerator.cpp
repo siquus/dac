@@ -104,6 +104,7 @@ static const char pcMutexId[] = "programCounterMutex";
 static const char pcId[] = "programCounter";
 
 static const char nodesId[] = "nodes";
+static const uint32_t NODE_T_MAX_EDGE_NUMBER = 42;
 
 FileWriter::~FileWriter()
 {
@@ -310,7 +311,7 @@ bool CodeGenerator::Generate(const Graph* graph, const Parallizer* parallizer)
 	retFalseOnFalse(GenerateRunFunction(), "Could not generate Run Function!\n");
 
 	// Define Node_t // TODO: Move into file
-	fprintProtect(fileNodes_.PrintfLine("#define NODE_T_MAX_EDGE_NUMBER 42u\n"))
+	fprintProtect(fileNodes_.PrintfLine("#define NODE_T_MAX_EDGE_NUMBER %uu\n", NODE_T_MAX_EDGE_NUMBER))
 	fprintProtect(fileNodes_.PrintfLine("typedef void (*instruction_t)(void);\n"));
 	fprintProtect(fileNodes_.PrintfLine("typedef struct node_s {"));
 	fileNodes_.Indent();
@@ -623,6 +624,12 @@ bool CodeGenerator::GenerateNodesElem(
 	buffer += instrId;
 	buffer += ", {";
 
+	if(NODE_T_MAX_EDGE_NUMBER < parentsArrayPosition->size())
+	{
+		Error("Too many parent nodes!");
+		return false;
+	}
+
 	for(uint32_t parent = 0; parent < parentsArrayPosition->size(); parent++)
 	{
 		buffer += "&";
@@ -638,6 +645,12 @@ bool CodeGenerator::GenerateNodesElem(
 	}
 
 	buffer += "}, {";
+
+	if(NODE_T_MAX_EDGE_NUMBER < childrenArrayPosition->size())
+	{
+		Error("Too many child nodes!");
+		return false;
+	}
 
 	for(uint32_t child = 0; child < childrenArrayPosition->size(); child++)
 	{
