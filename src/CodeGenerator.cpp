@@ -100,9 +100,6 @@ static const char fileHeader[] = \
 */\n\
 \n";
 
-static const char pcMutexId[] = "programCounterMutex";
-static const char pcId[] = "programCounter";
-
 static const char nodesId[] = "nodes";
 static const uint32_t NODE_T_MAX_EDGE_NUMBER = 42;
 
@@ -253,7 +250,10 @@ bool CodeGenerator::Generate(const Graph* graph, const Parallizer* parallizer)
 	// Copy files
 	GenerateEmbeddedFiles(&path_);
 
-	// Create threads
+	// Generate Includes
+	retFalseOnFalse(GenerateIncludes(), "Could not generate Includes\n");
+
+	// Generate #defines
 	auto cpuInfo = parallizer->GetCpuInfo();
 	if(1 != cpuInfo->size())
 	{
@@ -262,14 +262,7 @@ bool CodeGenerator::Generate(const Graph* graph, const Parallizer* parallizer)
 	}
 
 	const Parallizer::cpu_t * cpu = &cpuInfo->begin()->second;
-	for(uint16_t thread = 0; thread < cpu->coresNrOf; thread++)
-	{
-		cpuThreads_.push_back(cpuThread_t());
-		SNPRINTF(cpuThreads_.back().pthread, sizeof(cpuThreads_.back().pthread), "pthread%u", thread);
-	}
-
-	// Generate Includes
-	retFalseOnFalse(GenerateIncludes(), "Could not generate Includes\n");
+	fprintProtect(fileDacC_.PrintfLine("#define THREADS_NROF %uu", cpu->coresNrOf));
 
 	// Generate global variables
 	auto constHeading = std::string("Constant Variables");
@@ -280,18 +273,7 @@ bool CodeGenerator::Generate(const Graph* graph, const Parallizer* parallizer)
 	auto staticHeading = std::string("Static Variables");
 	retFalseOnFalse(GenerateHeading(&staticHeading), "Static Heading failed!\n");
 
-	fprintProtect(fileDacC_.PrintfLine("static pthread_mutex_t %s = PTHREAD_MUTEX_INITIALIZER;",
-			pcMutexId));
-
-	fprintProtect(fileDacC_.PrintfLine("static int %s = 0;\n", pcId));
-
-	for(const auto &thread: cpuThreads_)
-	{
-		fprintProtect(fileDacC_.PrintfLine("static pthread_t %s;", thread.pthread));
-	}
 	fprintProtect(fileDacC_.PrintfLine(""));
-
-	retFalseOnFalse(GenerateThreadSynchVariables(), "Could not generate Thread Synch Variables!\n");
 
 	retFalseOnFalse(GenerateStaticVariableDeclarations(), "Could not generate Statics\n!");
 
@@ -453,48 +435,10 @@ bool CodeGenerator::GenerateInstructions()
 			fileInstructions_.PrintfLine("{");
 			fileInstructions_.Indent();
 
-			// Lock mutex for node's variable
-			auto opNodeVarPair = variables_.find(childId);
-			if(variables_.end() != opNodeVarPair)
-			{
-				opNodeVarPair->second.GenerateLock(&fileInstructions_);
-			}
-
-			// Do we need to wait for parent node?
-			for(Node::Id_t parentId: nodePair->second->parents)
-			{
-				auto nodeVarPair = variables_.find(parentId);
-				if(variables_.end() == nodeVarPair)
-				{
-					continue; // Nothing to wait for in this node
-				}
-
-				if(nodeVarPair->second.HasProperty(Variable::PROPERTY_CONST))
-				{
-					continue; // Nothing to wait for in this node
-				}
-
-				// We need to make sure parent node was executed
-				std::string one = std::to_string(1);
-				nodeVarPair->second.GenerateConditionWait(
-						&fileInstructions_,
-						&one);
-			}
-
 			retFalseOnFalse(GenerateOperationCode(
 					nodePair->second,
 					&fileInstructions_),
 					"Could not generate Operation Code!\n");
-
-			// Increment the variable Iteration Counter (in case of loops)
-			// release lock
-			// Signal that this node is ready
-			if(variables_.end() != opNodeVarPair)
-			{
-				opNodeVarPair->second.GenerateConditionIncrement(&fileInstructions_);
-				opNodeVarPair->second.GenerateUnlock(&fileInstructions_);
-				opNodeVarPair->second.GenerateConditionBroadcast(&fileInstructions_);
-			}
 
 			// End function
 			fileInstructions_.Outdent();
@@ -691,30 +635,10 @@ bool CodeGenerator::GenerateRunFunction()
 	GenerateCallbackPtCheck(&fileDacC_);
 
 	// Fire up threads
-	fprintProtect(fileDacC_.PrintfLine("int threadCreateRet;"));
-
-	for(const cpuThread_t &thread: cpuThreads_)
-	{
-		fprintProtect(fileDacC_.PrintfLine("threadCreateRet = pthread_create(&%s, NULL, threadFunction, NULL);",
-				thread.pthread,
-				thread.pthread));
-		fprintProtect(fileDacC_.PrintfLine("if(0 != threadCreateRet)"));
-		fprintProtect(fileDacC_.PrintfLine("{"));
-		fprintProtect(fileDacC_.PrintfLine("\terrExitEN(threadCreateRet, \"pthread_create\");"));
-		fprintProtect(fileDacC_.PrintfLine("}\n"));
-	}
+	fprintProtect(fileDacC_.PrintfLine("StartThreads();"));
 
 	// Join threads, create return values and closing brackets
-	fprintProtect(fileDacC_.PrintfLine("int joinRet;"));
-	for(const cpuThread_t &thread: cpuThreads_)
-	{
-		fprintProtect(fileDacC_.PrintfLine("joinRet = pthread_join(%s, NULL);",
-				thread.pthread));
-		fprintProtect(fileDacC_.PrintfLine("if(0 != joinRet)"));
-		fprintProtect(fileDacC_.PrintfLine("{"));
-		fprintProtect(fileDacC_.PrintfLine("\terrExitEN(joinRet, \"pthread_join\");"));
-		fprintProtect(fileDacC_.PrintfLine("}\n"));
-	}
+	fprintProtect(fileDacC_.PrintfLine("JoinThreads();\n"));
 
 	// Return 0 to show success.
 	fprintProtect(fileDacC_.PrintfLine("return 0;\n}\n"));
@@ -930,33 +854,6 @@ bool CodeGenerator::GenerateConstantDeclarations()
 
 			generatedNodes_.insert(varPair.first);
 		}
-	}
-
-	return true;
-}
-
-bool CodeGenerator::GenerateThreadSynchVariables()
-{
-	std::string tmpString;
-	for(const auto &var: variables_)
-	{
-		if(var.second.HasProperty(Variable::PROPERTY_CONST))
-		{
-			// Constant variables require no mutex
-			continue;
-		}
-
-		var.second.GetMutexIdentifier(&tmpString);
-		fprintProtect(fileDacC_.PrintfLine("static pthread_mutex_t %s = PTHREAD_MUTEX_INITIALIZER;",
-				tmpString.c_str()));
-
-		var.second.GetConditionIdentifier(&tmpString);
-		fprintProtect(fileDacC_.PrintfLine("static pthread_cond_t %s = PTHREAD_COND_INITIALIZER;",
-				tmpString.c_str()));
-
-		var.second.GetReadyIdentifier(&tmpString);
-		fprintProtect(fileDacC_.PrintfLine("static uint32_t %s = 0;\n",
-				tmpString.c_str()));
 	}
 
 	return true;
@@ -1218,30 +1115,6 @@ inline bool Variable::HasProperty(properties_t property) const
 	return false;
 }
 
-void Variable::GetMutexIdentifier(std::string * mutex) const
-{
-	*mutex = identifier_;
-	*mutex += "Mutex";
-
-	return;
-}
-
-void Variable::GetConditionIdentifier(std::string * condId) const
-{
-	*condId = identifier_;
-	*condId += "Condition";
-
-	return;
-}
-
-void Variable::GetReadyIdentifier(std::string * readyId) const
-{
-	*readyId = identifier_;
-	*readyId += "Iteration";
-
-	return;
-}
-
 const char* Variable::GetTypeString() const
 {
 	static const char typeStrings[(int) Type::nrOf][30] = {
@@ -1316,107 +1189,6 @@ Variable::Variable(const std::string* identifier, properties_t properties, Type 
 	}
 
 	identifier_ = *identifier;
-}
-
-bool Variable::GenerateLock(FileWriter * file)
-{
-	std::string mutexId;
-	GetMutexIdentifier(&mutexId);
-
-	std::string retId = mutexId.c_str() + std::string("Ret") + std::to_string(GetNewRunningNumber());
-
-	fprintProtect(file->PrintfLine("int %s;", retId.c_str()));
-	fprintProtect(file->PrintfLine("%s = pthread_mutex_lock(&%s);",
-			retId.c_str(), mutexId.c_str()));
-	fprintProtect(file->PrintfLine("if(0 != %s)", retId.c_str()));
-	fprintProtect(file->PrintfLine("{"));
-	fprintProtect(file->PrintfLine("\terrExitEN(%s, \"pthread_mutex_lock\");",
-			retId.c_str()));
-	fprintProtect(file->PrintfLine("}\n"));
-
-		return true;
-}
-
-bool Variable::GenerateUnlock(FileWriter * file)
-{
-	std::string mutexId;
-	GetMutexIdentifier(&mutexId);
-
-	std::string retId = mutexId.c_str() + std::string("Ret") + std::to_string(GetNewRunningNumber());
-
-	fprintProtect(file->PrintfLine("int %s;", retId.c_str()));
-	fprintProtect(file->PrintfLine("%s = pthread_mutex_unlock(&%s);",
-			retId.c_str(), mutexId.c_str()));
-	fprintProtect(file->PrintfLine("if(0 != %s)", retId.c_str()));
-	fprintProtect(file->PrintfLine("{"));
-	fprintProtect(file->PrintfLine("\terrExitEN(%s, \"pthread_mutex_unlock\");",
-			retId.c_str()));
-	fprintProtect(file->PrintfLine("}\n"));
-
-	return true;
-}
-
-bool Variable::GenerateConditionWait(FileWriter * file, const std::string* iteration)
-{
-	retFalseOnFalse(GenerateLock(file), "Could not generate Lock");
-
-	std::string mutexId;
-	GetMutexIdentifier(&mutexId);
-
-	std::string condId;
-	GetConditionIdentifier(&condId);
-
-	std::string readyId;
-	GetReadyIdentifier(&readyId);
-
-	std::string retId = condId.c_str() + std::string("Ret") + std::to_string(GetNewRunningNumber());
-
-	fprintProtect(file->PrintfLine("while(%s < %s)", readyId.c_str(), iteration->c_str()));
-	fprintProtect(file->PrintfLine("{"));
-	fprintProtect(file->PrintfLine("\tint %s;", retId.c_str()));
-	fprintProtect(file->PrintfLine("\t%s = pthread_cond_wait(&%s, &%s);",
-			retId.c_str(),
-			condId.c_str(),
-			mutexId.c_str()));
-	fprintProtect(file->PrintfLine("\tif(%s != 0)", retId.c_str()));
-	fprintProtect(file->PrintfLine("\t{"));
-	fprintProtect(file->PrintfLine("\t\terrExitEN(%s, \"pthread_cond_wait\");",
-			retId.c_str()));
-	fprintProtect(file->PrintfLine("\t}"));
-	fprintProtect(file->PrintfLine("}\n"));
-
-	retFalseOnFalse(GenerateUnlock(file), "Could not generate Unlock");
-
-	return true;
-}
-
-bool Variable::GenerateConditionBroadcast(FileWriter * file)
-{
-	std::string condId;
-	GetConditionIdentifier(&condId);
-
-	std::string retId = condId.c_str() + std::string("Ret") + std::to_string(GetNewRunningNumber());
-
-	fprintProtect(file->PrintfLine("int %s;", retId.c_str()));
-	fprintProtect(file->PrintfLine("%s = pthread_cond_broadcast(&%s);",
-			retId.c_str(), condId.c_str()));
-	fprintProtect(file->PrintfLine("if(0 != %s)", retId.c_str()));
-	fprintProtect(file->PrintfLine("{"));
-	fprintProtect(file->PrintfLine("\terrExitEN(%s, \"pthread_cond_broadcast\");",
-			retId.c_str()));
-	fprintProtect(file->PrintfLine("}\n"));
-
-	return true;
-}
-
-bool Variable::GenerateConditionIncrement(FileWriter * file) const
-{
-	std::string condId;
-	GetReadyIdentifier(&condId);
-
-	fprintProtect(file->PrintfLine("%s++;", condId.c_str()));
-
-	return true;
 }
 
 bool Variable::GetDeclaration(std::string* decl) const

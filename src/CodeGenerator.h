@@ -61,14 +61,6 @@ public:
 	bool HasProperty(properties_t property) const;
 	bool AddProperty(properties_t property);
 	const char* GetTypeString() const;
-	void GetMutexIdentifier(std::string * mutex) const;
-	void GetReadyIdentifier(std::string * readyId) const;
-	void GetConditionIdentifier(std::string * condId) const;
-	bool GenerateLock(FileWriter * file);
-	bool GenerateUnlock(FileWriter * file);
-	bool GenerateConditionWait(FileWriter * file, const std::string* iteration);
-	bool GenerateConditionIncrement(FileWriter * file) const;
-	bool GenerateConditionBroadcast(FileWriter * file);
 	uint32_t GetNewRunningNumber();
 
 private:
@@ -97,7 +89,6 @@ class CodeGenerator {
 	bool GenerateOutputFunctions();
 	bool GenerateConstantDeclarations();
 	bool GenerateStaticVariableDeclarations();
-	bool GenerateThreadSynchVariables();
 	bool GenerateLocalVariableDeclaration(const Variable * var);
 	bool GenerateRunFunction();
 	bool GenerateInstructions();
@@ -121,12 +112,6 @@ class CodeGenerator {
 	std::map<Node::Id_t, const Node*> nodeMap_;
 	std::set<Node::Id_t> generatedNodes_;
 	std::map<Node::Id_t, const Node*> nodesInstructionMap_;
-
-	typedef struct {
-		char pthread[42];
-	} cpuThread_t;
-
-	std::vector<cpuThread_t> cpuThreads_;
 
 public:
 	CodeGenerator(const std::string* path);
