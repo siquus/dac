@@ -317,7 +317,7 @@ bool CodeGenerator::Generate(const Graph* graph, const Parallizer* parallizer)
 	fileNodes_.Indent();
 	fprintProtect(fileNodes_.PrintfLine("instruction_t instruction;"));
 	fprintProtect(fileNodes_.PrintfLine("const struct node_s * parents[NODE_T_MAX_EDGE_NUMBER];"));
-	fprintProtect(fileNodes_.PrintfLine("const struct node_s * children[NODE_T_MAX_EDGE_NUMBER];"));
+	fprintProtect(fileNodes_.PrintfLine("struct node_s * children[NODE_T_MAX_EDGE_NUMBER];"));
 	fprintProtect(fileNodes_.PrintfLine("uint32_t exeCnt;"));
 	fprintProtect(fileNodes_.PrintfLine("const uint16_t parentsNrOf;"));
 	fprintProtect(fileNodes_.PrintfLine("const uint16_t childrenNrOf;"));
