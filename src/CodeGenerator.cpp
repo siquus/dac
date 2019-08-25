@@ -366,12 +366,10 @@ bool CodeGenerator::GenerateNodesArray()
 	return true;
 }
 
-bool CodeGenerator::GenerateInstructions()
+bool CodeGenerator::GetFirstNodesToExecute(std::set<Node::Id_t> * nodeSet)
 {
-	// Traverse the Graph and generate Code
 	// Find all nodes which do not have parents and create a set of their children
 	std::set<Node::Id_t> roots;
-	std::set<Node::Id_t> firstGenerationChildren;
 
 	auto nodes = graph_->GetNodes();
 	for(const Node &node: *nodes)
@@ -381,14 +379,14 @@ bool CodeGenerator::GenerateInstructions()
 			roots.insert(node.id);
 			std::copy(
 					node.children.begin(), node.children.end(),
-					std::inserter(firstGenerationChildren, firstGenerationChildren.end()));
+					std::inserter(*nodeSet, nodeSet->end()));
 		}
 	}
 
 	// delete all children which have non-root parents.
 	// i.e. these children may be executed right away.
 	std::vector<Node::Id_t> nonFirstGenerationChildren;
-	for(Node::Id_t childId: firstGenerationChildren)
+	for(Node::Id_t childId: *nodeSet)
 	{
 		const auto childNodeIt =  nodeMap_.find(childId);
 		if(nodeMap_.end() == childNodeIt)
@@ -412,104 +410,53 @@ bool CodeGenerator::GenerateInstructions()
 
 	for(Node::Id_t childId: nonFirstGenerationChildren)
 	{
-		firstGenerationChildren.erase(childId);
+		nodeSet->erase(childId);
 	}
 
-	std::set<Node::Id_t> * children = &firstGenerationChildren;
+	return true;
+}
 
-	std::set<Node::Id_t> tmpSet;
-	std::set<Node::Id_t> * nextGenChildren = &tmpSet;
-
-	while(1)
+bool CodeGenerator::GenerateInstructions()
+{
+	const auto nodes = graph_->GetNodes();
+	for(const Node &node: *nodes)
 	{
-		// Create Code for all children and create new set with the next generation
-		for(Node::Id_t childId: *children)
+		// Does this node require a function?
+		switch(node.Type)
 		{
-			retFalseIfNotFound(nodePair, nodeMap_, childId);
+		default:
+			Error("Unknown Node-Type %u\n", (uint8_t) node.Type);
+			return false;
 
-			// Create function identifier
-			std::string fctId;
-			GenerateInstructionId(&fctId, childId);
+		case Node::Type::VECTOR:
+			continue; // does not have instruction
 
-			fileInstructions_.PrintfLine("void %s()", fctId.c_str());
-			fileInstructions_.PrintfLine("{");
-			fileInstructions_.Indent();
-
-			retFalseOnFalse(GenerateOperationCode(
-					nodePair->second,
-					&fileInstructions_),
-					"Could not generate Operation Code!\n");
-
-			// End function
-			fileInstructions_.Outdent();
-			fileInstructions_.PrintfLine("}\n");
-
-			// Add node to "nodes with instruction"
-			nodesInstructionMap_.insert(std::pair<Node::Id_t, const Node*>(childId, nodePair->second));
-
-			// Add node to nodes executed
-			generatedNodes_.insert(childId);
-
-			// Add its children to the next generation
-			for(Node::Id_t childsChildId: nodePair->second->children)
-			{
-				// Make sure it hasn't been generated already
-				if(generatedNodes_.end() == generatedNodes_.find(childsChildId))
-				{
-					nextGenChildren->insert(childsChildId);
-				}
-			}
+		case Node::Type::VECTOR_ADDITION: // no break intended
+		case Node::Type::VECTOR_SCALAR_MULTIPLICATION: // no break intended
+		case Node::Type::VECTOR_COMPARISON_IS_SMALLER: // no break intended
+		case Node::Type::OUTPUT:
+			break; // create instruction
 		}
 
-		// Remove all nextGen children who's parents have not been generated
-		for(auto childIt = nextGenChildren->begin(); childIt != nextGenChildren->end();)
-		{
-			retFalseIfNotFound(childPair, nodeMap_, *childIt);
-			bool removeChild = false;
-			for(Node::Id_t parentId: childPair->second->parents)
-			{
-				if(generatedNodes_.end() == generatedNodes_.find(parentId))
-				{
-					removeChild = true;
-					break;
-				}
-			}
+		// Create function identifier
+		std::string fctId;
+		GenerateInstructionId(&fctId, node.id);
 
-			if(removeChild)
-			{
-				childIt = nextGenChildren->erase(childIt);
-			}
-			else
-			{
-				childIt++;
-			}
-		}
+		fileInstructions_.PrintfLine("void %s()", fctId.c_str());
+		fileInstructions_.PrintfLine("{");
+		fileInstructions_.Indent();
 
-		// Any children left to generate?
-		if(0 == nextGenChildren->size())
-		{
-			// Have all nodes been generated? Otherwise we are stuck here..
-			if(generatedNodes_.size() != nodeMap_.size())
-			{
-				Error("Not all Nodes were generated! Missing ");
-				for(auto &node: nodeMap_)
-				{
-					if(generatedNodes_.end() == generatedNodes_.find(node.second->id))
-					{
-						ErrorContinued("Node%u, ", node.second->id);
-					}
-				}
-				ErrorContinued("\n");
-				return false;
-			}
-			break;
-		}
+		retFalseOnFalse(GenerateOperationCode(
+				&node,
+				&fileInstructions_),
+				"Could not generate Operation Code!\n");
 
-		// Prepare sets for next iteration
-		children->clear();
-		auto tmp = children;
-		children = nextGenChildren;
-		nextGenChildren = tmp;
+		// End function
+		fileInstructions_.Outdent();
+		fileInstructions_.PrintfLine("}\n");
+
+		// Add node to "nodes with instruction"
+		nodesInstructionMap_.insert(std::pair<Node::Id_t, const Node*>(node.id, &node));
 	}
 
 	return true;
@@ -851,8 +798,6 @@ bool CodeGenerator::GenerateConstantDeclarations()
 			retFalseOnFalse(var->GetDeclaration(&decl), "Could not get declaration!\n");
 
 			fprintProtect(fileDacC_.PrintfLine("%s", decl.c_str()));
-
-			generatedNodes_.insert(varPair.first);
 		}
 	}
 

@@ -8,7 +8,10 @@
 #ifndef SRC_HELPERS_H_
 #define SRC_HELPERS_H_
 
+#include <stdatomic.h>
+
 static pthread_t threads[THREADS_NROF];
+static atomic_uchar threadInactive[THREADS_NROF] = {1};
 
 const uint16_t ALL_JOBS_COMPLETED = UINT16_MAX;
 typedef struct {
@@ -27,6 +30,8 @@ static nodeJobPool_t nodeJobPool = {
 
 void * threadFunction(void * arg)
 {
+	uint16_t threadArrayIndex = *((uint16_t*) arg);
+
 	node_t * nodeJob = NULL;
 
 	while(1)
@@ -82,10 +87,37 @@ void * threadFunction(void * arg)
 					}
 				}
 			}
+
+			if(0 == nodeJobPool.jobsNrOf)
+			{
+				// Any other thread still working or are we out of work?
+				uint8_t stillWorking = 0;
+				for(uint16_t thread = 0; thread < sizeof(threads) / sizeof(threads[0]); thread++)
+				{
+					if(threadArrayIndex == thread)
+					{
+						continue; // this is us
+					}
+
+					if(!threadInactive[thread])
+					{
+						stillWorking = 1;
+						break;
+					}
+				}
+
+				if(!stillWorking)
+				{
+					// Program is done: Let other threads know and return
+					goto SIGNAL_DONE_AND_TERMINATE;
+				}
+			}
 		}
 
 		while (0 == nodeJobPool.jobsNrOf)
 		{
+			threadInactive[threadArrayIndex] = 1;
+
 			int waitRet = pthread_cond_wait(&nodeJobPool.condition, &nodeJobPool.mutex);
 			if(waitRet != 0)
 			{
@@ -95,13 +127,15 @@ void * threadFunction(void * arg)
 
 		if(ALL_JOBS_COMPLETED == nodeJobPool.jobsNrOf)
 		{
-			break; // done
+			goto SIGNAL_DONE_AND_TERMINATE;
 		}
 		else
 		{
 			nodeJob = nodeJobPool.jobs[nodeJobPool.jobsNrOf - 1];
 			nodeJobPool.jobsNrOf--;
 		}
+
+		threadInactive[threadArrayIndex] = 0;
 
 		uint8_t signalJobsAvailable = 0;
 		if(jobsWereEmptyBefore && nodeJobPool.jobsNrOf)
@@ -129,6 +163,22 @@ void * threadFunction(void * arg)
 		nodeJob->instruction();
 	}
 
+	SIGNAL_DONE_AND_TERMINATE:
+	nodeJobPool.jobsNrOf = ALL_JOBS_COMPLETED;
+
+	int mutexUnlockRet;
+	mutexUnlockRet = pthread_mutex_unlock(&nodeJobPool.mutex);
+	if(0 != mutexUnlockRet)
+	{
+		errExitEN(mutexUnlockRet, "pthread_mutex_unlock");
+	}
+
+	int condSignalReturn = pthread_cond_signal(&nodeJobPool.condition); // Wake sleeping consumer
+	if (condSignalReturn != 0)
+	{
+		errExitEN(condSignalReturn, "pthread_cond_signal");
+	}
+
 	return NULL;
 }
 
@@ -137,7 +187,7 @@ void StartThreads()
 	for(uint16_t thread = 0; thread < sizeof(threads) / sizeof(threads[0]); thread++)
 	{
 		int threadCreateRet;
-		threadCreateRet = pthread_create(&threads[thread], NULL, threadFunction, NULL);
+		threadCreateRet = pthread_create(&threads[thread], NULL, threadFunction, &thread);
 		if(0 != threadCreateRet)
 		{
 			errExitEN(threadCreateRet, "pthread_create");

@@ -107,10 +107,10 @@ class CodeGenerator {
 	bool VectorComparisonIsSmallerCode(const Node* node, FileWriter * file);
 
 	bool FetchVariables();
+	bool GetFirstNodesToExecute(std::set<Node::Id_t> * nodeSet);
 
 	std::map<Node::Id_t, Variable> variables_;
 	std::map<Node::Id_t, const Node*> nodeMap_;
-	std::set<Node::Id_t> generatedNodes_;
 	std::map<Node::Id_t, const Node*> nodesInstructionMap_;
 
 public:
