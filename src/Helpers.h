@@ -8,6 +8,8 @@
 #ifndef SRC_HELPERS_H_
 #define SRC_HELPERS_H_
 
+static pthread_t threads[THREADS_NROF];
+
 const uint16_t ALL_JOBS_COMPLETED = UINT16_MAX;
 typedef struct {
 	pthread_mutex_t mutex;
@@ -128,6 +130,32 @@ void * threadFunction(void * arg)
 	}
 
 	return NULL;
+}
+
+void StartThreads()
+{
+	for(uint16_t thread = 0; thread < sizeof(threads) / sizeof(threads[0]); thread++)
+	{
+		int threadCreateRet;
+		threadCreateRet = pthread_create(&threads[thread], NULL, threadFunction, NULL);
+		if(0 != threadCreateRet)
+		{
+			errExitEN(threadCreateRet, "pthread_create");
+		}
+	}
+}
+
+void JoinThreads()
+{
+	for(uint16_t thread = 0; thread < sizeof(threads) / sizeof(threads[0]); thread++)
+	{
+		int joinRet;
+		joinRet = pthread_join(threads[thread], NULL);
+		if(0 != joinRet)
+		{
+			errExitEN(joinRet, "pthread_join");
+		}
+	}
 }
 
 #endif /* SRC_HELPERS_H_ */
