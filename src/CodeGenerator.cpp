@@ -338,6 +338,12 @@ bool CodeGenerator::GenerateNodesArray()
 			if(nodesInstructionMap_.end() != nodesInstructionMap_.find(parent))
 			{
 				const auto &arrayPos = nodeArrayPos.find(parent);
+				if(nodeArrayPos.end() == arrayPos)
+				{
+					Error("Couldn't find array position");
+					return false;
+				}
+
 				parentsArrayPosition.push_back(arrayPos->second);
 			}
 		}
@@ -348,6 +354,12 @@ bool CodeGenerator::GenerateNodesArray()
 			if(nodesInstructionMap_.end() != nodesInstructionMap_.find(child))
 			{
 				const auto &arrayPos = nodeArrayPos.find(child);
+				if(nodeArrayPos.end() == arrayPos)
+				{
+					Error("Couldn't find array position");
+					return false;
+				}
+
 				childrenArrayPosition.push_back(arrayPos->second);
 			}
 		}
@@ -361,7 +373,35 @@ bool CodeGenerator::GenerateNodesArray()
 	}
 
 	fileNodes_.Outdent();
-	fprintProtect(fileNodes_.PrintfLine("};"));
+	fprintProtect(fileNodes_.PrintfLine("};\n"));
+
+	// Create node-list to initialize job pool
+	std::set<Node::Id_t> firstNodes;
+	GetFirstNodesToExecute(&firstNodes);
+
+	std::string jobPoolInitStr;
+	jobPoolInitStr += "#define JOB_POOL_INIT {";
+
+	for(const auto &node: firstNodes)
+	{
+		const auto &arrayPos = nodeArrayPos.find(node);
+		if(nodeArrayPos.end() == arrayPos)
+		{
+			Error("Couldn't find array position");
+			return false;
+		}
+
+		jobPoolInitStr += "&nodes[";
+		jobPoolInitStr += std::to_string(arrayPos->second);
+		jobPoolInitStr += "]";
+		jobPoolInitStr += ", ";
+	}
+
+	jobPoolInitStr.erase(jobPoolInitStr.size() - 2); // Remove last ", "
+	jobPoolInitStr += "}";
+
+	fprintProtect(fileNodes_.PrintfLine(jobPoolInitStr.c_str()));
+	fprintProtect(fileNodes_.PrintfLine("#define JOB_POOL_INIT_NROF %u", firstNodes.size()));
 
 	return true;
 }

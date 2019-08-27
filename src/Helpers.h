@@ -8,10 +8,11 @@
 #ifndef SRC_HELPERS_H_
 #define SRC_HELPERS_H_
 
+#include <stdio.h>
 #include <stdatomic.h>
 
 static pthread_t threads[THREADS_NROF];
-static atomic_uchar threadInactive[THREADS_NROF] = {1};
+static atomic_uchar threadActive[THREADS_NROF] = {0};
 
 const uint16_t ALL_JOBS_COMPLETED = UINT16_MAX;
 typedef struct {
@@ -24,8 +25,8 @@ typedef struct {
 static nodeJobPool_t nodeJobPool = {
 		.mutex = PTHREAD_MUTEX_INITIALIZER,
 		.condition = PTHREAD_COND_INITIALIZER,
-		.jobs = {NULL},
-		.jobsNrOf = 0
+		.jobs = JOB_POOL_INIT,
+		.jobsNrOf = JOB_POOL_INIT_NROF
 };
 
 void * threadFunction(void * arg)
@@ -99,7 +100,7 @@ void * threadFunction(void * arg)
 						continue; // this is us
 					}
 
-					if(!threadInactive[thread])
+					if(threadActive[thread])
 					{
 						stillWorking = 1;
 						break;
@@ -109,6 +110,9 @@ void * threadFunction(void * arg)
 				if(!stillWorking)
 				{
 					// Program is done: Let other threads know and return
+					printf("Thread %u executed last instruction!\n", threadArrayIndex);
+					fflush(stdout);
+
 					goto SIGNAL_DONE_AND_TERMINATE;
 				}
 			}
@@ -116,7 +120,7 @@ void * threadFunction(void * arg)
 
 		while (0 == nodeJobPool.jobsNrOf)
 		{
-			threadInactive[threadArrayIndex] = 1;
+			threadActive[threadArrayIndex] = 0;
 
 			int waitRet = pthread_cond_wait(&nodeJobPool.condition, &nodeJobPool.mutex);
 			if(waitRet != 0)
@@ -133,9 +137,32 @@ void * threadFunction(void * arg)
 		{
 			nodeJob = nodeJobPool.jobs[nodeJobPool.jobsNrOf - 1];
 			nodeJobPool.jobsNrOf--;
-		}
 
-		threadInactive[threadArrayIndex] = 0;
+			threadActive[threadArrayIndex] = 1;
+
+			printf("Thread %u picking up Node %u. ", threadArrayIndex, nodeJob->id);
+			printf("%u Nodes remaining: ", nodeJobPool.jobsNrOf);
+
+			for(uint32_t node = 0; node < nodeJobPool.jobsNrOf; node++)
+			{
+				printf("%u, ", (nodeJobPool.jobs[node])->id);
+			}
+
+			printf("Thread active: ");
+			for(uint16_t thread = 0; thread < sizeof(threadActive) / sizeof(threadActive[0]); thread++)
+			{
+				if(threadActive[thread])
+				{
+					printf("1 ");
+				}
+				else
+				{
+					printf("0 ");
+				}
+			}
+			printf("\n");
+			fflush(stdout);
+		}
 
 		uint8_t signalJobsAvailable = 0;
 		if(jobsWereEmptyBefore && nodeJobPool.jobsNrOf)
@@ -184,6 +211,9 @@ void * threadFunction(void * arg)
 
 void StartThreads()
 {
+	printf("Starting %u threads\n", sizeof(threads) / sizeof(threads[0]));
+	fflush(stdout);
+
 	for(uint16_t thread = 0; thread < sizeof(threads) / sizeof(threads[0]); thread++)
 	{
 		int threadCreateRet;
