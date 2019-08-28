@@ -11,6 +11,10 @@
 #include <stdio.h>
 #include <stdatomic.h>
 
+#define DPRINTF(...) \
+	printf(__VA_ARGS__); \
+	fflush(stdout);
+
 static pthread_t threads[THREADS_NROF];
 static atomic_uchar threadActive[THREADS_NROF] = {0};
 
@@ -110,8 +114,7 @@ void * threadFunction(void * arg)
 				if(!stillWorking)
 				{
 					// Program is done: Let other threads know and return
-					printf("Thread %u executed last instruction!\n", threadArrayIndex);
-					fflush(stdout);
+					DPRINTF("Thread %u executed last instruction!\n", threadArrayIndex);
 
 					goto SIGNAL_DONE_AND_TERMINATE;
 				}
@@ -140,28 +143,27 @@ void * threadFunction(void * arg)
 
 			threadActive[threadArrayIndex] = 1;
 
-			printf("Thread %u picking up Node %u. ", threadArrayIndex, nodeJob->id);
-			printf("%u Nodes remaining: ", nodeJobPool.jobsNrOf);
+			DPRINTF("Thread %2u picking up Node %2u. ", threadArrayIndex, nodeJob->id);
+			DPRINTF("%2u Nodes remaining: ", nodeJobPool.jobsNrOf);
 
 			for(uint32_t node = 0; node < nodeJobPool.jobsNrOf; node++)
 			{
-				printf("%u, ", (nodeJobPool.jobs[node])->id);
+				DPRINTF("%u, ", (nodeJobPool.jobs[node])->id);
 			}
 
-			printf("Thread active: ");
+			DPRINTF("\tThread active: ");
 			for(uint16_t thread = 0; thread < sizeof(threadActive) / sizeof(threadActive[0]); thread++)
 			{
 				if(threadActive[thread])
 				{
-					printf("1 ");
+					DPRINTF("1 ");
 				}
 				else
 				{
-					printf("0 ");
+					DPRINTF("0 ");
 				}
 			}
-			printf("\n");
-			fflush(stdout);
+			DPRINTF("\n");
 		}
 
 		uint8_t signalJobsAvailable = 0;
@@ -211,8 +213,7 @@ void * threadFunction(void * arg)
 
 void StartThreads()
 {
-	printf("Starting %u threads\n", sizeof(threads) / sizeof(threads[0]));
-	fflush(stdout);
+	DPRINTF("Starting %lu threads\n", sizeof(threads) / sizeof(threads[0]));
 
 	for(uint16_t thread = 0; thread < sizeof(threads) / sizeof(threads[0]); thread++)
 	{
