@@ -89,7 +89,7 @@ VectorSpace::Vector * VectorSpace::Element(Graph * graph, const std::vector<inTy
 	}
 
 	Node node;
-	node.Type = Node::Type::VECTOR;
+	node.type = Node::Type::VECTOR;
 	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
 	node.object = retVec;
 
@@ -147,7 +147,7 @@ VectorSpace::Vector* VectorSpace::Vector::Multiply(const Vector* vec)
 	Node node;
 	node.parents.push_back(nodeId_);
 	node.parents.push_back(vec->nodeId_);
-	node.Type = Node::Type::VECTOR_SCALAR_MULTIPLICATION;
+	node.type = Node::Type::VECTOR_SCALAR_MULTIPLICATION;
 	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
 	node.object = retVec;
 
@@ -183,7 +183,7 @@ VectorSpace::Vector* VectorSpace::Vector::IsSmaller(const Vector* vec)
 	Node node;
 	node.parents.push_back(nodeId_);
 	node.parents.push_back(vec->nodeId_);
-	node.Type = Node::Type::VECTOR_COMPARISON_IS_SMALLER;
+	node.type = Node::Type::VECTOR_COMPARISON_IS_SMALLER;
 	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
 	node.object = retVec;
 
@@ -235,7 +235,7 @@ VectorSpace::Vector* VectorSpace::Vector::Add(const Vector* vec)
 	Node node;
 	node.parents.push_back(nodeId_);
 	node.parents.push_back(vec->nodeId_);
-	node.Type = Node::Type::VECTOR_ADDITION;
+	node.type = Node::Type::VECTOR_ADDITION;
 	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
 	node.object = retVec;
 

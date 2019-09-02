@@ -45,7 +45,7 @@ public:
 	void* object = nullptr;
 	std::vector<Id_t> parents;
 	std::vector<Id_t> children;
-	Type Type;
+	Type type;
 	ObjectType objectType;
 	Id_t id;
 	Hardware_t hardware;

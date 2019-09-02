@@ -192,9 +192,9 @@ bool CodeGenerator::Generate(const Graph* graph, const Parallizer* parallizer)
 
 	for(const auto &nodePair: nodeMap_)
 	{
-		DEBUG("nodeMap Node%u: Type %u, ObjType %u,  Children ",
+		DEBUG("nodeMap Node%2u: Type %2u, ObjType %2u,  Children ",
 				nodePair.first,
-				(unsigned int) nodePair.second->Type,
+				(unsigned int) nodePair.second->type,
 				(unsigned int) nodePair.second->objectType);
 
 		for(Node::Id_t nodeId: nodePair.second->children)
@@ -462,10 +462,10 @@ bool CodeGenerator::GenerateInstructions()
 	for(const Node &node: *nodes)
 	{
 		// Does this node require a function?
-		switch(node.Type)
+		switch(node.type)
 		{
 		default:
-			Error("Unknown Node-Type %u\n", (uint8_t) node.Type);
+			Error("Unknown Node-Type %u\n", (uint8_t) node.type);
 			return false;
 
 		case Node::Type::VECTOR:
@@ -507,7 +507,7 @@ bool CodeGenerator::GenerateCallbackPtCheck(FileWriter* file) const
 	auto nodes = graph_->GetNodes();
 	for(const Node &node: *nodes)
 	{
-		if(Node::Type::OUTPUT != node.Type)
+		if(Node::Type::OUTPUT != node.type)
 		{
 			continue;
 		}
@@ -669,7 +669,7 @@ bool CodeGenerator::OutputCode(const Node* node, FileWriter * file)
 
 bool CodeGenerator::GenerateOperationCode(const Node* node, FileWriter * file)
 {
-	switch(node->Type)
+	switch(node->type)
 	{
 	case Node::Type::VECTOR_ADDITION:
 		retFalseOnFalse(VectorAdditionCode(node, file), "Could not generate Vector Addition Code!\n");
@@ -691,11 +691,11 @@ bool CodeGenerator::GenerateOperationCode(const Node* node, FileWriter * file)
 		break;
 
 	case Node::Type::VECTOR:
-		Error("Type %i is no operation!\n", (int) node->Type);
+		Error("Type %i is no operation!\n", (int) node->type);
 		return false;
 
 	default:
-		Error("Unknown Type %i!\n", (int) node->Type);
+		Error("Unknown Type %i!\n", (int) node->type);
 		return false;
 	}
 
@@ -942,7 +942,7 @@ bool CodeGenerator::FetchVariables()
 	// Identify Outputs and mark output variables as such
 	for(const Node &node: *nodes)
 	{
-		if(Node::Type::OUTPUT != node.Type)
+		if(Node::Type::OUTPUT != node.type)
 		{
 			continue;
 		}
@@ -991,7 +991,7 @@ bool CodeGenerator::GenerateOutputFunctions()
 	auto nodes = graph_->GetNodes();
 	for(const Node &node: *nodes)
 	{
-		if(Node::Type::OUTPUT != node.Type)
+		if(Node::Type::OUTPUT != node.type)
 		{
 			continue;
 		}

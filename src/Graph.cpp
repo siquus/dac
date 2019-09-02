@@ -80,4 +80,3 @@ bool Graph::AddParent(Node::Id_t parent, Node::Id_t child)
 	Error("Could not AddParent!\n");
 	return false;
 }
-

@@ -28,7 +28,7 @@ Output::Output(Graph* graph, const std::string* name)
 	graph_ = graph;
 
 	Node node;
-	node.Type = Node::Type::OUTPUT;
+	node.type = Node::Type::OUTPUT;
 	node.objectType = Node::ObjectType::INTERFACE_OUTPUT;
 	node.object = this;
 
