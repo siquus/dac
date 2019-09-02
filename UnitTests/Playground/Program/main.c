@@ -7,6 +7,14 @@
 const float expectedProduct[] = {210, 294, 378};
 const float expectedSum[] = {221, 315, 409};
 const int expectedIsSmaller = 0;
+typedef enum {
+	CALLED_PRODUCT = 1 << 0,
+	CALLED_SUM = 1 << 1,
+	CALLED_IS_SMALLER = 1 << 2,
+	CALLED_NROF = 1 << 3,
+} called_t;
+
+static called_t called = 0;
 
 // typedef void (*DacOutputCallbackProduct_t)(float* pt, size_t size);
 static void productCallback(const float* pt, size_t size)
@@ -17,6 +25,8 @@ static void productCallback(const float* pt, size_t size)
 		fflush(stderr);
 		exit(1);
 	}
+
+	called |= CALLED_PRODUCT;
 }
 
 static void sumCallback(const float* pt, size_t size)
@@ -27,6 +37,8 @@ static void sumCallback(const float* pt, size_t size)
 		fflush(stderr);
 		exit(1);
 	}
+
+	called |= CALLED_SUM;
 }
 
 static void isSmallerCallback(const int* pt, size_t size)
@@ -45,6 +57,8 @@ static void isSmallerCallback(const int* pt, size_t size)
 		fflush(stderr);
 		exit(1);
 	}
+
+	called |= CALLED_IS_SMALLER;
 }
 
 
@@ -54,6 +68,13 @@ int main() {
 	DacOutputCallbackSmallerThan_Register(isSmallerCallback);
 
 	DacRun();
+
+	if(CALLED_NROF - 1 != called)
+	{
+		fprintf(stderr, "Not all Callbacks called!\n");
+		fflush(stderr);
+		exit(1);
+	}
 
 	fprintf(stdout, "SUCCESS!!\n");
 	fflush(stdout);
