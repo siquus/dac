@@ -22,6 +22,8 @@ public:
 		CONTROL_TRANSFER_WHILE,
 	};
 
+	static const char* getName(Type type);
+
 	enum class ObjectType {
 		NONE,
 		MODULE_VECTORSPACE_VECTOR,

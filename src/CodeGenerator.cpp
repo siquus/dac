@@ -195,9 +195,9 @@ bool CodeGenerator::Generate(const Graph* graph, const Parallizer* parallizer)
 
 	for(const auto &nodePair: nodeMap_)
 	{
-		DEBUG("nodeMap Node%2u: Type %2u, ObjType %2u,  Children ",
+		DEBUG("nodeMap Node%2u: %s,\t\t ObjType %2u,  Children ",
 				nodePair.first,
-				(unsigned int) nodePair.second->type,
+				Node::getName(nodePair.second->type),
 				(unsigned int) nodePair.second->objectType);
 
 		for(Node::Id_t nodeId: nodePair.second->children)

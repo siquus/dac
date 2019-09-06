@@ -80,3 +80,35 @@ bool Graph::AddParent(Node::Id_t parent, Node::Id_t child)
 	Error("Could not AddParent!\n");
 	return false;
 }
+
+const char* Node::getName(Type type)
+{
+	switch(type)
+	{
+	case Type::VECTOR:
+		return "VECTOR";
+
+	case Type::VECTOR_ADDITION:
+		return "VECTOR_ADDITION";
+
+	case Type::VECTOR_SCALAR_MULTIPLICATION:
+		return "VECTOR_SCALAR_MULTIPLICATION";
+
+	case Type::VECTOR_COMPARISON_IS_SMALLER:
+		return "VECTOR_COMPARISON_IS_SMALLER";
+
+	case Type::OUTPUT:
+		return "OUTPUT";
+
+	case Type::CONTROL_TRANSFER_WHILE:
+		return "CONTROL_TRANSFER_WHILE";
+
+	default:
+		Error("Unknown Type %u\n", (uint8_t) type);
+		return nullptr;
+	}
+
+	// should not be reached
+	return nullptr;
+}
+
