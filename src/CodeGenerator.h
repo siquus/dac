@@ -79,6 +79,8 @@ class CodeGenerator {
 	FileWriter fileDacH_;
 	FileWriter fileNodes_;
 	FileWriter fileInstructions_;
+	FileWriter fileInstructionsH_;
+	FileWriter fileCommonH_;
 
 	const Graph* graph_ = nullptr;
 
@@ -105,6 +107,7 @@ class CodeGenerator {
 	bool VectorAdditionCode(const Node* node, FileWriter* file);
 	bool VectorScalarMultiplicationCode(const Node* node, FileWriter * file);
 	bool VectorComparisonIsSmallerCode(const Node* node, FileWriter * file);
+	bool ControlTransferWhileCode(const Node* node, FileWriter * file);
 
 	bool FetchVariables();
 	bool GetFirstNodesToExecute(std::set<Node::Id_t> * nodeSet);
@@ -112,6 +115,7 @@ class CodeGenerator {
 	std::map<Node::Id_t, Variable> variables_;
 	std::map<Node::Id_t, const Node*> nodeMap_;
 	std::map<Node::Id_t, const Node*> nodesInstructionMap_;
+	std::map<Node::Id_t, uint32_t> nodeArrayPos_;
 
 public:
 	CodeGenerator(const std::string* path);

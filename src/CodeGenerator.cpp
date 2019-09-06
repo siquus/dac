@@ -17,6 +17,8 @@
 #include "Interface.h"
 #include "embeddedFiles.h"
 
+#include "ControlTransfer.h"
+
 #define DEBUG(...) printf(__VA_ARGS__)
 
 #define fprintProtect(ret) \
@@ -74,7 +76,8 @@ static const char includeFilesBrackets[][42] = {
 
 static const char includeFilesQuotes[][42] = {
 		HEADER_NAME,
-		"error_functions.h"
+		"Helpers.h",
+		"error_functions.h",
 };
 
 static const char fileHeader[] = \
@@ -230,7 +233,7 @@ bool CodeGenerator::Generate(const Graph* graph, const Parallizer* parallizer)
 	}
 
 	std::string nodesPath = path_;
-	nodesPath += "Nodes.h";
+	nodesPath += "Nodes.c";
 	success = fileNodes_.Init(&nodesPath);
 	if(!success)
 	{
@@ -239,11 +242,29 @@ bool CodeGenerator::Generate(const Graph* graph, const Parallizer* parallizer)
 	}
 
 	std::string InstructionsPath = path_;
-	InstructionsPath += "Instructions.h";
+	InstructionsPath += "Instructions.c";
 	success = fileInstructions_.Init(&InstructionsPath);
 	if(!success)
 	{
 		Error("Could not initialize %s!", InstructionsPath.c_str());
+		return false;
+	}
+
+	InstructionsPath = path_;
+	InstructionsPath += "Instructions.h";
+	success = fileInstructionsH_.Init(&InstructionsPath);
+	if(!success)
+	{
+		Error("Could not initialize %s!", InstructionsPath.c_str());
+		return false;
+	}
+
+	std::string CommonPath = path_;
+	CommonPath += "Common.h";
+	success = fileCommonH_.Init(&CommonPath);
+	if(!success)
+	{
+		Error("Could not initialize %s!", CommonPath.c_str());
 		return false;
 	}
 
@@ -252,6 +273,7 @@ bool CodeGenerator::Generate(const Graph* graph, const Parallizer* parallizer)
 
 	// Generate Includes
 	retFalseOnFalse(GenerateIncludes(), "Could not generate Includes\n");
+	fprintProtect(fileDacC_.PrintfLine(""));
 
 	// Generate #defines
 	auto cpuInfo = parallizer->GetCpuInfo();
@@ -262,50 +284,33 @@ bool CodeGenerator::Generate(const Graph* graph, const Parallizer* parallizer)
 	}
 
 	const Parallizer::cpu_t * cpu = &cpuInfo->begin()->second;
-	fprintProtect(fileDacC_.PrintfLine("#define THREADS_NROF %uu", cpu->coresNrOf));
+	fprintProtect(fileCommonH_.PrintfLine("#define THREADS_NROF %uu", cpu->coresNrOf));
 
-	// Generate global variables
-	auto constHeading = std::string("Constant Variables");
-	retFalseOnFalse(GenerateHeading(&constHeading), "Constant Heading failed!\n");
-
-	retFalseOnFalse(GenerateConstantDeclarations(), "Could not generate Constants\n");
-
-	auto staticHeading = std::string("Static Variables");
-	retFalseOnFalse(GenerateHeading(&staticHeading), "Static Heading failed!\n");
-
-	fprintProtect(fileDacC_.PrintfLine(""));
-
-	retFalseOnFalse(GenerateStaticVariableDeclarations(), "Could not generate Statics\n!");
+	fprintProtect(fileInstructions_.PrintfLine("#include <stdint.h>\n"));
+	fprintProtect(fileInstructions_.PrintfLine("#include \"dac.h\""));
+	fprintProtect(fileInstructions_.PrintfLine("#include \"Nodes.h\"\n"));
+	fprintProtect(fileInstructions_.PrintfLine("#include \"Helpers.h\"\n"));
+	fprintProtect(fileInstructions_.PrintfLine("#include \"Instructions.h\"\n"));
 
 	// Generate Functions
+	fprintProtect(fileDacH_.PrintfLine("#include <stddef.h>\n"));
 	retFalseOnFalse(GenerateOutputFunctions(), "Could not generate Output Functions\n!");
+	fprintProtect(fileInstructions_.PrintfLine(""));
 
-	auto threadIncludeHeading = std::string("Instructions defined inside header files");
-	retFalseOnFalse(GenerateHeading(&threadIncludeHeading), "Instructions Include Heading failed!\n");
-
-	fprintProtect(fileDacC_.PrintfLine("#include \"Instructions.h\""));
-	fprintProtect(fileDacC_.PrintfLine("#include \"Nodes.h\""));
-	fprintProtect(fileDacC_.PrintfLine("#include \"Helpers.h\""));
+	// Generate Variables
+	retFalseOnFalse(GenerateConstantDeclarations(), "Could not generate Constants\n");
+	fprintProtect(fileInstructions_.PrintfLine(""));
+	retFalseOnFalse(GenerateStaticVariableDeclarations(), "Could not generate Statics\n!");
+	fprintProtect(fileInstructions_.PrintfLine(""));
 
 	auto runHeading = std::string("The main run routine");
 	retFalseOnFalse(GenerateHeading(&runHeading), "Run Heading failed!\n");
 
 	retFalseOnFalse(GenerateRunFunction(), "Could not generate Run Function!\n");
 
-	// Define Node_t // TODO: Move into file
-	fprintProtect(fileNodes_.PrintfLine("#define NODE_T_MAX_EDGE_NUMBER %uu\n", NODE_T_MAX_EDGE_NUMBER))
-	fprintProtect(fileNodes_.PrintfLine("typedef void (*instruction_t)(void);\n"));
-	fprintProtect(fileNodes_.PrintfLine("typedef struct node_s {"));
-	fileNodes_.Indent();
-	fprintProtect(fileNodes_.PrintfLine("instruction_t instruction;"));
-	fprintProtect(fileNodes_.PrintfLine("const struct node_s * parents[NODE_T_MAX_EDGE_NUMBER];"));
-	fprintProtect(fileNodes_.PrintfLine("struct node_s * children[NODE_T_MAX_EDGE_NUMBER];"));
-	fprintProtect(fileNodes_.PrintfLine("uint32_t exeCnt;"));
-	fprintProtect(fileNodes_.PrintfLine("const uint16_t parentsNrOf;"));
-	fprintProtect(fileNodes_.PrintfLine("const uint16_t childrenNrOf;"));
-	fprintProtect(fileNodes_.PrintfLine("const uint16_t id;"));
-	fileNodes_.Outdent();
-	fprintProtect(fileNodes_.PrintfLine("} node_t;\n"));
+	fprintProtect(fileNodes_.PrintfLine("#include <stdint.h>\n"));
+	fprintProtect(fileNodes_.PrintfLine("#include \"Instructions.h\"\n"));
+	fprintProtect(fileNodes_.PrintfLine("#include \"Nodes.h\""));
 
 	retFalseOnFalse(GenerateInstructions(), "Could not generate Instructions!\n");
 
@@ -316,17 +321,8 @@ bool CodeGenerator::Generate(const Graph* graph, const Parallizer* parallizer)
 
 bool CodeGenerator::GenerateNodesArray()
 {
-	fprintProtect(fileNodes_.PrintfLine("static node_t %s[] = {", nodesId));
+	fprintProtect(fileNodes_.PrintfLine("node_t %s[] = {", nodesId));
 	fileNodes_.Indent();
-
-	// Pre-Determine array positions
-	std::map<Node::Id_t, uint32_t> nodeArrayPos;
-	Node::Id_t arrayPos = 0;
-	for(const auto &nodePair: nodesInstructionMap_)
-	{
-		nodeArrayPos.insert(std::pair<Node::Id_t, uint32_t>(nodePair.first, arrayPos));
-		arrayPos++;
-	}
 
 	// Write array
 	for(const auto &nodePair: nodesInstructionMap_)
@@ -337,8 +333,8 @@ bool CodeGenerator::GenerateNodesArray()
 		{
 			if(nodesInstructionMap_.end() != nodesInstructionMap_.find(parent))
 			{
-				const auto &arrayPos = nodeArrayPos.find(parent);
-				if(nodeArrayPos.end() == arrayPos)
+				const auto &arrayPos = nodeArrayPos_.find(parent);
+				if(nodeArrayPos_.end() == arrayPos)
 				{
 					Error("Couldn't find array position");
 					return false;
@@ -349,18 +345,21 @@ bool CodeGenerator::GenerateNodesArray()
 		}
 
 		std::vector<uint32_t> childrenArrayPosition;
-		for(const Node::Id_t &child: nodePair.second->children)
+		if(nodePair.second->type != Node::Type::CONTROL_TRANSFER_WHILE) // Control Transfers don't have children
 		{
-			if(nodesInstructionMap_.end() != nodesInstructionMap_.find(child))
+			for(const Node::Id_t &child: nodePair.second->children)
 			{
-				const auto &arrayPos = nodeArrayPos.find(child);
-				if(nodeArrayPos.end() == arrayPos)
+				if(nodesInstructionMap_.end() != nodesInstructionMap_.find(child))
 				{
-					Error("Couldn't find array position");
-					return false;
-				}
+					const auto &arrayPos = nodeArrayPos_.find(child);
+					if(nodeArrayPos_.end() == arrayPos)
+					{
+						Error("Couldn't find array position");
+						return false;
+					}
 
-				childrenArrayPosition.push_back(arrayPos->second);
+					childrenArrayPosition.push_back(arrayPos->second);
+				}
 			}
 		}
 
@@ -384,8 +383,8 @@ bool CodeGenerator::GenerateNodesArray()
 
 	for(const auto &node: firstNodes)
 	{
-		const auto &arrayPos = nodeArrayPos.find(node);
-		if(nodeArrayPos.end() == arrayPos)
+		const auto &arrayPos = nodeArrayPos_.find(node);
+		if(nodeArrayPos_.end() == arrayPos)
 		{
 			Error("Couldn't find array position");
 			return false;
@@ -400,8 +399,8 @@ bool CodeGenerator::GenerateNodesArray()
 	jobPoolInitStr.erase(jobPoolInitStr.size() - 2); // Remove last ", "
 	jobPoolInitStr += "}";
 
-	fprintProtect(fileNodes_.PrintfLine(jobPoolInitStr.c_str()));
-	fprintProtect(fileNodes_.PrintfLine("#define JOB_POOL_INIT_NROF %u", firstNodes.size()));
+	fprintProtect(fileCommonH_.PrintfLine(jobPoolInitStr.c_str()));
+	fprintProtect(fileCommonH_.PrintfLine("#define JOB_POOL_INIT_NROF %u", firstNodes.size()));
 
 	return true;
 }
@@ -458,6 +457,7 @@ bool CodeGenerator::GetFirstNodesToExecute(std::set<Node::Id_t> * nodeSet)
 
 bool CodeGenerator::GenerateInstructions()
 {
+	Node::Id_t arrayPos = 0;
 	const auto nodes = graph_->GetNodes();
 	for(const Node &node: *nodes)
 	{
@@ -471,6 +471,7 @@ bool CodeGenerator::GenerateInstructions()
 		case Node::Type::VECTOR:
 			continue; // does not have instruction
 
+		case Node::Type::CONTROL_TRANSFER_WHILE: // no break intended
 		case Node::Type::VECTOR_ADDITION: // no break intended
 		case Node::Type::VECTOR_SCALAR_MULTIPLICATION: // no break intended
 		case Node::Type::VECTOR_COMPARISON_IS_SMALLER: // no break intended
@@ -481,6 +482,8 @@ bool CodeGenerator::GenerateInstructions()
 		// Create function identifier
 		std::string fctId;
 		GenerateInstructionId(&fctId, node.id);
+
+		fileInstructionsH_.PrintfLine("void %s();", fctId.c_str());
 
 		fileInstructions_.PrintfLine("void %s()", fctId.c_str());
 		fileInstructions_.PrintfLine("{");
@@ -497,6 +500,10 @@ bool CodeGenerator::GenerateInstructions()
 
 		// Add node to "nodes with instruction"
 		nodesInstructionMap_.insert(std::pair<Node::Id_t, const Node*>(node.id, &node));
+
+		// Determine Nodes array positions
+		nodeArrayPos_.insert(std::pair<Node::Id_t, uint32_t>(node.id, arrayPos));
+		arrayPos++;
 	}
 
 	return true;
@@ -675,6 +682,11 @@ bool CodeGenerator::GenerateOperationCode(const Node* node, FileWriter * file)
 		retFalseOnFalse(VectorAdditionCode(node, file), "Could not generate Vector Addition Code!\n");
 		break;
 
+	case Node::Type::CONTROL_TRANSFER_WHILE:
+		retFalseOnFalse(ControlTransferWhileCode(node, file),
+				"Could not generatede Control Transfer While Code!\n");
+		break;
+
 	case Node::Type::VECTOR_SCALAR_MULTIPLICATION:
 		retFalseOnFalse(VectorScalarMultiplicationCode(node, file),
 				"Could not generate Vector Scalar Multiplication Code!\n");
@@ -802,6 +814,52 @@ bool CodeGenerator::VectorComparisonIsSmallerCode(const Node* node, FileWriter *
 	return true;
 }
 
+bool CodeGenerator::ControlTransferWhileCode(const Node* node, FileWriter * file)
+{
+	retFalseIfNotFound(varCond, variables_, node->parents[0]);
+
+	if(1 != varCond->second.Length())
+	{
+		Error("Control Transfer condition has more than one dim.!\n");
+		return false;
+	}
+
+	if(2 != node->children.size())
+	{
+		Error("Control Transfer should have two children, but has %lu!\n", node->children.size());
+		return false;
+	}
+
+	const auto &arrayPosTrue = nodeArrayPos_.find(node->children[ControlTransfer::While::CHILD_GOTO_TRUE]);
+	if(nodeArrayPos_.end() == arrayPosTrue)
+	{
+		Error("Couldn't find array position for Node%u\n",
+				node->children[ControlTransfer::While::CHILD_GOTO_TRUE]);
+
+		return false;
+	}
+
+	const auto &arrayPosFalse = nodeArrayPos_.find(node->children[ControlTransfer::While::CHILD_GOTO_FALSE]);
+	if(nodeArrayPos_.end() == arrayPosFalse)
+	{
+		Error("Couldn't find array position for Node%u\n",
+				node->children[ControlTransfer::While::CHILD_GOTO_FALSE]);
+
+		return false;
+	}
+
+	fprintProtect(file->PrintfLine("if(%s)", varCond->second.GetIdentifier()->c_str()));
+	fprintProtect(file->PrintfLine("{"));
+	fprintProtect(file->PrintfLine("\taddJob(&nodes[%u]);", arrayPosTrue->second));
+	fprintProtect(file->PrintfLine("}"));
+	fprintProtect(file->PrintfLine("else"));
+	fprintProtect(file->PrintfLine("{"));
+	fprintProtect(file->PrintfLine("\taddJob(&nodes[%u]);", arrayPosFalse->second));
+	fprintProtect(file->PrintfLine("}"));
+
+	return true;
+}
+
 bool CodeGenerator::VectorScalarMultiplicationCode(const Node* node, FileWriter * file)
 {
 	retFalseIfNotFound(varOp, variables_, node->id);
@@ -837,7 +895,7 @@ bool CodeGenerator::GenerateConstantDeclarations()
 			std::string decl;
 			retFalseOnFalse(var->GetDeclaration(&decl), "Could not get declaration!\n");
 
-			fprintProtect(fileDacC_.PrintfLine("%s", decl.c_str()));
+			fprintProtect(fileInstructions_.PrintfLine("%s", decl.c_str()));
 		}
 	}
 
@@ -860,7 +918,7 @@ bool CodeGenerator::GenerateStaticVariableDeclarations()
 			std::string decl;
 			retFalseOnFalse(var->GetDeclaration(&decl), "Could not get declaration!\n");
 
-			fprintProtect(fileDacC_.PrintfLine("%s", decl.c_str()));
+			fprintProtect(fileInstructions_.PrintfLine("%s", decl.c_str()));
 		}
 	}
 
@@ -1026,7 +1084,11 @@ bool CodeGenerator::GenerateOutputFunctions()
 					fctPtTypeId.c_str()));
 
 			// Declare Static Variables keeping the callback pointers
-			fprintProtect(fileDacC_.PrintfLine("static %s_t %s = NULL;",
+			fprintProtect(fileDacC_.PrintfLine("%s_t %s = NULL;",
+					fctPtTypeId.c_str(),
+					fctPtTypeId.c_str()));
+
+			fprintProtect(fileInstructions_.PrintfLine("extern %s_t %s;",
 					fctPtTypeId.c_str(),
 					fctPtTypeId.c_str()));
 

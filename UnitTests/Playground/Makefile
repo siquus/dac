@@ -7,7 +7,8 @@ DAC_DIR ?= $(shell realpath $(DAC_DIR_REL))# otherwise the *.o files end up anyw
 SRC_DIRS ?= ./ $(DAC_DIR)
 
 FILES := Helpers.c Helpers.h error_functions.c error_functions.h\
-	get_num.c get_num.h tlpi_hdr.h ename.c.inc
+	get_num.c get_num.h tlpi_hdr.h ename.c.inc Nodes.h
+	
 FILES_OBJ := $(FILES:%=$(BUILD_DIR)/%.file)
 
 SRCS := $(shell find $(SRC_DIRS) -maxdepth 1 -name "*.cpp" -or -name "*.c" -or -name "*.s")
@@ -48,7 +49,7 @@ $(BUILD_DIR)/%.cpp.o: %.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
 # files
-$(BUILD_DIR)/%.file: $(DAC_DIR_REL)/%
+$(BUILD_DIR)/%.file: $(DAC_DIR_REL)/embeddedFiles/%
 	ld -r -b binary $< -o $@
 
 # ename
