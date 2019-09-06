@@ -84,12 +84,14 @@ void * threadFunction(void * arg)
 		if(NULL != nodeJob)
 		{
 			nodeJob->exeCnt++;
+			DPRINTF("Thread %2u: updated node %u exe cnt to %u, added nodes ",
+					threadArrayIndex, nodeJob->id, nodeJob->exeCnt);
 
 			// Have any children become available for execution?
 			// Go through all children's parents and check
-			uint8_t readyForExe = 1;
 			for(uint32_t child = 0; child < nodeJob->childrenNrOf; child++)
 			{
+				uint8_t readyForExe = 1;
 				node_t* pChild = nodeJob->children[child];
 				for(uint32_t parent = 0; parent < pChild->parentsNrOf; parent++)
 				{
@@ -116,6 +118,8 @@ void * threadFunction(void * arg)
 					{
 						nodeJobPool.jobs[nodeJobPool.jobsNrOf] = pChild;
 						nodeJobPool.jobsNrOf++;
+
+						DPRINTF("%u ", pChild->id);
 					}
 					else
 					{
@@ -123,6 +127,8 @@ void * threadFunction(void * arg)
 					}
 				}
 			}
+
+			DPRINTF("to job list\n");
 
 			if(0 == nodeJobPool.jobsNrOf)
 			{
@@ -145,7 +151,7 @@ void * threadFunction(void * arg)
 				if(!stillWorking)
 				{
 					// Program is done: Let other threads know and return
-					DPRINTF("Thread %u executed last instruction!\n", threadArrayIndex);
+					DPRINTF("Thread %2u: executed last instruction!\n", threadArrayIndex);
 
 					goto SIGNAL_DONE_AND_TERMINATE;
 				}
@@ -174,7 +180,7 @@ void * threadFunction(void * arg)
 
 			threadActive[threadArrayIndex] = 1;
 
-			DPRINTF("Thread %2u picking up Node %2u. ", threadArrayIndex, nodeJob->id);
+			DPRINTF("Thread %2u: picking up Node %2u. ", threadArrayIndex, nodeJob->id);
 			DPRINTF("%2u Nodes remaining: ", nodeJobPool.jobsNrOf);
 
 			for(uint32_t node = 0; node < nodeJobPool.jobsNrOf; node++)
