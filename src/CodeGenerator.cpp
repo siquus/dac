@@ -519,17 +519,14 @@ bool CodeGenerator::GenerateCallbackPtCheck(FileWriter* file) const
 			continue;
 		}
 
-		for(Node::Id_t outId: node.parents)
-		{
-			auto output = (const Interface::Output*) node.object;
+		auto output = (const Interface::Output*) node.object;
 
-			fprintProtect(file->PrintfLine("if(NULL == DacOutputCallback%s)",
-					output->GetOutputName(outId)->c_str()));
-			fprintProtect(file->PrintfLine("{"));
-			fprintProtect(file->PrintfLine("\tfatal(\"DacOutputCallback%s == NULL\");",
-					output->GetOutputName(outId)->c_str()));
-			fprintProtect(file->PrintfLine("}\n"));
-		}
+		fprintProtect(file->PrintfLine("if(NULL == DacOutputCallback%s)",
+				output->GetOutputName()->c_str()));
+		fprintProtect(file->PrintfLine("{"));
+		fprintProtect(file->PrintfLine("\tfatal(\"DacOutputCallback%s == NULL\");",
+				output->GetOutputName()->c_str()));
+		fprintProtect(file->PrintfLine("}\n"));
 	}
 
 	return true;
@@ -664,7 +661,7 @@ bool CodeGenerator::OutputCode(const Node* node, FileWriter * file)
 		NodeStr += "Node";
 
 		fprintProtect(file->PrintfLine("DacOutputCallback%s(%s%u, sizeof(Node%u));\n",
-				output->GetOutputName(outId)->c_str(),
+				output->GetOutputName()->c_str(),
 				NodeStr.c_str(), outId,
 				outId));
 	}
@@ -1056,54 +1053,51 @@ bool CodeGenerator::GenerateOutputFunctions()
 
 		auto * output = (const Interface::Output* ) node.object;
 
-		for(const Node::Id_t &nodeId: node.parents)
+		// Get Variable attached to node
+		const auto var = variables_.find(node.parents[0]);
+		if(variables_.end() == var)
 		{
-			// Get Variable attached to node
-			const auto var = variables_.find(nodeId);
-			if(variables_.end() == var)
-			{
-				Error("Variable does not exist!\n");
-				return false;
-			}
-
-			std::string fctPtTypeId = "DacOutputCallback";
-			fctPtTypeId += *(output->GetOutputName(nodeId));
-
-			std::string callbackTypedef;
-			callbackTypedef += "typedef void (*";
-			callbackTypedef += fctPtTypeId;
-			callbackTypedef += "_t)(";
-			callbackTypedef += "const ";
-			callbackTypedef += var->second.GetTypeString();
-			callbackTypedef += "* pt, size_t size);";
-
-			// Export function prototype
-			fprintProtect(fileDacH_.PrintfLine("%s", callbackTypedef.c_str()));
-			fprintProtect(fileDacH_.PrintfLine("extern void %s_Register(%s_t callback);",
-					fctPtTypeId.c_str(),
-					fctPtTypeId.c_str()));
-
-			// Declare Static Variables keeping the callback pointers
-			fprintProtect(fileDacC_.PrintfLine("%s_t %s = NULL;",
-					fctPtTypeId.c_str(),
-					fctPtTypeId.c_str()));
-
-			fprintProtect(fileInstructions_.PrintfLine("extern %s_t %s;",
-					fctPtTypeId.c_str(),
-					fctPtTypeId.c_str()));
-
-			// Define Function
-			char tmpBuff[100];
-			SNPRINTF(tmpBuff, sizeof(tmpBuff), "void %s_Register(%s_t callback)\n{\n",
-					fctPtTypeId.c_str(),
-					fctPtTypeId.c_str());
-
-			fctDefinitions += tmpBuff;
-
-			SNPRINTF(tmpBuff, sizeof(tmpBuff), "\t %s = callback;\n", fctPtTypeId.c_str());
-			fctDefinitions += tmpBuff;
-			fctDefinitions += "}\n\n";
+			Error("Variable does not exist!\n");
+			return false;
 		}
+
+		std::string fctPtTypeId = "DacOutputCallback";
+		fctPtTypeId += *(output->GetOutputName());
+
+		std::string callbackTypedef;
+		callbackTypedef += "typedef void (*";
+		callbackTypedef += fctPtTypeId;
+		callbackTypedef += "_t)(";
+		callbackTypedef += "const ";
+		callbackTypedef += var->second.GetTypeString();
+		callbackTypedef += "* pt, size_t size);";
+
+		// Export function prototype
+		fprintProtect(fileDacH_.PrintfLine("%s", callbackTypedef.c_str()));
+		fprintProtect(fileDacH_.PrintfLine("extern void %s_Register(%s_t callback);",
+				fctPtTypeId.c_str(),
+				fctPtTypeId.c_str()));
+
+		// Declare Static Variables keeping the callback pointers
+		fprintProtect(fileDacC_.PrintfLine("%s_t %s = NULL;",
+				fctPtTypeId.c_str(),
+				fctPtTypeId.c_str()));
+
+		fprintProtect(fileInstructions_.PrintfLine("extern %s_t %s;",
+				fctPtTypeId.c_str(),
+				fctPtTypeId.c_str()));
+
+		// Define Function
+		char tmpBuff[100];
+		SNPRINTF(tmpBuff, sizeof(tmpBuff), "void %s_Register(%s_t callback)\n{\n",
+				fctPtTypeId.c_str(),
+				fctPtTypeId.c_str());
+
+		fctDefinitions += tmpBuff;
+
+		SNPRINTF(tmpBuff, sizeof(tmpBuff), "\t %s = callback;\n", fctPtTypeId.c_str());
+		fctDefinitions += tmpBuff;
+		fctDefinitions += "}\n\n";
 	}
 
 	fprintProtect(fileDacC_.PrintfLine(""));

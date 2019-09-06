@@ -8,7 +8,9 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <vector>
 
+#include "ControlTransfer.h"
 #include "Graph.h"
 #include "Module.h"
 #include "Ring.h"
@@ -53,32 +55,73 @@ int main()
 
 	auto isSmaller = sum2->IsSmaller(prod); // false
 
-	auto outPutName = std::string("Output");
-	auto output = Interface::Output(&graph, &outPutName);
-
-	auto outName = std::string("Product");
-	bool success = output.Add(&outName, prod);
+	auto prodOutput = Interface::Output(&graph, "Product");
+	bool success = prodOutput.Set(prod);
 	if(!success)
 	{
-		printf("Could not add to Output\n");
+		printf("Could not set prodOutput\n");
 		return 1;
 	}
 
-	auto outName2 = std::string("Sum");
-	success = output.Add(&outName2, sum2);
+	auto sumOutput = Interface::Output(&graph, "Sum");
+	success = sumOutput.Set(sum2);
 	if(!success)
 	{
-		printf("Could not add to Output2\n");
+		printf("Could not set sumOutput\n");
 		return 1;
 	}
 
-	auto outName3 = std::string("SmallerThan");
-	success = output.Add(&outName3, isSmaller);
+	auto smallerThanOutput = Interface::Output(&graph, "SmallerThan");
+	success = smallerThanOutput.Set(isSmaller);
 	if(!success)
 	{
-		printf("Could not add to Output3\n");
+		printf("Could not set smallerThanOutput\n");
 		return 1;
 	}
+
+	// Loop test
+	auto vec6_init = std::vector<float>{10, 10, 10};
+	auto vec7_init = std::vector<float>{1, 1, 1};
+	auto vec8_init = std::vector<float>{2, 2, 2};
+	auto vec9_init = std::vector<float>{-1, -1, -1};
+
+	auto vec6 = myVs.Element(&graph, &vec6_init);
+	auto vec7 = myVs.Element(&graph, &vec7_init);
+	auto vec8 = myVs.Element(&graph, &vec8_init);
+	auto vec9 = myVs.Element(&graph, &vec9_init);
+
+	auto add69 = vec6->Add(vec9);
+	auto cond = add69->IsSmaller(vec7);
+
+#if 0
+	auto outWhileName = std::string("WhileOut");
+	auto outWhile = Interface::Output(&graph, &outWhileName);
+
+	auto outName4 = std::string("Looping");
+	success = outWhile.Add(&outName4, add69);
+	if(!success)
+	{
+		printf("Could not add to Output4\n");
+		return 1;
+	}
+
+	auto add78 = vec7->Add(vec8);
+
+	ControlTransfer::While While(&graph);
+	if(!While.Init(cond, add78, add69))
+	{
+		printf("Could not create While!\n");
+		return 1;
+	}
+
+	auto outName5 = std::string("WhileDone");
+	success = outWhile.Add(&outName5, add78);
+	if(!success)
+	{
+		printf("Could not add to Output4\n");
+		return 1;
+	}
+#endif
 
 	Parallizer parallizer;
 	bool parSuccess = parallizer.Parallize(&graph);

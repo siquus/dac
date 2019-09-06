@@ -18,13 +18,14 @@
 namespace Interface {
 
 class Output : public NodeRef {
+	void Init(Graph * graph, const char * name);
 	std::string name_;
-	std::map<Node::Id_t, std::string> outNames_;
 
 public:
 	Output(Graph* graph, const std::string* name);
-	bool Add(const std::string* name, const Algebra::Module::VectorSpace::Vector * vector);
-	const std::string * GetOutputName(Node::Id_t nodeId) const;
+	Output(Graph* graph, const char * name);
+	bool Set(const Algebra::Module::VectorSpace::Vector * vector);
+	const std::string * GetOutputName() const;
 };
 
 }

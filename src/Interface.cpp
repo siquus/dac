@@ -9,7 +9,17 @@
 
 using namespace Interface;
 
+Output::Output(Graph * graph, const char * name)
+{
+	Init(graph, name);
+}
+
 Output::Output(Graph* graph, const std::string* name)
+{
+	Init(graph, name->c_str());
+}
+
+void Output::Init(Graph * graph, const char * name)
 {
 	if(nullptr == name)
 	{
@@ -17,7 +27,7 @@ Output::Output(Graph* graph, const std::string* name)
 		return;
 	}
 
-	name_ = *name;
+	name_ = name;
 
 	if(nullptr == graph)
 	{
@@ -40,7 +50,7 @@ Output::Output(Graph* graph, const std::string* name)
 	}
 }
 
-bool Output::Add(const std::string* name, const Algebra::Module::VectorSpace::Vector * vector)
+bool Output::Set(const Algebra::Module::VectorSpace::Vector * vector)
 {
 	if(nullptr == vector)
 	{
@@ -61,18 +71,10 @@ bool Output::Add(const std::string* name, const Algebra::Module::VectorSpace::Ve
 		return false;
 	}
 
-	outNames_[vector->nodeId_] = *name;
-
 	return true;
 }
 
-const std::string * Output::GetOutputName(Node::Id_t nodeId) const
+const std::string * Output::GetOutputName() const
 {
-	auto it = outNames_.find(nodeId);
-	if(outNames_.end() == it)
-	{
-		return nullptr;
-	}
-
-	return &it->second;
+	return &name_;
 }
