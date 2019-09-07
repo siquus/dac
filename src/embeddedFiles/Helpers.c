@@ -84,7 +84,7 @@ void * threadFunction(void * arg)
 		if(NULL != nodeJob)
 		{
 			nodeJob->exeCnt++;
-			DPRINTF("Thread %2u: updated node %u exe cnt to %u, added nodes ",
+			DPRINTF("Thread %2u: updated node %u exe cnt to %u, added nodes {",
 					threadArrayIndex, nodeJob->id, nodeJob->exeCnt);
 
 			// Have any children become available for execution?
@@ -97,7 +97,9 @@ void * threadFunction(void * arg)
 				{
 					if(pChild->parents[parent]->exeCnt > pChild->exeCnt + 1)
 					{
-						fatal("Parent was executed once without its child afterwards!");
+						fatal("Parent Node%u was executed once without its child node%u afterwards!",
+								pChild->parents[parent]->id,
+								pChild->id);
 					}
 
 					if(pChild->parents[parent]->exeCnt != pChild->exeCnt + 1)
@@ -121,6 +123,10 @@ void * threadFunction(void * arg)
 
 						DPRINTF("%u ", pChild->id);
 					}
+					else if(ALL_JOBS_COMPLETED == nodeJobPool.jobsNrOf)
+					{
+						fatal("Program terminated before being done! Node%u missing!", pChild->id);
+					}
 					else
 					{
 						fatal("Job Pool does not have enough slots!");
@@ -128,7 +134,7 @@ void * threadFunction(void * arg)
 				}
 			}
 
-			DPRINTF("to job list\n");
+			DPRINTF("} to job list\n");
 
 			if(0 == nodeJobPool.jobsNrOf)
 			{
@@ -250,12 +256,28 @@ void * threadFunction(void * arg)
 
 void StartThreads()
 {
-	DPRINTF("Starting %lu threads\n", sizeof(threads) / sizeof(threads[0]));
+	DPRINTF("Job pool is initialized with nodes {");
+	for(uint16_t node = 0; node < JOB_POOL_INIT_NROF; node++)
+	{
+		DPRINTF("%u ", nodeJobPool.jobs[node]->id);
+	}
+	DPRINTF("}\n");
+
+	const size_t threadsNrOf = sizeof(threads) / sizeof(threads[0]);
+	DPRINTF("Starting %lu threads\n", threadsNrOf);
+
+	uint16_t* threadNumbers = malloc(sizeof(uint16_t) * threadsNrOf);
+	if(NULL == threadNumbers)
+	{
+		fatal("Could not malloc thread numbers!\n");
+	}
 
 	for(uint16_t thread = 0; thread < sizeof(threads) / sizeof(threads[0]); thread++)
 	{
+		threadNumbers[thread] = thread;
+
 		int threadCreateRet;
-		threadCreateRet = pthread_create(&threads[thread], NULL, threadFunction, &thread);
+		threadCreateRet = pthread_create(&threads[thread], NULL, threadFunction, &threadNumbers[thread]);
 		if(0 != threadCreateRet)
 		{
 			errExitEN(threadCreateRet, "pthread_create");
