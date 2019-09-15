@@ -7,6 +7,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdatomic.h>
 #include <pthread.h>
 
@@ -27,7 +28,9 @@ typedef struct {
 	pthread_mutex_t mutex;
 	pthread_cond_t condition;
 	node_t * jobs[42];
+	node_t * deferredJobs[42];
 	uint16_t jobsNrOf;
+	uint16_t deferredJobsNrOf;
 } nodeJobPool_t;
 
 static nodeJobPool_t nodeJobPool = {
@@ -37,7 +40,24 @@ static nodeJobPool_t nodeJobPool = {
 		.jobsNrOf = JOB_POOL_INIT_NROF
 };
 
-void addJob(const node_t* node)
+static void addJobWithinMutex(const node_t* node)
+{
+	if(sizeof(nodeJobPool.jobs) / sizeof(nodeJobPool.jobs[0]) > nodeJobPool.jobsNrOf)
+	{
+		nodeJobPool.jobs[nodeJobPool.jobsNrOf] = node;
+		nodeJobPool.jobsNrOf++;
+	}
+	else if(ALL_JOBS_COMPLETED == nodeJobPool.jobsNrOf)
+	{
+		fatal("Program terminated before being done! Node%u missing!", node->id);
+	}
+	else
+	{
+		fatal("Job Pool does not have enough slots!");
+	}
+}
+
+static void addJob(const node_t* node)
 {
 	int mutexLockRet;
 	mutexLockRet = pthread_mutex_lock(&nodeJobPool.mutex);
@@ -46,15 +66,61 @@ void addJob(const node_t* node)
 		errExitEN(mutexLockRet, "pthread_mutex_lock");
 	}
 
-	if(sizeof(nodeJobPool.jobs) / sizeof(nodeJobPool.jobs[0]) > nodeJobPool.jobsNrOf)
+	addJobWithinMutex(node);
+
+	int mutexUnlockRet;
+	mutexUnlockRet = pthread_mutex_unlock(&nodeJobPool.mutex);
+	if(0 != mutexUnlockRet)
 	{
-		nodeJobPool.jobs[nodeJobPool.jobsNrOf] = node;
-		nodeJobPool.jobsNrOf++;
+		errExitEN(mutexUnlockRet, "pthread_mutex_unlock");
+	}
+}
+
+static uint8_t allChildrenConsumedParent(const node_t* parent)
+{
+	// Go through all children and check that they have already consumed this child
+	for(uint32_t child = 0; child < parent->childrenNrOf; child++)
+	{
+		if(parent->children[child]->exeCnt < parent->exeCnt)
+		{
+			return 0;
+		}
+	}
+
+	return 1;
+}
+
+static void addPossiblyDeferredJobWithinMutex(const node_t* node)
+{
+	if(allChildrenConsumedParent(node))
+	{
+		addJobWithinMutex(node);
 	}
 	else
 	{
-		fatal("Job Pool does not have enough slots!");
+		// Defer this job, as parents are ready!
+		if(sizeof(nodeJobPool.deferredJobs) / sizeof(nodeJobPool.deferredJobs[0]) > nodeJobPool.deferredJobsNrOf)
+		{
+			nodeJobPool.deferredJobs[nodeJobPool.deferredJobsNrOf] = node;
+			nodeJobPool.deferredJobsNrOf++;
+		}
+		else
+		{
+			fatal("Deferred Job Pool does not have enough slots!");
+		}
 	}
+}
+
+void addPossiblyDeferredJob(const node_t* node)
+{
+	int mutexLockRet;
+	mutexLockRet = pthread_mutex_lock(&nodeJobPool.mutex);
+	if(0 != mutexLockRet)
+	{
+		errExitEN(mutexLockRet, "pthread_mutex_lock");
+	}
+
+	addPossiblyDeferredJobWithinMutex(node);
 
 	int mutexUnlockRet;
 	mutexUnlockRet = pthread_mutex_unlock(&nodeJobPool.mutex);
@@ -79,8 +145,14 @@ void * threadFunction(void * arg)
 			errExitEN(mutexLockRet, "pthread_mutex_lock");
 		}
 
+		// In case we generate new jobs for other threads with this:
+		uint8_t jobsWereEmptyBefore = 0;
+		if(0 == nodeJobPool.jobsNrOf)
+		{
+			jobsWereEmptyBefore = 1;
+		}
+
 		// Update from last loop run
-		uint8_t jobsWereEmptyBefore = 0; // In case we generate new jobs for other threads with this.
 		if(NULL != nodeJob)
 		{
 			nodeJob->exeCnt++;
@@ -88,16 +160,17 @@ void * threadFunction(void * arg)
 					threadArrayIndex, nodeJob->id, nodeJob->exeCnt);
 
 			// Have any children become available for execution?
-			// Go through all children's parents and check
 			for(uint32_t child = 0; child < nodeJob->childrenNrOf; child++)
 			{
 				uint8_t readyForExe = 1;
 				node_t* pChild = nodeJob->children[child];
+
+				// Go through all parents and check if they already executed
 				for(uint32_t parent = 0; parent < pChild->parentsNrOf; parent++)
 				{
 					if(pChild->parents[parent]->exeCnt > pChild->exeCnt + 1)
 					{
-						fatal("Parent Node%u was executed once without its child node%u afterwards!",
+						fatal("Parent Node%u was executed once without its child Node%u afterwards!",
 								pChild->parents[parent]->id,
 								pChild->id);
 					}
@@ -109,29 +182,51 @@ void * threadFunction(void * arg)
 					}
 				}
 
-				if(readyForExe)
+				if(!readyForExe)
 				{
-					if(0 == nodeJobPool.jobsNrOf)
-					{
-						jobsWereEmptyBefore = 1;
-					}
+					continue; // NOTE: Below code assumes parents checked out!
+				}
 
-					if(sizeof(nodeJobPool.jobs) / sizeof(nodeJobPool.jobs[0]) > nodeJobPool.jobsNrOf)
+				if(!allChildrenConsumedParent(pChild))
+				{
+					// Defer this job, as parents are ready!
+					if(sizeof(nodeJobPool.deferredJobs) / sizeof(nodeJobPool.deferredJobs[0]) > nodeJobPool.deferredJobsNrOf)
 					{
-						nodeJobPool.jobs[nodeJobPool.jobsNrOf] = pChild;
-						nodeJobPool.jobsNrOf++;
+						DPRINTF("(%u) ", pChild->id);
 
-						DPRINTF("%u ", pChild->id);
-					}
-					else if(ALL_JOBS_COMPLETED == nodeJobPool.jobsNrOf)
-					{
-						fatal("Program terminated before being done! Node%u missing!", pChild->id);
+						nodeJobPool.deferredJobs[nodeJobPool.deferredJobsNrOf] = pChild;
+						nodeJobPool.deferredJobsNrOf++;
 					}
 					else
 					{
-						fatal("Job Pool does not have enough slots!");
+						fatal("Deferred Job Pool does not have enough slots!");
 					}
 				}
+				else // Child is ready for execution!
+				{
+					DPRINTF("%u ", pChild->id);
+					addJobWithinMutex(pChild);
+				}
+			}
+
+			// Check out all deferred jobs
+			for(int defJob = nodeJobPool.deferredJobsNrOf - 1; defJob >= 0; defJob--)
+			{
+				node_t * pDefJob = nodeJobPool.deferredJobs[defJob];
+				if(!allChildrenConsumedParent(pDefJob))
+				{
+					continue;
+				}
+
+				addJobWithinMutex(pDefJob);
+				DPRINTF("%u ", pDefJob->id);
+
+				for(uint16_t cpyJob = nodeJobPool.deferredJobsNrOf - 1; cpyJob > defJob; cpyJob--)
+				{
+					nodeJobPool.deferredJobs[cpyJob - 1] = nodeJobPool.deferredJobs[cpyJob];
+				}
+
+				nodeJobPool.deferredJobsNrOf--;
 			}
 
 			DPRINTF("} to job list\n");
@@ -206,7 +301,7 @@ void * threadFunction(void * arg)
 					DPRINTF("0 ");
 				}
 			}
-			DPRINTF("\n");
+			DPRINTF("\n\n");
 		}
 
 		uint8_t signalJobsAvailable = 0;

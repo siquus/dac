@@ -10,7 +10,7 @@
 
 #include "Nodes.h"
 
-extern void addJob(const node_t* node);
+extern void addPossiblyDeferredJob(const node_t* node);
 extern void * threadFunction(void * arg);
 extern void StartThreads();
 extern void JoinThreads();

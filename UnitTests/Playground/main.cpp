@@ -90,38 +90,27 @@ int main()
 	auto vec8 = myVs.Element(&graph, &vec8_init);
 	auto vec9 = myVs.Element(&graph, &vec9_init);
 
-	auto add69 = vec6->Add(vec9);
-	auto cond = add69->IsSmaller(vec7);
+	auto add69 = vec6->Add(vec9); // TODO: Add ->Self->Add()
+	add69->StoreIn(vec6);
 
-#if 0
-	auto outWhileName = std::string("WhileOut");
-	auto outWhile = Interface::Output(&graph, &outWhileName);
-
-	auto outName4 = std::string("Looping");
-	success = outWhile.Add(&outName4, add69);
-	if(!success)
-	{
-		printf("Could not add to Output4\n");
-		return 1;
-	}
+	auto cond = add69->IsSmaller(vec7); // TODO: Now it can't find variable for add69..
 
 	auto add78 = vec7->Add(vec8);
 
 	ControlTransfer::While While(&graph);
-	if(!While.Init(cond, add78, add69))
+	if(!While.Set(cond, add78, false, add69, true))
 	{
 		printf("Could not create While!\n");
 		return 1;
 	}
 
-	auto outName5 = std::string("WhileDone");
-	success = outWhile.Add(&outName5, add78);
+	auto whileOutput = Interface::Output(&graph, "While");
+	success = whileOutput.Set(add69);
 	if(!success)
 	{
-		printf("Could not add to Output4\n");
+		printf("Could not add to whileOutput\n");
 		return 1;
 	}
-#endif
 
 	Parallizer parallizer;
 	bool parSuccess = parallizer.Parallize(&graph);

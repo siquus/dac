@@ -14,7 +14,10 @@ While::While(Graph * graph)
 	graph_ = graph;
 }
 
-bool While::Init(vector_t* condition, NodeRef* trueNode, NodeRef* falseNode)
+bool While::Set(
+		vector_t* condition,
+		NodeRef* trueNode, bool trueNodeExeBefore,
+		NodeRef* falseNode, bool falseNodeExeBefore)
 {
 	if((nullptr == graph_) || (nullptr == trueNode) || (nullptr == falseNode))
 	{
@@ -46,12 +49,22 @@ bool While::Init(vector_t* condition, NodeRef* trueNode, NodeRef* falseNode)
 		return false;
 	}
 
+	if(!trueNodeExeBefore)
+	{
+		graph_->DeleteChildReferences(trueNode->nodeId_);
+	}
+
+	if(!falseNodeExeBefore)
+	{
+		graph_->DeleteChildReferences(falseNode->nodeId_);
+	}
+
 	Node node;
 	node.parents.push_back(condition->nodeId_);
 
 	node.type = Node::Type::CONTROL_TRANSFER_WHILE;
-	node.objectType = Node::ObjectType::NONE;
-	node.object = nullptr;
+	node.objectType = Node::ObjectType::CONTROL_TRANSFER_WHILE;
+	node.object = this;
 
 	Node::Id_t nodeId = graph_->AddNode(&node);
 
@@ -61,22 +74,18 @@ bool While::Init(vector_t* condition, NodeRef* trueNode, NodeRef* falseNode)
 		return false;
 	}
 
-	// Add this parent to children
-	bool success;
-	success = graph_->AddParent(nodeId, falseNode->nodeId_);
-	if(!success)
-	{
-		Error("Could not add Parent!");
-		return false;
-	}
-
-
-	success = graph_->AddParent(nodeId, trueNode->nodeId_);
-	if(!success)
-	{
-		Error("Could not add Parent!");
-		return false;
-	}
+	falseNode_ = falseNode->nodeId_;
+	trueNode_ = trueNode->nodeId_;
 
 	return true;
+}
+
+Node::Id_t While::getTrueNode() const
+{
+	return trueNode_;
+}
+
+Node::Id_t While::getFalseNode() const
+{
+	return falseNode_;
 }

@@ -65,6 +65,21 @@ std::vector<Node> * Graph::GetNodesModifyable()
 	return &nodes_;
 }
 
+bool Graph::DeleteChildReferences(Node::Id_t child)
+{
+	for(Node &parent: nodes_)
+	{
+		for(auto childIt = parent.children.begin(); childIt != parent.children.end(); childIt++)
+		{
+			if(child == *childIt)
+			{
+				parent.children.erase(childIt);
+				break;
+			}
+		}
+	}
+}
+
 bool Graph::AddParent(Node::Id_t parent, Node::Id_t child)
 {
 	// search for Child and add parent
@@ -112,3 +127,36 @@ const char* Node::getName(Type type)
 	return nullptr;
 }
 
+bool NodeRef::StoreIn(const NodeRef* nodeRef)
+{
+	if(nodeRef->graph_ != graph_)
+	{
+		Error("Different Graphs!\n");
+		return false;
+	}
+
+	auto nodes = graph_->GetNodesModifyable();
+
+	// TODO: Test that nodes are compatible!
+	uint8_t foundCnt = 0;
+	for(auto &node: *nodes)
+	{
+		if(node.id == nodeId_)
+		{
+			node.storedIn_ = nodeRef->nodeId_;
+			foundCnt++;
+		}
+		else if(node.id == nodeRef->nodeId_)
+		{
+			node.usedAsStorageBy_.push_back(nodeId_);
+			foundCnt++;
+		}
+
+		if(2 == foundCnt)
+		{
+			return true;
+		}
+	}
+
+	return false;
+}

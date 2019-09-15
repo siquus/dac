@@ -53,11 +53,11 @@
 			} \
 		}
 
-#define retFalseIfNotFound(pair, map, key) \
-	const auto pair = map.find(key); \
-	if(map.end() == pair) \
+#define getVarRetFalseOnError(pt, nodeId) \
+	Variable* pt = GetVariable(nodeId); \
+	if(nullptr == pt) \
 	{ \
-		Error("Unknown Key!\n"); \
+		Error("Variable for Node%u does not exist!\n", nodeId); \
 		return false; \
 	} \
 
@@ -642,28 +642,29 @@ bool CodeGenerator::OutputCode(const Node* node, FileWriter * file)
 	// Call corresponding function callbacks
 	for(Node::Id_t outId: node->parents)
 	{
-		auto var = variables_.find(outId);
-		if(variables_.end() == var)
-		{
-			Error("Output variable does not exist!\n");
-			return false;
-		}
+		getVarRetFalseOnError(var, outId);
 
 		auto output = (const Interface::Output*) node->object;
 
-		std::string NodeStr;
+		const std::string * varIdentifier = var->GetIdentifier();
+		if(nullptr == varIdentifier)
+		{
+			Error("Could not find Var. Identifier!\n");
+			return false;
+		}
 
 		// If node is not an array, we need to take address
-		if(2 > var->second.Length())
+		std::string NodeStr;
+		if(2 > var->Length())
 		{
 			NodeStr += "&";
 		}
-		NodeStr += "Node";
+		NodeStr += *varIdentifier;
 
-		fprintProtect(file->PrintfLine("DacOutputCallback%s(%s%u, sizeof(Node%u));\n",
+		fprintProtect(file->PrintfLine("DacOutputCallback%s(%s, sizeof(%s));\n",
 				output->GetOutputName()->c_str(),
-				NodeStr.c_str(), outId,
-				outId));
+				NodeStr.c_str(),
+				varIdentifier->c_str()));
 	}
 
 	fprintProtect(file->PrintfLine(""));
@@ -726,11 +727,11 @@ bool CodeGenerator::GenerateLocalVariableDeclaration(const Variable * var)
 
 bool CodeGenerator::VectorAdditionCode(const Node* node, FileWriter * file)
 {
-	retFalseIfNotFound(varOp, variables_, node->id);
-	retFalseIfNotFound(varSum1, variables_, node->parents[0]);
-	retFalseIfNotFound(varSum2, variables_, node->parents[1]);
+	getVarRetFalseOnError(varOp, node->id);
+	getVarRetFalseOnError(varSum1, node->parents[0]);
+	getVarRetFalseOnError(varSum2, node->parents[1]);
 
-	GenerateLocalVariableDeclaration(&varOp->second);
+	GenerateLocalVariableDeclaration(varOp);
 
 	auto vecOp = (const Algebra::Module::VectorSpace::Vector*) node->object;
 
@@ -740,9 +741,9 @@ bool CodeGenerator::VectorAdditionCode(const Node* node, FileWriter * file)
 	fprintProtect(file->PrintfLine("{"));
 
 	fprintProtect(file->PrintfLine("\t%s[dim] = %s[dim] + %s[dim];",
-			varOp->second.GetIdentifier()->c_str(),
-			varSum1->second.GetIdentifier()->c_str(),
-			varSum2->second.GetIdentifier()->c_str()));
+			varOp->GetIdentifier()->c_str(),
+			varSum1->GetIdentifier()->c_str(),
+			varSum2->GetIdentifier()->c_str()));
 
 	fprintProtect(file->PrintfLine("}\n"));
 
@@ -752,31 +753,31 @@ bool CodeGenerator::VectorAdditionCode(const Node* node, FileWriter * file)
 bool CodeGenerator::VectorComparisonIsSmallerCode(const Node* node, FileWriter * file)
 {
 	// TODO: Create extra Norm-Nodes for this.
-	retFalseIfNotFound(varOp, variables_, node->id);
-	retFalseIfNotFound(varLVec, variables_, node->parents[0]);
-	retFalseIfNotFound(varRVec, variables_, node->parents[1]);
+	getVarRetFalseOnError(varOp, node->id);
+	getVarRetFalseOnError(varLVec, node->parents[0]);
+	getVarRetFalseOnError(varRVec, node->parents[1]);
 
 	std::string lNormId;
-	lNormId += *(varLVec->second.GetIdentifier());
+	lNormId += *(varLVec->GetIdentifier());
 	lNormId += "Norm";
-	lNormId += std::to_string(varLVec->second.GetNewRunningNumber());
+	lNormId += std::to_string(varLVec->GetNewRunningNumber());
 	fprintProtect(file->PrintfLine("%s %s = 0;",
-			varLVec->second.GetTypeString(),
+			varLVec->GetTypeString(),
 			lNormId.c_str()));
 
 	std::string rNormId;
-	rNormId += *(varRVec->second.GetIdentifier());
+	rNormId += *(varRVec->GetIdentifier());
 	rNormId += "Norm";
-	rNormId += std::to_string(varRVec->second.GetNewRunningNumber());
+	rNormId += std::to_string(varRVec->GetNewRunningNumber());
 	fprintProtect(file->PrintfLine("%s %s = 0;",
-			varRVec->second.GetTypeString(),
+			varRVec->GetTypeString(),
 			rNormId.c_str()));
 
 	std::string lArrayElem;
-	varLVec->second.GetElement(&lArrayElem, "dim");
+	varLVec->GetElement(&lArrayElem, "dim");
 
 	fprintProtect(file->PrintfLine("for(uint32_t dim = 0; dim < %u; dim++)",
-			varLVec->second.Length()));
+			varLVec->Length()));
 	fprintProtect(file->PrintfLine("{"));
 	fprintProtect(file->PrintfLine("\t %s += %s * %s;",
 			lNormId.c_str(),
@@ -784,28 +785,28 @@ bool CodeGenerator::VectorComparisonIsSmallerCode(const Node* node, FileWriter *
 	fprintProtect(file->PrintfLine("}\n"));
 
 	std::string rArrayElem;
-	varRVec->second.GetElement(&rArrayElem, "dim");
+	varRVec->GetElement(&rArrayElem, "dim");
 
 	fprintProtect(file->PrintfLine("for(uint32_t dim = 0; dim < %u; dim++)",
-			varRVec->second.Length()));
+			varRVec->Length()));
 	fprintProtect(file->PrintfLine("{"));
 	fprintProtect(file->PrintfLine("\t %s += %s * %s;",
 			rNormId.c_str(),
 			rArrayElem.c_str(), rArrayElem.c_str()));
 	fprintProtect(file->PrintfLine("}\n"));
 
-	retFalseOnFalse(GenerateLocalVariableDeclaration(&varOp->second), "Could not generate Var. Decl.\n");
+	retFalseOnFalse(GenerateLocalVariableDeclaration(varOp), "Could not generate Var. Decl.\n");
 
 	fprintProtect(file->PrintfLine("if(%s < %s)",
 			lNormId.c_str(), rNormId.c_str()));
 	fprintProtect(file->PrintfLine("{"));
 	fprintProtect(file->PrintfLine("\t %s = 1;",
-			varOp->second.GetIdentifier()->c_str()));
+			varOp->GetIdentifier()->c_str()));
 	fprintProtect(file->PrintfLine("}"));
 	fprintProtect(file->PrintfLine("else"));
 	fprintProtect(file->PrintfLine("{"));
 	fprintProtect(file->PrintfLine("\t %s = 0;",
-			varOp->second.GetIdentifier()->c_str()));
+			varOp->GetIdentifier()->c_str()));
 	fprintProtect(file->PrintfLine("}\n"));
 
 	return true;
@@ -813,45 +814,41 @@ bool CodeGenerator::VectorComparisonIsSmallerCode(const Node* node, FileWriter *
 
 bool CodeGenerator::ControlTransferWhileCode(const Node* node, FileWriter * file)
 {
-	retFalseIfNotFound(varCond, variables_, node->parents[0]);
+	getVarRetFalseOnError(varCond, node->parents[0]);
 
-	if(1 != varCond->second.Length())
+	if(1 != varCond->Length())
 	{
 		Error("Control Transfer condition has more than one dim.!\n");
 		return false;
 	}
 
-	if(2 != node->children.size())
-	{
-		Error("Control Transfer should have two children, but has %lu!\n", node->children.size());
-		return false;
-	}
+	const auto * ctWhile = (ControlTransfer::While*) node->object;
 
-	const auto &arrayPosTrue = nodeArrayPos_.find(node->children[ControlTransfer::While::CHILD_GOTO_TRUE]);
+	const auto &arrayPosTrue = nodeArrayPos_.find(ctWhile->getTrueNode());
 	if(nodeArrayPos_.end() == arrayPosTrue)
 	{
 		Error("Couldn't find array position for Node%u\n",
-				node->children[ControlTransfer::While::CHILD_GOTO_TRUE]);
+				ctWhile->getTrueNode());
 
 		return false;
 	}
 
-	const auto &arrayPosFalse = nodeArrayPos_.find(node->children[ControlTransfer::While::CHILD_GOTO_FALSE]);
+	const auto &arrayPosFalse = nodeArrayPos_.find(ctWhile->getFalseNode());
 	if(nodeArrayPos_.end() == arrayPosFalse)
 	{
 		Error("Couldn't find array position for Node%u\n",
-				node->children[ControlTransfer::While::CHILD_GOTO_FALSE]);
+				ctWhile->getTrueNode());
 
 		return false;
 	}
 
-	fprintProtect(file->PrintfLine("if(%s)", varCond->second.GetIdentifier()->c_str()));
+	fprintProtect(file->PrintfLine("if(%s)", varCond->GetIdentifier()->c_str()));
 	fprintProtect(file->PrintfLine("{"));
-	fprintProtect(file->PrintfLine("\taddJob(&nodes[%u]);", arrayPosTrue->second));
+	fprintProtect(file->PrintfLine("\taddPossiblyDeferredJob(&nodes[%u]);", arrayPosTrue->second));
 	fprintProtect(file->PrintfLine("}"));
 	fprintProtect(file->PrintfLine("else"));
 	fprintProtect(file->PrintfLine("{"));
-	fprintProtect(file->PrintfLine("\taddJob(&nodes[%u]);", arrayPosFalse->second));
+	fprintProtect(file->PrintfLine("\taddPossiblyDeferredJob(&nodes[%u]);", arrayPosFalse->second));
 	fprintProtect(file->PrintfLine("}"));
 
 	return true;
@@ -859,11 +856,11 @@ bool CodeGenerator::ControlTransferWhileCode(const Node* node, FileWriter * file
 
 bool CodeGenerator::VectorScalarMultiplicationCode(const Node* node, FileWriter * file)
 {
-	retFalseIfNotFound(varOp, variables_, node->id);
-	retFalseIfNotFound(varVec, variables_, node->parents[0]);
-	retFalseIfNotFound(varScalar, variables_, node->parents[1]);
+	getVarRetFalseOnError(varOp, node->id);
+	getVarRetFalseOnError(varVec, node->parents[0]);
+	getVarRetFalseOnError(varScalar, node->parents[1]);
 
-	retFalseOnFalse(GenerateLocalVariableDeclaration(&varOp->second), "Could not generate Var. Decl.\n");
+	retFalseOnFalse(GenerateLocalVariableDeclaration(varOp), "Could not generate Var. Decl.\n");
 
 	auto vecOp = (const Algebra::Module::VectorSpace::Vector*) node->object;
 
@@ -873,9 +870,9 @@ bool CodeGenerator::VectorScalarMultiplicationCode(const Node* node, FileWriter 
 	fprintProtect(file->PrintfLine("{"));
 
 	fprintProtect(file->PrintfLine("\t%s[dim] = %s[dim] * %s;",
-			varOp->second.GetIdentifier()->c_str(),
-			varVec->second.GetIdentifier()->c_str(),
-			varScalar->second.GetIdentifier()->c_str()));
+			varOp->GetIdentifier()->c_str(),
+			varVec->GetIdentifier()->c_str(),
+			varScalar->GetIdentifier()->c_str()));
 
 	fprintProtect(file->PrintfLine("}\n"));
 
@@ -922,12 +919,46 @@ bool CodeGenerator::GenerateStaticVariableDeclarations()
 	return true;
 }
 
+Variable* CodeGenerator::GetVariable(Node::Id_t id)
+{
+	const auto nodeIt = nodeMap_.find(id);
+	if(nodeMap_.end() == nodeIt)
+	{
+		Error("Could not find Node for id %u\n", id);
+		return nullptr;
+	}
+
+	Node::Id_t storageNodeId;
+	if(Node::ID_NONE != nodeIt->second->storedIn_)
+	{
+		storageNodeId = nodeIt->second->storedIn_;
+	}
+	else
+	{
+		storageNodeId = id;
+	}
+
+	auto varIt = variables_.find(storageNodeId);
+	if(variables_.end() == varIt)
+	{
+		Error("Node %u does not have a variable!\n", storageNodeId);
+		return nullptr;
+	}
+
+	return &varIt->second;
+}
+
 bool CodeGenerator::FetchVariables()
 {
 	// Fetch all variables
 	auto nodes = graph_->GetNodes();
 	for(const Node &node: *nodes)
 	{
+		if(Node::ID_NONE != node.storedIn_)
+		{
+			continue; // This node is not stored in its own variable
+		}
+
 		std::string identifier;
 		Variable::properties_t properties = Variable::PROPERTY_NONE;
 		Variable::Type type = Variable::Type::none;
@@ -973,7 +1004,8 @@ bool CodeGenerator::FetchVariables()
 		break;
 
 		case Node::ObjectType::NONE: // no break intended
-		case Node::ObjectType::INTERFACE_OUTPUT:
+		case Node::ObjectType::INTERFACE_OUTPUT: // no break intended
+		case Node::ObjectType::CONTROL_TRANSFER_WHILE:
 			// No variable to create.
 			continue;
 
@@ -986,6 +1018,12 @@ bool CodeGenerator::FetchVariables()
 		{
 			Error("Variable already exists!\n");
 			return false;
+		}
+
+		if(node.usedAsStorageBy_.size())
+		{
+			properties = (Variable::properties_t) (
+					properties & ~Variable::PROPERTY_CONST);
 		}
 
 		variables_.insert(
@@ -1013,16 +1051,9 @@ bool CodeGenerator::FetchVariables()
 					continue;
 				}
 
-				// Found output parent variable
-				auto var = variables_.find(parentNodeId);
-				if(variables_.end() == var)
-				{
-					Error("Parent Variable does not exists!\n");
-					return false;
-				}
-
-				var->second.AddProperty(Variable::PROPERTY_GLOBAL);
-				var->second.AddProperty(Variable::PROPERTY_STATIC);
+				getVarRetFalseOnError(var, parentNodeId);
+				var->AddProperty(Variable::PROPERTY_GLOBAL);
+				var->AddProperty(Variable::PROPERTY_STATIC);
 			}
 		}
 	}
@@ -1054,12 +1085,7 @@ bool CodeGenerator::GenerateOutputFunctions()
 		auto * output = (const Interface::Output* ) node.object;
 
 		// Get Variable attached to node
-		const auto var = variables_.find(node.parents[0]);
-		if(variables_.end() == var)
-		{
-			Error("Variable does not exist!\n");
-			return false;
-		}
+		getVarRetFalseOnError(var, node.parents[0]);
 
 		std::string fctPtTypeId = "DacOutputCallback";
 		fctPtTypeId += *(output->GetOutputName());
@@ -1069,7 +1095,7 @@ bool CodeGenerator::GenerateOutputFunctions()
 		callbackTypedef += fctPtTypeId;
 		callbackTypedef += "_t)(";
 		callbackTypedef += "const ";
-		callbackTypedef += var->second.GetTypeString();
+		callbackTypedef += var->GetTypeString();
 		callbackTypedef += "* pt, size_t size);";
 
 		// Export function prototype

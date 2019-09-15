@@ -28,6 +28,7 @@ public:
 		NONE,
 		MODULE_VECTORSPACE_VECTOR,
 		INTERFACE_OUTPUT,
+		CONTROL_TRANSFER_WHILE,
 	};
 
 	typedef uint32_t Id_t;
@@ -52,6 +53,8 @@ public:
 	ObjectType objectType;
 	Id_t id;
 	Hardware_t hardware;
+	Id_t storedIn_ = ID_NONE;
+	std::vector<Id_t> usedAsStorageBy_;
 };
 
 class Graph {
@@ -65,6 +68,7 @@ public:
 	bool AddParent(Node::Id_t parent, Node::Id_t child);
 	const std::vector<Node> * GetNodes() const;
 	std::vector<Node> * GetNodesModifyable();
+	bool DeleteChildReferences(Node::Id_t child);
 
 private:
 	std::vector<Node> nodes_;
@@ -76,6 +80,8 @@ class NodeRef {
 public:
 	Node::Id_t nodeId_ = Node::ID_NONE;
 	Graph* graph_ = nullptr;
+
+	bool StoreIn(const NodeRef* nodeRef);
 };
 
 #endif /* SRC_GRAPH_H_ */
