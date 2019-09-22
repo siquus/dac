@@ -39,52 +39,16 @@ VectorSpace::Vector * VectorSpace::Element(Graph * graph, const std::vector<inTy
 		return nullptr;
 	}
 
+	if(!Ring::IsCompatible(ring_, initializer))
+	{
+		Error("Initializer for Vector of incompatible Type!\n");
+		return nullptr;
+	}
+
 	Vector * retVec = new Vector;
 	if(nullptr == retVec)
 	{
 		Error("Could not malloc Vec\n");
-		return nullptr;
-	}
-
-	void * dataPt = nullptr;
-	switch(ring_)
-	{
-	case Ring::Float32:
-		if(!std::is_same<inType, float>::value)
-		{
-			Error("Type mismatch\n");
-			return nullptr;
-		}
-
-		dataPt = malloc(dim_ * sizeof(float));
-		if(nullptr != dataPt)
-		{
-			memcpy(dataPt, initializer->data(), dim_ * sizeof(float));
-		}
-		break;
-
-	case Ring::Int32:
-		if(!std::is_same<inType, int32_t>::value)
-		{
-			Error("Type mismatch\n");
-			return nullptr;
-		}
-
-		dataPt = malloc(dim_ * sizeof(int32_t));
-		if(nullptr != dataPt)
-		{
-			memcpy(dataPt, initializer->data(), dim_ * sizeof(int32_t));
-		}
-		break;
-
-	default:
-		Error("Type mismatch\n");
-		return nullptr;
-	}
-
-	if(nullptr == dataPt)
-	{
-		Error("Malloc failed!\n");
 		return nullptr;
 	}
 
@@ -100,7 +64,7 @@ VectorSpace::Vector * VectorSpace::Element(Graph * graph, const std::vector<inTy
 		return nullptr;
 	}
 
-	retVec->__value_ = dataPt;
+	retVec->__value_ = initializer->data();
 	retVec->__space_ = this;
 	retVec->graph_ = graph;
 	retVec->nodeId_ = nodeId;
@@ -198,17 +162,49 @@ VectorSpace::Vector* VectorSpace::Vector::IsSmaller(const Vector* vec)
 	return retVec;
 }
 
-VectorSpace::Vector* VectorSpace::Vector::Add(const Vector* vec)
+bool VectorSpace::Vector::AreCompatible(const Vector* vec1, const Vector* vec2)
 {
-	if(__space_->dim_ != vec->__space_->dim_)
-	{
-		Error("Dimension Mismatch!\n");
-		return nullptr;
-	}
-
-	if(graph_ != vec->graph_)
+	if(vec1->graph_ != vec2->graph_)
 	{
 		Error("Not on the same Graph!\n");
+		return false;
+	}
+
+	if(vec1->__space_->dim_ != vec2->__space_->dim_)
+	{
+		Error("Dimension Mismatch!\n");
+		return false;
+	}
+
+	if(vec1->__space_->factors_.size() != vec2->__space_->factors_.size())
+	{
+		Error("Product Space has different number of factors!\n");
+		return false;
+	}
+
+	for(int factor = 0; factor < vec1->__space_->factors_.size(); factor++)
+	{
+		if(vec1->__space_->factors_[factor]->dim_ != vec2->__space_->factors_[factor]->dim_)
+		{
+			Error("Factor %u is of different dimension!\n", factor);
+			return false;
+		}
+
+		if(vec1->__space_->factors_[factor]->ring_ != vec2->__space_->factors_[factor]->ring_)
+		{
+			Error("Factor %u has a different ring!\n", factor);
+			return false;
+		}
+	}
+
+	return true;
+}
+
+VectorSpace::Vector* VectorSpace::Vector::Add(const Vector* vec)
+{
+	if(!AreCompatible(this, vec))
+	{
+		Error("Incompatible Vectors!\n");
 		return nullptr;
 	}
 
@@ -249,3 +245,19 @@ VectorSpace::Vector* VectorSpace::Vector::Add(const Vector* vec)
 
 	return retVec;
 }
+
+VectorSpace::VectorSpace(const std::vector<VectorSpace*>* factors)
+{
+	factors_ = *factors;
+
+	ring_ = Ring::None;
+	dim_ = 1;
+
+	for(const auto &factor: factors_)
+	{
+		dim_ *= factor->dim_;
+
+		ring_ = Ring::GetSuperiorRing(ring_, factor->ring_);
+	}
+}
+

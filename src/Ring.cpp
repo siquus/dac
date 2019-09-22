@@ -6,11 +6,12 @@
  */
 
 #include <stdint.h>
+
 #include "Ring.h"
 
 using namespace Algebra;
 
-Ring::type_t Algebra::Ring::GetSuperiorRing(type_t t1, type_t t2)
+Ring::type_t Ring::GetSuperiorRing(type_t t1, type_t t2)
 {
 	if((int) t1 > (int) t2)
 	{

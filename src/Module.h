@@ -20,27 +20,32 @@ namespace Algebra {
 namespace Module {
 
 class VectorSpace {
-
 public:
 	VectorSpace(Ring::type_t ring, dimension_t dim);
+	VectorSpace(const std::vector<VectorSpace*>* factors);
+
+	Ring::type_t ring_;
+	dimension_t dim_;
+
+	// Vector space created by the tensor product of given factors
+	std::vector<VectorSpace*> factors_; // TODO: Currently not allowed to take the product of product spaces
 
 	class Vector : public NodeRef {
 	public:
-		const VectorSpace* __space_;
+		const VectorSpace * __space_;
 		const void* __value_ = nullptr;
 
 		Vector* Add(const Vector* vec);
 		Vector* Multiply(const Vector* vec);
 		Vector* IsSmaller(const Vector* vec);
-	};
 
-	Ring::type_t ring_;
-	dimension_t dim_;
+	private:
+		static bool AreCompatible(const Vector* vec1, const Vector* vec2);
+	};
 
 	template<typename T>
 	Vector * Element(Graph* graph, const std::vector<T>* initializer);
 };
-
 }
 }
 
