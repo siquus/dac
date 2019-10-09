@@ -21,14 +21,19 @@ namespace Module {
 
 class VectorSpace {
 public:
-	VectorSpace(Ring::type_t ring, dimension_t dim);
-	VectorSpace(const std::vector<VectorSpace*>* factors);
+	typedef struct {
+		Ring::type_t ring_;
+		dimension_t dim_;
+	} simpleVs_t;
 
-	Ring::type_t ring_;
-	dimension_t dim_;
+	VectorSpace(Ring::type_t ring, dimension_t dim);
+	VectorSpace(const std::vector<simpleVs_t>* factors);
 
 	// Vector space created by the tensor product of given factors
-	std::vector<VectorSpace*> factors_; // TODO: Currently not allowed to take the product of product spaces
+	std::vector<simpleVs_t> factors_; // TODO: Currently not allowed to take the product of product spaces
+
+	dimension_t GetDim() const;
+	Ring::type_t GetRing() const;
 
 	class Vector : public NodeRef {
 	public:

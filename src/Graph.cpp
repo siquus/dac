@@ -60,6 +60,19 @@ const std::vector<Node> * Graph::GetNodes() const
 	return &nodes_;
 }
 
+const Node * Graph::GetNode(Node::Id_t id) const
+{
+	for(const Node &node: nodes_)
+	{
+		if(node.id == id)
+		{
+			return &node;
+		}
+	}
+
+	return nullptr;
+}
+
 std::vector<Node> * Graph::GetNodesModifyable()
 {
 	return &nodes_;

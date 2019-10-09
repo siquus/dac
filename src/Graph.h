@@ -67,6 +67,7 @@ public:
 	Node::Id_t AddNode(Node * node);
 	bool AddParent(Node::Id_t parent, Node::Id_t child);
 	const std::vector<Node> * GetNodes() const;
+	const Node * GetNode(Node::Id_t id) const;
 	std::vector<Node> * GetNodesModifyable();
 	bool DeleteChildReferences(Node::Id_t child);
 

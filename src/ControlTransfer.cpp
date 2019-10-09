@@ -31,7 +31,7 @@ bool While::Set(
 		return false;
 	}
 
-	if(condition->__space_->dim_ != 1)
+	if(condition->__space_->GetDim() != 1)
 	{
 		Error("Condition must be a scalar!\n");
 		return false;

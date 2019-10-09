@@ -736,7 +736,7 @@ bool CodeGenerator::VectorAdditionCode(const Node* node, FileWriter * file)
 	auto vecOp = (const Algebra::Module::VectorSpace::Vector*) node->object;
 
 	fprintProtect(file->PrintfLine("for(uint32_t dim = 0; dim < %u; dim++)",
-			vecOp->__space_->dim_));
+			vecOp->__space_->GetDim()));
 
 	fprintProtect(file->PrintfLine("{"));
 
@@ -865,7 +865,7 @@ bool CodeGenerator::VectorScalarMultiplicationCode(const Node* node, FileWriter 
 	auto vecOp = (const Algebra::Module::VectorSpace::Vector*) node->object;
 
 	fprintProtect(file->PrintfLine("for(uint32_t dim = 0; dim < %u; dim++)",
-			vecOp->__space_->dim_));
+			vecOp->__space_->GetDim()));
 
 	fprintProtect(file->PrintfLine("{"));
 
@@ -975,8 +975,8 @@ bool CodeGenerator::FetchVariables()
 		{
 			auto vector = (const Algebra::Module::VectorSpace::Vector*) node.object;
 			value = vector->__value_;
-			length = vector->__space_->dim_;
-			switch(vector->__space_->ring_)
+			length = vector->__space_->GetDim();
+			switch(vector->__space_->GetRing())
 			{
 			case Algebra::Ring::Float32:
 				type = Variable::Type::float_;

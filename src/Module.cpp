@@ -20,8 +20,29 @@ template VectorSpace::Vector * VectorSpace::Element<float>(Graph * graph, const 
 
 VectorSpace::VectorSpace(Ring::type_t ring, dimension_t dim)
 {
-	dim_ = dim;
-	ring_ = ring;
+	factors_.push_back(simpleVs_t{ring, dim});
+}
+
+dimension_t VectorSpace::GetDim() const
+{
+	dimension_t retDim = 0;
+	for(const simpleVs_t &factor: factors_)
+	{
+		retDim += factor.dim_;
+	}
+
+	return retDim;
+}
+
+Ring::type_t VectorSpace::GetRing() const
+{
+	Ring::type_t retRing = Ring::None;
+	for(const simpleVs_t &factor: factors_)
+	{
+		retRing = Ring::GetSuperiorRing(retRing, factor.ring_);
+	}
+
+	return retRing;
 }
 
 template<typename inType>
@@ -33,13 +54,13 @@ VectorSpace::Vector * VectorSpace::Element(Graph * graph, const std::vector<inTy
 		return nullptr;
 	}
 
-	if(initializer->size() != dim_)
+	if(initializer->size() != GetDim())
 	{
 		Error("Dimensions do not match!\n");
 		return nullptr;
 	}
 
-	if(!Ring::IsCompatible(ring_, initializer))
+	if(!Ring::IsCompatible(GetRing(), initializer))
 	{
 		Error("Initializer for Vector of incompatible Type!\n");
 		return nullptr;
@@ -74,7 +95,7 @@ VectorSpace::Vector * VectorSpace::Element(Graph * graph, const std::vector<inTy
 
 VectorSpace::Vector* VectorSpace::Vector::Multiply(const Vector* vec)
 {
-	if(1 != vec->__space_->dim_)
+	if(1 != vec->__space_->GetDim())
 	{
 		Error("Dimension Mismatch!\n");
 		return nullptr;
@@ -87,7 +108,7 @@ VectorSpace::Vector* VectorSpace::Vector::Multiply(const Vector* vec)
 	}
 
 	// Infer space
-	Ring::type_t inferredRing = Ring::GetSuperiorRing(__space_->ring_, vec->__space_->ring_);
+	Ring::type_t inferredRing = Ring::GetSuperiorRing(__space_->GetRing(), vec->__space_->GetRing());
 	if(Ring::None == inferredRing)
 	{
 		Error("Incompatible Rings\n");
@@ -98,7 +119,7 @@ VectorSpace::Vector* VectorSpace::Vector::Multiply(const Vector* vec)
 	retVec->graph_ = graph_;
 
 	VectorSpace * retSpace = nullptr;
-	retSpace = new VectorSpace(inferredRing, __space_->dim_);
+	retSpace = new VectorSpace(inferredRing, __space_->GetDim());
 
 	if(nullptr == retSpace)
 	{
@@ -128,7 +149,7 @@ VectorSpace::Vector* VectorSpace::Vector::Multiply(const Vector* vec)
 
 VectorSpace::Vector* VectorSpace::Vector::IsSmaller(const Vector* vec)
 {
-	if(__space_->dim_ != vec->__space_->dim_)
+	if(__space_->GetDim() != vec->__space_->GetDim())
 	{
 		Error("Dimension Mismatch!\n");
 		return nullptr;
@@ -170,12 +191,6 @@ bool VectorSpace::Vector::AreCompatible(const Vector* vec1, const Vector* vec2)
 		return false;
 	}
 
-	if(vec1->__space_->dim_ != vec2->__space_->dim_)
-	{
-		Error("Dimension Mismatch!\n");
-		return false;
-	}
-
 	if(vec1->__space_->factors_.size() != vec2->__space_->factors_.size())
 	{
 		Error("Product Space has different number of factors!\n");
@@ -184,13 +199,13 @@ bool VectorSpace::Vector::AreCompatible(const Vector* vec1, const Vector* vec2)
 
 	for(int factor = 0; factor < vec1->__space_->factors_.size(); factor++)
 	{
-		if(vec1->__space_->factors_[factor]->dim_ != vec2->__space_->factors_[factor]->dim_)
+		if(vec1->__space_->factors_[factor].dim_ != vec2->__space_->factors_[factor].dim_)
 		{
 			Error("Factor %u is of different dimension!\n", factor);
 			return false;
 		}
 
-		if(vec1->__space_->factors_[factor]->ring_ != vec2->__space_->factors_[factor]->ring_)
+		if(vec1->__space_->factors_[factor].ring_ != vec2->__space_->factors_[factor].ring_)
 		{
 			Error("Factor %u has a different ring!\n", factor);
 			return false;
@@ -209,7 +224,7 @@ VectorSpace::Vector* VectorSpace::Vector::Add(const Vector* vec)
 	}
 
 	// Infer space
-	Ring::type_t inferredRing = Ring::GetSuperiorRing(__space_->ring_, vec->__space_->ring_);
+	Ring::type_t inferredRing = Ring::GetSuperiorRing(__space_->GetRing(), vec->__space_->GetRing());
 	if(Ring::None == inferredRing)
 	{
 		Error("Incompatible Rings\n");
@@ -219,7 +234,7 @@ VectorSpace::Vector* VectorSpace::Vector::Add(const Vector* vec)
 	Vector* retVec = new Vector;
 	retVec->graph_ = graph_;
 
-	if(inferredRing == __space_->ring_)
+	if(inferredRing == __space_->GetRing())
 	{
 		retVec->__space_ = __space_;
 	}
@@ -246,18 +261,8 @@ VectorSpace::Vector* VectorSpace::Vector::Add(const Vector* vec)
 	return retVec;
 }
 
-VectorSpace::VectorSpace(const std::vector<VectorSpace*>* factors)
+VectorSpace::VectorSpace(const std::vector<simpleVs_t>* factors)
 {
 	factors_ = *factors;
-
-	ring_ = Ring::None;
-	dim_ = 1;
-
-	for(const auto &factor: factors_)
-	{
-		dim_ *= factor->dim_;
-
-		ring_ = Ring::GetSuperiorRing(ring_, factor->ring_);
-	}
 }
 
