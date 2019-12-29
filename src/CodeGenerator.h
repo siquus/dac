@@ -107,6 +107,7 @@ class CodeGenerator {
 	bool VectorAdditionCode(const Node* node, FileWriter* file);
 	bool VectorScalarMultiplicationCode(const Node* node, FileWriter * file);
 	bool VectorComparisonIsSmallerCode(const Node* node, FileWriter * file);
+	bool VectorContractionCode(const Node* node, FileWriter * file);
 	bool ControlTransferWhileCode(const Node* node, FileWriter * file);
 
 	bool FetchVariables();

@@ -53,6 +53,8 @@ int main()
 
 	auto sum2 = sum45->Add(prod); // {221, 315, 409}
 
+	auto contr = sum45->Contract(prod); // 20202
+
 	auto isSmaller = sum2->IsSmaller(prod); // false
 
 	auto prodOutput = Interface::Output(&graph, "Product");

@@ -15,6 +15,7 @@
 #include "GlobalDefines.h"
 #include "Ring.h"
 #include "Interface.h"
+#include "Module.h"
 #include "embeddedFiles.h"
 
 #include "ControlTransfer.h"
@@ -474,6 +475,7 @@ bool CodeGenerator::GenerateInstructions()
 		case Node::Type::CONTROL_TRANSFER_WHILE: // no break intended
 		case Node::Type::VECTOR_ADDITION: // no break intended
 		case Node::Type::VECTOR_SCALAR_MULTIPLICATION: // no break intended
+		case Node::Type::VECTOR_CONTRACTION: // no break intended
 		case Node::Type::VECTOR_COMPARISON_IS_SMALLER: // no break intended
 		case Node::Type::OUTPUT:
 			break; // create instruction
@@ -704,6 +706,11 @@ bool CodeGenerator::GenerateOperationCode(const Node* node, FileWriter * file)
 		Error("Type %i is no operation!\n", (int) node->type);
 		return false;
 
+	case Node::Type::VECTOR_CONTRACTION:
+		retFalseOnFalse(VectorContractionCode(node, file),
+		"Could not generate vector contraction Code!\n");
+		break;
+
 	default:
 		Error("Unknown Type %i!\n", (int) node->type);
 		return false;
@@ -746,6 +753,186 @@ bool CodeGenerator::VectorAdditionCode(const Node* node, FileWriter * file)
 			varSum2->GetIdentifier()->c_str()));
 
 	fprintProtect(file->PrintfLine("}\n"));
+
+	return true;
+}
+
+bool CodeGenerator::VectorContractionCode(const Node* node, FileWriter * file)
+{
+	getVarRetFalseOnError(varOp, node->id);
+	getVarRetFalseOnError(varLVec, node->parents[0]);
+	getVarRetFalseOnError(varRVec, node->parents[1]);
+
+	const auto lnode = nodeMap_.find(node->parents[0]);
+	if(nodeMap_.end() == lnode)
+	{
+		Error("Could not find Node for id %u\n", node->parents[0]);
+		return false;
+	}
+
+	const Algebra::Module::VectorSpace::Vector* lVec = (const Algebra::Module::VectorSpace::Vector*) lnode->second->object;
+
+	const auto rnode = nodeMap_.find(node->parents[1]);
+	if(nodeMap_.end() == rnode)
+	{
+		Error("Could not find Node for id %u\n", node->parents[1]);
+		return false;
+	}
+
+	const Algebra::Module::VectorSpace::Vector* rVec = (const Algebra::Module::VectorSpace::Vector*) rnode->second->object;
+
+	const Algebra::Module::VectorSpace::Vector* opVec = (const Algebra::Module::VectorSpace::Vector*) node->object;
+	const Algebra::Module::VectorSpace::Vector::contractValue_t * contractValue = (const Algebra::Module::VectorSpace::Vector::contractValue_t *) opVec->__operationParameters_;
+
+	// Calculate Strides, assume Row-Major Layout
+	// https://en.wikipedia.org/wiki/Row-_and_column-major_order#Address_calculation_in_general
+	std::vector<uint32_t> lStrides;
+	lVec->__space_->GetStrides(&lStrides);
+	const char lstridesId[] = "lStrides";
+	fprintProtect(file->PrintfLine("const uint32_t %s[] = {", lstridesId));
+	for(const uint32_t &stride: lStrides)
+	{
+		fprintProtect(file->PrintfLine("\t %u,", stride));
+	}
+	fprintProtect(file->PrintfLine("};"));
+
+	std::vector<uint32_t> rStrides;
+	lVec->__space_->GetStrides(&rStrides);
+	const char rstridesId[] = "rStrides";
+	fprintProtect(file->PrintfLine("const uint32_t %s[] = {", rstridesId));
+	for(const uint32_t &stride: rStrides)
+	{
+		fprintProtect(file->PrintfLine("\t %u,", stride));
+	}
+	fprintProtect(file->PrintfLine("};"));
+
+	std::vector<uint32_t> opStrides;
+	opVec->__space_->GetStrides(&opStrides);
+	const char opstridesId[] = "opStrides";
+	fprintProtect(file->PrintfLine("const uint32_t %s[] = {", opstridesId));
+	for(const uint32_t &stride: opStrides)
+	{
+		fprintProtect(file->PrintfLine("\t %u,", stride));
+	}
+	fprintProtect(file->PrintfLine("};\n"));
+
+	const char * varOpId = varOp->GetIdentifier()->c_str();
+
+	bool resultIsArray = false;
+	if(1 < varOp->Length())
+	{
+		resultIsArray = true;
+	}
+
+	if(resultIsArray)
+	{
+		fprintProtect(file->PrintfLine("for(int opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
+				varOpId, varOpId));
+		fprintProtect(file->PrintfLine("{"));
+		file->Indent();
+
+		std::string opIndexTuple = "const uint32_t opIndexTuple[] = {";
+		for(uint32_t stride = 0; stride < opStrides.size(); stride++)
+		{
+			if(0 == stride)
+			{
+				opIndexTuple += "opIndex / ";
+				opIndexTuple += opstridesId;
+				opIndexTuple += "[";
+				opIndexTuple += std::to_string(stride);
+				opIndexTuple += "]";
+				opIndexTuple += ", ";
+			}
+			else
+			{
+				opIndexTuple += "(opIndex % opStrides[";
+				opIndexTuple += std::to_string(stride - 1);
+				opIndexTuple += " - 1]) / opStrides[";
+				opIndexTuple += std::to_string(stride);
+				opIndexTuple += ", ";
+			}
+		}
+		opIndexTuple.erase(opIndexTuple.end() - 2, opIndexTuple.end()); // remove last ", "
+		opIndexTuple += "};";
+
+		fprintProtect(file->PrintfLine("%s", opIndexTuple.c_str()));
+	}
+
+	fprintProtect(file->PrintfLine("%s sum = 0;", varOp->GetTypeString()));
+	fprintProtect(file->PrintfLine("for(int dim = 0; dim < %u; dim++)",
+			lVec->__space_->factors_[contractValue->lfactor].dim_));
+	fprintProtect(file->PrintfLine("{"));
+
+	std::string lIndexTuple = "\tconst uint32_t lIndexTuple[] = {";
+	for(uint32_t lDim = 0; lDim < lVec->__space_->factors_.size(); lDim++)
+	{
+		if(lDim != contractValue->lfactor)
+		{
+			lIndexTuple += "lIndexTuple[";
+			lIndexTuple += std::to_string(lDim);
+			lIndexTuple += "], ";
+		}
+		else
+		{
+			lIndexTuple += "dim, ";
+		}
+	}
+
+	lIndexTuple.erase(lIndexTuple.end() - 2, lIndexTuple.end()); // remove last ", "
+	lIndexTuple += "};";
+	fprintProtect(file->PrintfLine(lIndexTuple.c_str()));
+
+	std::string rIndexTuple = "\tconst uint32_t rIndexTuple[] = {";
+	for(uint32_t rDim = 0; rDim < rVec->__space_->factors_.size(); rDim++)
+	{
+		if(rDim != contractValue->rfactor)
+		{
+			rIndexTuple += "rIndexTuple[";
+			rIndexTuple += std::to_string(rDim + lVec->__space_->factors_.size() - 1);
+			rIndexTuple += "], ";
+		}
+		else
+		{
+			rIndexTuple += "dim, ";
+		}
+	}
+
+	rIndexTuple.erase(rIndexTuple.end() - 2, rIndexTuple.end()); // remove last ", "
+	rIndexTuple += "};";
+	fprintProtect(file->PrintfLine(rIndexTuple.c_str()));
+
+	std::string sum = "\tsum += ";
+	sum += *(varLVec->GetIdentifier());
+	for(uint32_t lIndex = 0; lIndex < lVec->__space_->factors_.size(); lIndex++)
+	{
+		sum += "[lIndexTuple[" + std::to_string(lIndex) + "]]";
+	}
+
+	sum += " * ";
+
+	sum += *(varRVec->GetIdentifier());
+	for(uint32_t rIndex = 0; rIndex < lVec->__space_->factors_.size(); rIndex++)
+	{
+		sum += "[rIndexTuple[" + std::to_string(rIndex) + "]]";
+	}
+
+	sum += ";";
+	fprintProtect(file->PrintfLine(sum.c_str()));
+
+	fprintProtect(file->PrintfLine("}\n"));
+
+	if(resultIsArray)
+	{
+		fprintProtect(file->PrintfLine("%s[opIndex] = sum;",
+				varOpId));
+
+		file->Outdent();
+		fprintProtect(file->PrintfLine("};"));
+	}
+	else
+	{
+		fprintProtect(file->PrintfLine("%s = sum;", varOpId));
+	}
 
 	return true;
 }
@@ -988,7 +1175,7 @@ bool CodeGenerator::FetchVariables()
 
 			case Algebra::Ring::None: // no break intended
 			default:
-				Error("Unknown Ring!\n");
+				Error("Unknown Ring %u!\n", vector->__space_->GetRing());
 				return false;
 			}
 

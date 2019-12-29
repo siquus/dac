@@ -45,6 +45,21 @@ Ring::type_t VectorSpace::GetRing() const
 	return retRing;
 }
 
+void VectorSpace::GetStrides(std::vector<uint32_t> * strides) const
+{
+	strides->resize(factors_.size());
+	for(int fac = 0; fac < factors_.size(); fac++)
+	{
+		uint32_t stride = 1;
+		for(int prodFac = fac + 1; prodFac < factors_.size(); prodFac++)
+		{
+			stride *= factors_[prodFac].dim_;
+		}
+
+		strides->at(fac) = stride;
+	}
+}
+
 template<typename inType>
 VectorSpace::Vector * VectorSpace::Element(Graph * graph, const std::vector<inType>* initializer)
 {
@@ -213,6 +228,73 @@ bool VectorSpace::Vector::AreCompatible(const Vector* vec1, const Vector* vec2)
 	}
 
 	return true;
+}
+
+VectorSpace::Vector* VectorSpace::Vector::Contract(const Vector* vec, uint32_t lfactor, uint32_t rfactor)
+{
+	if(graph_ != vec->graph_)
+	{
+		Error("Not on the same Graph!\n");
+		return nullptr;
+	}
+
+	if((__space_->factors_.size() <= lfactor) || (vec->__space_->factors_.size() <= rfactor))
+	{
+		Error("Given contraction factor is larger than number of factors!\n");
+		return nullptr;
+	}
+
+	// Create contracted vector space
+	// Remove the contracted dimension:
+	std::vector<simpleVs_t> factorsVec = __space_->factors_;
+	factorsVec.insert(factorsVec.end(), vec->__space_->factors_.begin(), vec->__space_->factors_.end());
+
+	factorsVec.erase(factorsVec.begin() + vec->__space_->factors_.size() + rfactor);
+	factorsVec.erase(factorsVec.begin() + lfactor);
+
+	// Special case: Scalar product, i.e. total contraction
+	if(0 == factorsVec.size())
+	{
+		Ring::type_t superiorRing = Ring::GetSuperiorRing(
+				__space_->factors_[0].ring_,
+				vec->__space_->factors_[0].ring_);
+
+		factorsVec.push_back(simpleVs_t{superiorRing, 1});
+	}
+
+	VectorSpace * retSpace = nullptr;
+	retSpace = new VectorSpace(&factorsVec);
+	if(nullptr == retSpace)
+	{
+		Error("Could not create VectorSpace");
+		return nullptr;
+	}
+
+	Vector* retVec = new Vector;
+	retVec->graph_ = graph_;
+	retVec->__space_ = retSpace;
+
+	contractValue_t * opParameters = new contractValue_t;
+	opParameters->lfactor = lfactor;
+	opParameters->rfactor = rfactor;
+	retVec->__operationParameters_ = opParameters;
+
+	Node node;
+	node.parents.push_back(nodeId_);
+	node.parents.push_back(vec->nodeId_);
+	node.type = Node::Type::VECTOR_CONTRACTION;
+	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
+	node.object = retVec;
+
+	retVec->nodeId_ = graph_->AddNode(&node);
+
+	if(Node::ID_NONE == retVec->nodeId_)
+	{
+		Error("Could not add Node!\n");
+		return nullptr;
+	}
+
+	return retVec;
 }
 
 VectorSpace::Vector* VectorSpace::Vector::Add(const Vector* vec)

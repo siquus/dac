@@ -34,16 +34,26 @@ public:
 
 	dimension_t GetDim() const;
 	Ring::type_t GetRing() const;
+	void GetStrides(std::vector<uint32_t> * strides) const;
 
 	class Vector : public NodeRef {
 	public:
 		const VectorSpace * __space_;
 		const void* __value_ = nullptr;
+		const void* __operationParameters_ = nullptr;
 
+		// TODO: Make these operators derived classes?
+		// Then we don't have to weirdly hand over the argument order and stuff..
 		Vector* Add(const Vector* vec);
 		Vector* Multiply(const Vector* vec);
 		Vector* IsSmaller(const Vector* vec);
 
+		typedef struct {
+			uint32_t lfactor;
+			uint32_t rfactor;
+		} contractValue_t;
+
+		Vector* Contract(const Vector* vec, uint32_t lfactor = 0, uint32_t rfactor = 0);
 	private:
 		static bool AreCompatible(const Vector* vec1, const Vector* vec2);
 	};

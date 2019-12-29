@@ -119,6 +119,9 @@ const char* Node::getName(Type type)
 	case Type::VECTOR_ADDITION:
 		return "VECTOR_ADDITION";
 
+	case Type::VECTOR_CONTRACTION:
+		return "VECTOR_CONTRACTION";
+
 	case Type::VECTOR_SCALAR_MULTIPLICATION:
 		return "VECTOR_SCALAR_MULTIPLICATION";
 
