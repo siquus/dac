@@ -19,6 +19,10 @@
 #define ErrorContinued(...) \
 	fprintf(stderr, __VA_ARGS__)
 
+#define DEBUG(...) \
+	printf(__VA_ARGS__); \
+	fflush(stdout)
+
 typedef uint16_t dimension_t;
 
 

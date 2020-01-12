@@ -24,6 +24,15 @@ int main()
 
 	auto myVs = Algebra::Module::VectorSpace(Algebra::Ring::Float32, 3);
 
+	auto myMatrixSpace = Algebra::Module::VectorSpace({&myVs, &myVs});
+	auto matrix1_init = std::vector<float>{1, 2, 3, 4, 5, 6, 7, 8, 9};
+	auto matrix2_init = std::vector<float>{1, 0, 0, 0, 1, 0, 0, 0, 1};
+
+	auto matrix1 = myMatrixSpace.Element(&graph, &matrix1_init);
+	auto matrix2 = myMatrixSpace.Element(&graph, &matrix2_init);
+
+	auto matrixProd = matrix1->Contract(matrix2, 1, 0);
+
 	auto vec1_init = std::vector<float>{1, 2, 3};
 	auto vec2_init = std::vector<float>{4, 5, 6};
 
@@ -52,6 +61,8 @@ int main()
 	}
 
 	auto sum2 = sum45->Add(prod); // {221, 315, 409}
+
+	auto dsum2dvec4 = sum2->Derivative(vec4);
 
 	auto contr = sum45->Contract(prod); // 20202
 

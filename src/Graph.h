@@ -47,11 +47,12 @@ public:
 		HardwareIdentifier_t identifier = UINT16_MAX;
 	} Hardware_t;
 
-	void* object = nullptr;
 	std::vector<Id_t> parents;
 	std::vector<Id_t> children;
 	Type type;
+	const void* typeParameters = nullptr;
 	ObjectType objectType;
+	const void* object = nullptr;
 	Id_t id;
 	Hardware_t hardware;
 	Id_t storedIn_ = ID_NONE;

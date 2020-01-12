@@ -10,6 +10,8 @@
 
 #include <stdint.h>
 #include <vector>
+#include <map>
+#include <set>
 
 #include "GlobalDefines.h"
 #include "Graph.h"
@@ -27,7 +29,8 @@ public:
 	} simpleVs_t;
 
 	VectorSpace(Ring::type_t ring, dimension_t dim);
-	VectorSpace(const std::vector<simpleVs_t>* factors);
+	VectorSpace(const std::vector<simpleVs_t>* factors); // TODO: Don'T expose simpleVs.
+	VectorSpace(std::initializer_list<const VectorSpace*> list);
 
 	// Vector space created by the tensor product of given factors
 	std::vector<simpleVs_t> factors_; // TODO: Currently not allowed to take the product of product spaces
@@ -40,7 +43,13 @@ public:
 	public:
 		const VectorSpace * __space_;
 		const void* __value_ = nullptr;
-		const void* __operationParameters_ = nullptr;
+
+		enum class SpecialType {
+			IDENTITY,
+			PREDEFINED, // e.g. idendity, Ones or all zero. Values need not be saved.
+		};
+
+		std::set<SpecialType> __specialType_;
 
 		// TODO: Make these operators derived classes?
 		// Then we don't have to weirdly hand over the argument order and stuff..
@@ -49,13 +58,27 @@ public:
 		Vector* IsSmaller(const Vector* vec);
 
 		typedef struct {
-			uint32_t lfactor;
-			uint32_t rfactor;
+			std::vector<uint32_t> lfactors;
+			std::vector<uint32_t> rfactors;
 		} contractValue_t;
 
 		Vector* Contract(const Vector* vec, uint32_t lfactor = 0, uint32_t rfactor = 0);
+		Vector* Contract(const Vector* vec, const std::vector<uint32_t> &lfactors, const std::vector<uint32_t> &rfactors);
+
+		Vector* Derivative(const Vector* vec);
+
 	private:
 		static bool AreCompatible(const Vector* vec1, const Vector* vec2);
+
+		typedef struct depNode_s {
+			std::set<Node::Id_t> parents;
+			std::set<Node::Id_t> children;
+		} depNode_t;
+		void TraverseParents(std::map<Node::Id_t, depNode_t> * depNodes, Node::Id_t currentNode, Node::Id_t depNodeId) const;
+		VectorSpace::Vector* CreateDerivative(std::map<Node::Id_t, depNode_t> * depNodes, const VectorSpace::Vector * currentVec, Node::Id_t depNodeId);
+
+		static VectorSpace::Vector* CreateDerivative(const Vector* vecValuedFct, const Vector* arg);
+		static Vector* AddDerivative(const Vector* vecValuedFct, const Vector* arg);
 	};
 
 	template<typename T>

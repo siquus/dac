@@ -11,6 +11,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <cstdarg>
+#include <algorithm>
 
 #include "GlobalDefines.h"
 #include "Ring.h"
@@ -19,8 +20,6 @@
 #include "embeddedFiles.h"
 
 #include "ControlTransfer.h"
-
-#define DEBUG(...) printf(__VA_ARGS__)
 
 #define fprintProtect(ret) \
 	{if(0 > ret) \
@@ -782,7 +781,7 @@ bool CodeGenerator::VectorContractionCode(const Node* node, FileWriter * file)
 	const Algebra::Module::VectorSpace::Vector* rVec = (const Algebra::Module::VectorSpace::Vector*) rnode->second->object;
 
 	const Algebra::Module::VectorSpace::Vector* opVec = (const Algebra::Module::VectorSpace::Vector*) node->object;
-	const Algebra::Module::VectorSpace::Vector::contractValue_t * contractValue = (const Algebra::Module::VectorSpace::Vector::contractValue_t *) opVec->__operationParameters_;
+	const Algebra::Module::VectorSpace::Vector::contractValue_t * contractValue = (const Algebra::Module::VectorSpace::Vector::contractValue_t *) node->typeParameters;
 
 	// Calculate Strides, assume Row-Major Layout
 	// https://en.wikipedia.org/wiki/Row-_and_column-major_order#Address_calculation_in_general
@@ -847,9 +846,9 @@ bool CodeGenerator::VectorContractionCode(const Node* node, FileWriter * file)
 			{
 				opIndexTuple += "(opIndex % opStrides[";
 				opIndexTuple += std::to_string(stride - 1);
-				opIndexTuple += " - 1]) / opStrides[";
+				opIndexTuple += "]) / opStrides[";
 				opIndexTuple += std::to_string(stride);
-				opIndexTuple += ", ";
+				opIndexTuple += "], ";
 			}
 		}
 		opIndexTuple.erase(opIndexTuple.end() - 2, opIndexTuple.end()); // remove last ", "
@@ -859,22 +858,36 @@ bool CodeGenerator::VectorContractionCode(const Node* node, FileWriter * file)
 	}
 
 	fprintProtect(file->PrintfLine("%s sum = 0;", varOp->GetTypeString()));
-	fprintProtect(file->PrintfLine("for(int dim = 0; dim < %u; dim++)",
-			lVec->__space_->factors_[contractValue->lfactor].dim_));
-	fprintProtect(file->PrintfLine("{"));
+	for(uint32_t factorIndex = 0; factorIndex < contractValue->lfactors.size(); factorIndex++)
+	{
+		fprintProtect(file->PrintfLine("for(int dim%u = 0; dim%u < %u; dim%u++)",
+				factorIndex, factorIndex,
+				lVec->__space_->factors_[contractValue->lfactors[factorIndex]].dim_,
+				factorIndex));
+		fprintProtect(file->PrintfLine("{"));
+		file->Indent();
+	}
 
-	std::string lIndexTuple = "\tconst uint32_t lIndexTuple[] = {";
+	uint32_t opIndex = 0;
+	std::string lIndexTuple = "const uint32_t lIndexTuple[] = {";
 	for(uint32_t lDim = 0; lDim < lVec->__space_->factors_.size(); lDim++)
 	{
-		if(lDim != contractValue->lfactor)
+		auto it = std::find(
+				contractValue->lfactors.begin(),
+				contractValue->lfactors.end(),
+				lDim);
+
+		if(it == contractValue->lfactors.end())
 		{
-			lIndexTuple += "lIndexTuple[";
-			lIndexTuple += std::to_string(lDim);
+			lIndexTuple += "opIndexTuple[";
+			lIndexTuple += std::to_string(opIndex);
 			lIndexTuple += "], ";
+			opIndex++;
 		}
 		else
 		{
-			lIndexTuple += "dim, ";
+			lIndexTuple += "dim" + std::to_string(std::distance(contractValue->lfactors.begin(), it));
+			lIndexTuple += ", ";
 		}
 	}
 
@@ -882,18 +895,25 @@ bool CodeGenerator::VectorContractionCode(const Node* node, FileWriter * file)
 	lIndexTuple += "};";
 	fprintProtect(file->PrintfLine(lIndexTuple.c_str()));
 
-	std::string rIndexTuple = "\tconst uint32_t rIndexTuple[] = {";
+	std::string rIndexTuple = "const uint32_t rIndexTuple[] = {";
 	for(uint32_t rDim = 0; rDim < rVec->__space_->factors_.size(); rDim++)
 	{
-		if(rDim != contractValue->rfactor)
+		auto it = std::find(
+				contractValue->rfactors.begin(),
+				contractValue->rfactors.end(),
+				rDim);
+
+		if(it == contractValue->rfactors.end())
 		{
-			rIndexTuple += "rIndexTuple[";
-			rIndexTuple += std::to_string(rDim + lVec->__space_->factors_.size() - 1);
+			rIndexTuple += "opIndexTuple[";
+			rIndexTuple += std::to_string(opIndex);
 			rIndexTuple += "], ";
+			opIndex++;
 		}
 		else
 		{
-			rIndexTuple += "dim, ";
+			rIndexTuple += "dim" + std::to_string(std::distance(contractValue->rfactors.begin(), it));
+			rIndexTuple += ", ";
 		}
 	}
 
@@ -901,25 +921,38 @@ bool CodeGenerator::VectorContractionCode(const Node* node, FileWriter * file)
 	rIndexTuple += "};";
 	fprintProtect(file->PrintfLine(rIndexTuple.c_str()));
 
-	std::string sum = "\tsum += ";
-	sum += *(varLVec->GetIdentifier());
+	std::string sum = "sum += ";
+	sum += *(varLVec->GetIdentifier()) + "[";
 	for(uint32_t lIndex = 0; lIndex < lVec->__space_->factors_.size(); lIndex++)
 	{
-		sum += "[lIndexTuple[" + std::to_string(lIndex) + "]]";
+		sum += "lIndexTuple[" +
+				std::to_string(lIndex) + "] * "
+				+  lstridesId + "[" +  std::to_string(lIndex) + "] + ";
 	}
+	sum.erase(sum.end() - 3, sum.end()); // remove last " +"
+	sum += "]";
 
 	sum += " * ";
 
-	sum += *(varRVec->GetIdentifier());
-	for(uint32_t rIndex = 0; rIndex < lVec->__space_->factors_.size(); rIndex++)
+	sum += *(varRVec->GetIdentifier()) + "[";
+	for(uint32_t rIndex = 0; rIndex < rVec->__space_->factors_.size(); rIndex++)
 	{
-		sum += "[rIndexTuple[" + std::to_string(rIndex) + "]]";
+		sum += "rIndexTuple[" +
+				std::to_string(rIndex) + "] * "
+				+  rstridesId + "[" +  std::to_string(rIndex) + "] + ";
 	}
+	sum.erase(sum.end() - 3, sum.end()); // remove last " +"
+	sum += "];";
 
-	sum += ";";
 	fprintProtect(file->PrintfLine(sum.c_str()));
 
-	fprintProtect(file->PrintfLine("}\n"));
+	for(uint32_t factorIndex = 0; factorIndex < contractValue->lfactors.size(); factorIndex++)
+	{
+		file->Outdent();
+		fprintProtect(file->PrintfLine("}"));
+	}
+
+	fprintProtect(file->PrintfLine(""));
 
 	if(resultIsArray)
 	{
@@ -927,7 +960,7 @@ bool CodeGenerator::VectorContractionCode(const Node* node, FileWriter * file)
 				varOpId));
 
 		file->Outdent();
-		fprintProtect(file->PrintfLine("};"));
+		fprintProtect(file->PrintfLine("}"));
 	}
 	else
 	{
@@ -1161,6 +1194,11 @@ bool CodeGenerator::FetchVariables()
 		case Node::ObjectType::MODULE_VECTORSPACE_VECTOR:
 		{
 			auto vector = (const Algebra::Module::VectorSpace::Vector*) node.object;
+			if(vector->__specialType_.end() != vector->__specialType_.find(Algebra::Module::VectorSpace::Vector::SpecialType::PREDEFINED))
+			{
+				continue; // Value is predefined, so no need for variable
+			}
+
 			value = vector->__value_;
 			length = vector->__space_->GetDim();
 			switch(vector->__space_->GetRing())
