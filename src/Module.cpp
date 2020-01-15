@@ -10,6 +10,7 @@
 #include <type_traits>
 #include <iostream>
 #include <algorithm>
+#include <numeric>
 
 #include "Module.h"
 
@@ -324,34 +325,7 @@ VectorSpace::Vector * VectorSpace::Vector::Derivative(const Vector* vec)
 	// Chain rule: Contract / Add the derivatives of all nodes above
 	// Start Node: Sum over all derivatives w.r.t. all parents
 
-	// dA/dB * dB/dX + dA/dC * dC/dD * dD/dX + ...
-
-	Vector* retVec = new Vector;
-	retVec->graph_ = graph_;
-
-	// The new vector will be of tensor product vector space type.
-	// The derivative vector's VS will come first (as in differential forms)
-	std::vector<simpleVs_t> factors;
-	factors.insert(factors.begin(), vec->__space_->factors_.begin(), vec->__space_->factors_.end());
-	factors.insert(factors.end(), __space_->factors_.begin(), __space_->factors_.end());
-
-	retVec->__space_ = new VectorSpace(&factors);
-
-	Node node;
-	// TODO node.parents.push_back(????);
-	node.type = Node::Type::VECTOR;
-	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
-	node.object = retVec;
-
-	retVec->nodeId_ = graph_->AddNode(&node);
-
-	if(Node::ID_NONE == retVec->nodeId_)
-	{
-		Error("Could not add Node!\n");
-		return nullptr;
-	}
-
-	return retVec;
+	return CreateDerivative(&dependenceGraph, this, vec->nodeId_);
 }
 
 void VectorSpace::Vector::TraverseParents(std::map<Node::Id_t, depNode_t> * depNodes, Node::Id_t currentNode, Node::Id_t depNodeId) const
@@ -379,6 +353,24 @@ void VectorSpace::Vector::TraverseParents(std::map<Node::Id_t, depNode_t> * depN
 
 VectorSpace::Vector* VectorSpace::Vector::CreateDerivative(std::map<Node::Id_t, depNode_t> * depNodes, const VectorSpace::Vector * currentVec, Node::Id_t depNodeId)
 {
+	if(currentVec->nodeId_ == depNodeId)
+	{
+		Error("Taking derivative w.r.t. oneself!\n");
+		return nullptr;
+	}
+
+	if(0 == (*depNodes)[currentVec->nodeId_].parents.size())
+	{
+		Error("Taking derivative of parentless vector!\n");
+		return nullptr;
+	}
+
+	// Example:
+	// dA_ij(B(C(E), F(E)), D(E)) / dE_kl =
+	// (dA_ij / dB_mn)((dB_mn / dC_op)(dC_op / dE_kl) + (dB_mn / dF) / (dF / dE_kl) + (dA_ij / dD_qrs) (dD_qrs / dE_kl)
+	// B and D are A's parents. The following for-loop will create the "+" sign above, i.e. sum over all parents
+	// Inside that Loop, this function will be called recursively to create the sums for the chain-rule, e.g. above
+	// for B(C, F) ... i.e. dC and dF are summed.
 	Vector * summandVec = nullptr;
 	for(const Node::Id_t &parentId: (*depNodes)[currentVec->nodeId_].parents)
 	{
@@ -396,12 +388,35 @@ VectorSpace::Vector* VectorSpace::Vector::CreateDerivative(std::map<Node::Id_t, 
 			return nullptr;
 		}
 
+		// TODO: Check for Null returns
 		const Vector * parentVec = (const Vector *) parentNode->object;
+		Vector * derivativeVec = CreateDerivative(currentVec, parentVec);
+
+		if(depNodeId != parentId)
+		{
+			// Call this function recursively if parent is not the variable w.r.t. which
+			// the derivative is calculated
+			Vector * currentVecChainDerivative = CreateDerivative(depNodes, parentVec, depNodeId);
+
+			std::vector<uint32_t> lfactors(parentVec->__space_->factors_.size());
+			std::iota(lfactors.begin(), lfactors.end(), 0);
+
+			std::vector<uint32_t> rfactors(parentVec->__space_->factors_.size());
+			std::iota(rfactors.begin(), rfactors.end(),
+					currentVecChainDerivative->__space_->factors_.size() - lfactors.size());
+
+			derivativeVec = derivativeVec->Contract(
+					currentVecChainDerivative,
+					lfactors, rfactors);
+		}
 
 		if(nullptr == summandVec) // first run
 		{
-			Vector * derivativeVec = CreateDerivative(currentVec, parentVec);
-			summandVec = derivativeVec->Contract(CreateDerivative(depNodes, parentVec, depNodeId));
+			summandVec = derivativeVec;
+		}
+		else
+		{
+			summandVec = summandVec->Add(derivativeVec);
 		}
 
 		if(nullptr == summandVec)
