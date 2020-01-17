@@ -468,7 +468,8 @@ bool CodeGenerator::GenerateInstructions()
 			Error("Unknown Node-Type %u\n", (uint8_t) node.type);
 			return false;
 
-		case Node::Type::VECTOR:
+		case Node::Type::VECTOR: // no break intended
+		case Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT:
 			continue; // does not have instruction
 
 		case Node::Type::CONTROL_TRANSFER_WHILE: // no break intended
@@ -756,20 +757,14 @@ bool CodeGenerator::VectorAdditionCode(const Node* node, FileWriter * file)
 	return true;
 }
 
-bool CodeGenerator::VectorContractionCode(const Node* node, FileWriter * file)
+bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWriter * file)
 {
-	getVarRetFalseOnError(varOp, node->id);
-	getVarRetFalseOnError(varLVec, node->parents[0]);
-	getVarRetFalseOnError(varRVec, node->parents[1]);
-
 	const auto lnode = nodeMap_.find(node->parents[0]);
 	if(nodeMap_.end() == lnode)
 	{
 		Error("Could not find Node for id %u\n", node->parents[0]);
 		return false;
 	}
-
-	const Algebra::Module::VectorSpace::Vector* lVec = (const Algebra::Module::VectorSpace::Vector*) lnode->second->object;
 
 	const auto rnode = nodeMap_.find(node->parents[1]);
 	if(nodeMap_.end() == rnode)
@@ -778,6 +773,246 @@ bool CodeGenerator::VectorContractionCode(const Node* node, FileWriter * file)
 		return false;
 	}
 
+	if((Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lnode->second->type) &&
+			(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lnode->second->type))
+	{
+		Error("Contraction of two KroneckerDeltas not supported!\n");
+		return false; // TODO: Implement for both nodes being kroneckers
+	}
+
+	const Node * argVecNode;
+	const Node * kronNode;
+	bool argVecIsLeftArg;
+	if(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lnode->second->type)
+	{
+		argVecNode = rnode->second;
+		kronNode = lnode->second;
+		argVecIsLeftArg = true;
+	}
+	else
+	{
+		argVecNode = lnode->second;
+		kronNode = rnode->second;
+		argVecIsLeftArg = false;
+	}
+
+	getVarRetFalseOnError(varOp, node->id);
+	getVarRetFalseOnError(varArgVec, argVecNode->id);
+
+	const Algebra::Module::VectorSpace::Vector* argVec = (const Algebra::Module::VectorSpace::Vector*) argVecNode->object;
+	const Algebra::Module::VectorSpace::Vector* kronVec = (const Algebra::Module::VectorSpace::Vector*) kronNode->object;
+	const Algebra::Module::VectorSpace::Vector* opVec = (const Algebra::Module::VectorSpace::Vector*) node->object;
+
+	const Algebra::Module::VectorSpace::Vector::contractValue_t * contractValue = (const Algebra::Module::VectorSpace::Vector::contractValue_t *) node->typeParameters;
+
+	const std::vector<uint32_t> * argContractFactors;
+	const std::vector<uint32_t> * kronContractFactors;
+	if(argVecIsLeftArg)
+	{
+		argContractFactors = &contractValue->lfactors;
+		kronContractFactors = &contractValue->rfactors;
+	}
+	else
+	{
+		argContractFactors = &contractValue->rfactors;
+		kronContractFactors = &contractValue->lfactors;
+	}
+
+	const Algebra::Module::VectorSpace::Vector::KroneckerDeltaParameters_t * kroneckerParam = (const Algebra::Module::VectorSpace::Vector::KroneckerDeltaParameters_t *) kronNode->typeParameters;
+
+	// Calculate Strides, assume Row-Major Layout
+	// https://en.wikipedia.org/wiki/Row-_and_column-major_order#Address_calculation_in_general
+	std::vector<uint32_t> argStrides;
+	argVec->__space_->GetStrides(&argStrides);
+	const char argStridesId[] = "argStrides";
+	fprintProtect(file->PrintfLine("const uint32_t %s[] = {", argStridesId));
+	for(const uint32_t &stride: argStrides)
+	{
+		fprintProtect(file->PrintfLine("\t %u,", stride));
+	}
+	fprintProtect(file->PrintfLine("};"));
+
+	std::vector<uint32_t> opStrides;
+	opVec->__space_->GetStrides(&opStrides);
+	const char opstridesId[] = "opStrides";
+	fprintProtect(file->PrintfLine("const uint32_t %s[] = {", opstridesId));
+	for(const uint32_t &stride: opStrides)
+	{
+		fprintProtect(file->PrintfLine("\t %u,", stride));
+	}
+	fprintProtect(file->PrintfLine("};\n"));
+
+	const char * varOpId = varOp->GetIdentifier()->c_str();
+
+	bool resultIsArray = false;
+	if(1 < varOp->Length())
+	{
+		resultIsArray = true;
+	}
+
+	if(resultIsArray)
+	{
+		fprintProtect(file->PrintfLine("for(int opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
+				varOpId, varOpId));
+		fprintProtect(file->PrintfLine("{"));
+		file->Indent();
+
+		std::string opIndexTuple = "const uint32_t opIndexTuple[] = {";
+		for(uint32_t stride = 0; stride < opStrides.size(); stride++)
+		{
+			if(0 == stride)
+			{
+				opIndexTuple += "opIndex / ";
+				opIndexTuple += opstridesId;
+				opIndexTuple += "[";
+				opIndexTuple += std::to_string(stride);
+				opIndexTuple += "]";
+				opIndexTuple += ", ";
+			}
+			else
+			{
+				opIndexTuple += "(opIndex % opStrides[";
+				opIndexTuple += std::to_string(stride - 1);
+				opIndexTuple += "]) / opStrides[";
+				opIndexTuple += std::to_string(stride);
+				opIndexTuple += "], ";
+			}
+		}
+		opIndexTuple.erase(opIndexTuple.end() - 2, opIndexTuple.end()); // remove last ", "
+		opIndexTuple += "};";
+
+		fprintProtect(file->PrintfLine("%s", opIndexTuple.c_str()));
+	}
+
+	fprintProtect(file->PrintfLine("%s sum = 0;", varOp->GetTypeString()));
+	for(uint32_t factorIndex = 0; factorIndex < contractValue->lfactors.size(); factorIndex++)
+	{
+		fprintProtect(file->PrintfLine("for(int dim%u = 0; dim%u < %u; dim%u++)",
+				factorIndex, factorIndex,
+				argVec->__space_->factors_[contractValue->lfactors[factorIndex]].dim_,
+				factorIndex));
+		fprintProtect(file->PrintfLine("{"));
+		file->Indent();
+	}
+
+	uint32_t opIndex = 0;
+	std::string argIndexTuple = "const uint32_t argIndexTuple[] = {";
+	for(uint32_t lDim = 0; lDim < argVec->__space_->factors_.size(); lDim++)
+	{
+
+		auto it = std::find(
+				argContractFactors->begin(),
+				argContractFactors->end(),
+				lDim);
+
+		if(it == argContractFactors->end())
+		{
+			argIndexTuple += "opIndexTuple[";
+			argIndexTuple += std::to_string(opIndex);
+			argIndexTuple += "], ";
+			opIndex++;
+		}
+		else
+		{
+			argIndexTuple += "dim" + std::to_string(std::distance(argContractFactors->begin(), it));
+			argIndexTuple += ", ";
+		}
+	}
+
+	argIndexTuple.erase(argIndexTuple.end() - 2, argIndexTuple.end()); // remove last ", "
+	argIndexTuple += "};";
+	fprintProtect(file->PrintfLine(argIndexTuple.c_str()));
+
+	std::string kronIndexTuple = "const uint32_t kronIndexTuple[] = {";
+	for(uint32_t rDim = 0; rDim < kronVec->__space_->factors_.size(); rDim++)
+	{
+		auto it = std::find(
+				kronContractFactors->begin(),
+				kronContractFactors->end(),
+				rDim);
+
+		if(it == kronContractFactors->end())
+		{
+			kronIndexTuple += "opIndexTuple[";
+			kronIndexTuple += std::to_string(opIndex);
+			kronIndexTuple += "], ";
+			opIndex++;
+		}
+		else
+		{
+			kronIndexTuple += "dim" + std::to_string(std::distance(kronContractFactors->begin(), it));
+			kronIndexTuple += ", ";
+		}
+	}
+
+	kronIndexTuple.erase(kronIndexTuple.end() - 2, kronIndexTuple.end()); // remove last ", "
+	kronIndexTuple += "};";
+	fprintProtect(file->PrintfLine(kronIndexTuple.c_str()));
+
+	std::string sum = "sum += ";
+	sum += *(varArgVec->GetIdentifier()) + "[";
+	for(uint32_t argIndex = 0; argIndex < argVec->__space_->factors_.size(); argIndex++)
+	{
+		sum += "argIndexTuple[" +
+				std::to_string(argIndex) + "] * "
+				+  argStridesId + "[" +  std::to_string(argIndex) + "] + ";
+	}
+	sum.erase(sum.end() - 3, sum.end()); // remove last " +"
+	sum += "]";
+
+	fprintProtect(file->PrintfLine(sum.c_str()));
+
+	for(uint32_t factorIndex = 0; factorIndex < contractValue->lfactors.size(); factorIndex++)
+	{
+		file->Outdent();
+		fprintProtect(file->PrintfLine("}"));
+	}
+
+	fprintProtect(file->PrintfLine(""));
+
+	if(resultIsArray)
+	{
+		fprintProtect(file->PrintfLine("%s[opIndex] = sum;",
+				varOpId));
+
+		file->Outdent();
+		fprintProtect(file->PrintfLine("}"));
+	}
+	else
+	{
+		fprintProtect(file->PrintfLine("%s = sum;", varOpId));
+	}
+
+	return true;
+}
+
+bool CodeGenerator::VectorContractionCode(const Node* node, FileWriter * file)
+{
+	const auto lnode = nodeMap_.find(node->parents[0]);
+	if(nodeMap_.end() == lnode)
+	{
+		Error("Could not find Node for id %u\n", node->parents[0]);
+		return false;
+	}
+
+	const auto rnode = nodeMap_.find(node->parents[1]);
+	if(nodeMap_.end() == rnode)
+	{
+		Error("Could not find Node for id %u\n", node->parents[1]);
+		return false;
+	}
+
+	if((Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lnode->second->type) ||
+			(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == rnode->second->type))
+	{
+		return VectorContractionKroneckerDeltaCode(node, file);
+	}
+
+	getVarRetFalseOnError(varOp, node->id);
+	getVarRetFalseOnError(varLVec, node->parents[0]);
+	getVarRetFalseOnError(varRVec, node->parents[1]);
+
+	const Algebra::Module::VectorSpace::Vector* lVec = (const Algebra::Module::VectorSpace::Vector*) lnode->second->object;
 	const Algebra::Module::VectorSpace::Vector* rVec = (const Algebra::Module::VectorSpace::Vector*) rnode->second->object;
 
 	const Algebra::Module::VectorSpace::Vector* opVec = (const Algebra::Module::VectorSpace::Vector*) node->object;
@@ -1174,9 +1409,9 @@ bool CodeGenerator::FetchVariables()
 	auto nodes = graph_->GetNodes();
 	for(const Node &node: *nodes)
 	{
-		if(Node::ID_NONE != node.storedIn_)
+		if(node.noStorage_ || (Node::ID_NONE != node.storedIn_))
 		{
-			continue; // This node is not stored in its own variable
+			continue; // This node is not stored in its own variable or doesn't require storage
 		}
 
 		std::string identifier;
@@ -1194,10 +1429,6 @@ bool CodeGenerator::FetchVariables()
 		case Node::ObjectType::MODULE_VECTORSPACE_VECTOR:
 		{
 			auto vector = (const Algebra::Module::VectorSpace::Vector*) node.object;
-			if(vector->__specialType_.end() != vector->__specialType_.find(Algebra::Module::VectorSpace::Vector::SpecialType::PREDEFINED))
-			{
-				continue; // Value is predefined, so no need for variable
-			}
 
 			value = vector->__value_;
 			length = vector->__space_->GetDim();

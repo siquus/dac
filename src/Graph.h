@@ -19,6 +19,7 @@ public:
 		VECTOR_CONTRACTION,
 		VECTOR_SCALAR_MULTIPLICATION,
 		VECTOR_COMPARISON_IS_SMALLER,
+		VECTOR_KRONECKER_DELTA_PRODUCT, // i.e. deta^i_j * delta^k_l * ...
 		OUTPUT,
 		CONTROL_TRANSFER_WHILE,
 	};
@@ -56,6 +57,7 @@ public:
 	Id_t id;
 	Hardware_t hardware;
 	Id_t storedIn_ = ID_NONE;
+	bool noStorage_ = false;
 	std::vector<Id_t> usedAsStorageBy_;
 };
 

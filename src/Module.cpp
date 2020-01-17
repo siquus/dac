@@ -374,6 +374,8 @@ VectorSpace::Vector* VectorSpace::Vector::CreateDerivative(std::map<Node::Id_t, 
 	Vector * summandVec = nullptr;
 	for(const Node::Id_t &parentId: (*depNodes)[currentVec->nodeId_].parents)
 	{
+		DEBUG("Child %u: Adding parent %u\n",currentVec->nodeId_, parentId);
+
 		const Node * parentNode = graph_->GetNode(parentId);
 		if(nullptr == parentNode)
 		{
@@ -589,16 +591,33 @@ VectorSpace::Vector* VectorSpace::Vector::AddDerivative(const Vector* vecValuedF
 	factors.insert(factors.begin(), arg->__space_->factors_.begin(), arg->__space_->factors_.end());
 	factors.insert(factors.end(), vecValuedFct->__space_->factors_.begin(), vecValuedFct->__space_->factors_.end());
 
+	if(arg->__space_->factors_.size() != vecValuedFct->__space_->factors_.size())
+	{
+		Error("For addition the resulting tensor should have same dimensions as arguments!\n");
+		return nullptr;
+	}
+
 	retVec->__space_ = new VectorSpace(&factors);
 
-	// Derivative of Add is easy: Just the identity
-	retVec->__specialType_.insert(SpecialType::IDENTITY);
-	retVec->__specialType_.insert(SpecialType::PREDEFINED);
-
+	// Derivative of Add is easy: Just the product of Kronecker Deltas
 	Node node;
-	node.type = Node::Type::VECTOR;
+	node.type = Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT;
+	KroneckerDeltaParameters_t * opParameters = new KroneckerDeltaParameters_t;
+	opParameters->factorPair.resize(factors.size());
+	for(size_t factor = 0; factor < opParameters->factorPair.size() / 2; factor++)
+	{
+		opParameters->factorPair[factor] = opParameters->factorPair.size() / 2 + factor ;
+	}
+
+	for(size_t factor = opParameters->factorPair.size() / 2; factor < opParameters->factorPair.size(); factor++)
+	{
+		opParameters->factorPair[factor] = factor - opParameters->factorPair.size() / 2;
+	}
+
+	node.typeParameters = opParameters;
 	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
 	node.object = retVec;
+	node.noStorage_ = true;
 
 	retVec->nodeId_ = vecValuedFct->graph_->AddNode(&node);
 

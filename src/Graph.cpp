@@ -128,6 +128,9 @@ const char* Node::getName(Type type)
 	case Type::VECTOR_COMPARISON_IS_SMALLER:
 		return "VECTOR_COMPARISON_IS_SMALLER";
 
+	case Type::VECTOR_KRONECKER_DELTA_PRODUCT:
+		return "VECTOR_KRONECKER_DELTA_PRODUCT";
+
 	case Type::OUTPUT:
 		return "OUTPUT";
 

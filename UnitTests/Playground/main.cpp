@@ -62,7 +62,7 @@ int main()
 
 	auto sum2 = sum45->Add(prod); // {221, 315, 409}
 
-	auto dsum2dvec4 = sum2->Derivative(vec4);
+	auto dsum2dvec4 = sum2->Derivative(vec4); // (d / dvec4) (vec4 + vec5 + (vec1 + vec2) * vec3)
 
 	auto contr = sum45->Contract(prod); // 20202
 

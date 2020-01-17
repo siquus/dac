@@ -44,13 +44,6 @@ public:
 		const VectorSpace * __space_;
 		const void* __value_ = nullptr;
 
-		enum class SpecialType {
-			IDENTITY,
-			PREDEFINED, // e.g. idendity, Ones or all zero. Values need not be saved.
-		};
-
-		std::set<SpecialType> __specialType_;
-
 		// TODO: Make these operators derived classes?
 		// Then we don't have to weirdly hand over the argument order and stuff..
 		Vector* Add(const Vector* vec);
@@ -66,6 +59,10 @@ public:
 		Vector* Contract(const Vector* vec, const std::vector<uint32_t> &lfactors, const std::vector<uint32_t> &rfactors);
 
 		Vector* Derivative(const Vector* vec);
+
+		typedef struct {
+			std::vector<uint32_t> factorPair; // I.e. for delta^i_j * delta^k_l * , ... position i will contain j and vice versa.
+		} KroneckerDeltaParameters_t;
 
 	private:
 		static bool AreCompatible(const Vector* vec1, const Vector* vec2);
