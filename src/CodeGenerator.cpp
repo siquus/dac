@@ -641,6 +641,8 @@ bool CodeGenerator::GenerateRunFunction()
 
 bool CodeGenerator::OutputCode(const Node* node, FileWriter * file)
 {
+	file->PrintfLine("// %s\n", __func__);
+
 	// Call corresponding function callbacks
 	for(Node::Id_t outId: node->parents)
 	{
@@ -734,6 +736,8 @@ bool CodeGenerator::GenerateLocalVariableDeclaration(const Variable * var)
 
 bool CodeGenerator::VectorAdditionCode(const Node* node, FileWriter * file)
 {
+	file->PrintfLine("// %s\n", __func__);
+
 	getVarRetFalseOnError(varOp, node->id);
 	getVarRetFalseOnError(varSum1, node->parents[0]);
 	getVarRetFalseOnError(varSum2, node->parents[1]);
@@ -759,6 +763,8 @@ bool CodeGenerator::VectorAdditionCode(const Node* node, FileWriter * file)
 
 bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWriter * file)
 {
+	file->PrintfLine("// %s\n", __func__);
+
 	const auto lnode = nodeMap_.find(node->parents[0]);
 	if(nodeMap_.end() == lnode)
 	{
@@ -776,8 +782,8 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 	if((Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lnode->second->type) &&
 			(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lnode->second->type))
 	{
-		Error("Contraction of two KroneckerDeltas not supported!\n");
-		return false; // TODO: Implement for both nodes being kroneckers
+		Error("Contraction of two KroneckerDeltas not supported: Should be handled in graph creation!\n");
+		return false;
 	}
 
 	const Node * argVecNode;
@@ -960,6 +966,9 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 	sum.erase(sum.end() - 3, sum.end()); // remove last " +"
 	sum += "]";
 
+	Error("This is where kronecker-vector-contraction implementation stops..\n"); // TODO: Finish code!
+	return false;
+
 	fprintProtect(file->PrintfLine(sum.c_str()));
 
 	for(uint32_t factorIndex = 0; factorIndex < contractValue->lfactors.size(); factorIndex++)
@@ -988,6 +997,8 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 
 bool CodeGenerator::VectorContractionCode(const Node* node, FileWriter * file)
 {
+	file->PrintfLine("// %s\n", __func__);
+
 	const auto lnode = nodeMap_.find(node->parents[0]);
 	if(nodeMap_.end() == lnode)
 	{
@@ -1207,6 +1218,8 @@ bool CodeGenerator::VectorContractionCode(const Node* node, FileWriter * file)
 
 bool CodeGenerator::VectorComparisonIsSmallerCode(const Node* node, FileWriter * file)
 {
+	file->PrintfLine("// %s\n", __func__);
+
 	// TODO: Create extra Norm-Nodes for this.
 	getVarRetFalseOnError(varOp, node->id);
 	getVarRetFalseOnError(varLVec, node->parents[0]);
@@ -1269,6 +1282,8 @@ bool CodeGenerator::VectorComparisonIsSmallerCode(const Node* node, FileWriter *
 
 bool CodeGenerator::ControlTransferWhileCode(const Node* node, FileWriter * file)
 {
+	file->PrintfLine("// %s\n", __func__);
+
 	getVarRetFalseOnError(varCond, node->parents[0]);
 
 	if(1 != varCond->Length())
@@ -1311,6 +1326,8 @@ bool CodeGenerator::ControlTransferWhileCode(const Node* node, FileWriter * file
 
 bool CodeGenerator::VectorScalarMultiplicationCode(const Node* node, FileWriter * file)
 {
+	file->PrintfLine("// %s\n", __func__);
+
 	getVarRetFalseOnError(varOp, node->id);
 	getVarRetFalseOnError(varVec, node->parents[0]);
 	getVarRetFalseOnError(varScalar, node->parents[1]);

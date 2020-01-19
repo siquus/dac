@@ -610,6 +610,8 @@ VectorSpace::Vector* VectorSpace::Vector::Contract(const Vector* vec, const std:
 				{
 					dPair -= 1;
 				}
+
+#error "Same needs to be done for lfactors and rfactors!"
 			}
 
 			opKronParam->Scaling *= __space_->factors_[lfactors[contrFactor]].dim_;
