@@ -374,8 +374,6 @@ VectorSpace::Vector* VectorSpace::Vector::CreateDerivative(std::map<Node::Id_t, 
 	Vector * summandVec = nullptr;
 	for(const Node::Id_t &parentId: (*depNodes)[currentVec->nodeId_].parents)
 	{
-		DEBUG("Child %u: Adding parent %u\n",currentVec->nodeId_, parentId);
-
 		const Node * parentNode = graph_->GetNode(parentId);
 		if(nullptr == parentNode)
 		{
@@ -549,15 +547,89 @@ VectorSpace::Vector* VectorSpace::Vector::Contract(const Vector* vec, const std:
 	retVec->graph_ = graph_;
 	retVec->__space_ = retSpace;
 
-	contractValue_t * opParameters = new contractValue_t;
-	opParameters->lfactors = lfactors;
-	opParameters->rfactors = rfactors;
+	const Node * thisNode = graph_->GetNode(nodeId_);
+	const Node * vecNode = graph_->GetNode(vec->nodeId_);
 
 	Node node;
-	node.parents.push_back(nodeId_);
-	node.parents.push_back(vec->nodeId_);
-	node.type = Node::Type::VECTOR_CONTRACTION;
-	node.typeParameters = opParameters;
+	if((Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == thisNode->type) &&
+			(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == thisNode->type))
+	{
+		// Example:
+		// Say we have C_jklmnp = A_ijkl B_mnip = d_ij d_kl d_mi d_np
+		//                           = |i| * d_mj d_dkl d_np, |i| = dim of index i
+		// i.e. Kon. Params: {1, 0, 3, 2} {2, 3, 0, 1}
+		// Combine the lists to d := {1, 0, 3, 2, 6, 7, 4, 5} i.e. += 4 to all B indices.
+		// Perform the sum over index position 0 (pos. of i in A) and 2 + 4 (pos. of i in B, + 4 for pos in d):
+		// 1. tmp = d[d[0]];
+		//    d[d[0]] = d[d[2 + 4]]; d[d[2 + 4]] = tmp; i.e. d_ij d_mi = |i| d_jm
+		// 2. Erase array position 0 and -= 1 all array values > 0 (all of them, the one == 0 was removed in 1.)
+		// 3. Erase array position 2 + 4 and -= 1 all array indices < 2 + 4 (again, == 2 + 4 was removed in 1.)
+		// 4. C *= |i|
+		// done.
+
+		const KroneckerDeltaParameters_t * thisKronParam = (const KroneckerDeltaParameters_t *) thisNode->typeParameters;
+		const KroneckerDeltaParameters_t * vecKronParam = (const KroneckerDeltaParameters_t *) vecNode->typeParameters;
+
+		KroneckerDeltaParameters_t * opKronParam = new KroneckerDeltaParameters_t;
+		opKronParam->Scaling = thisKronParam->Scaling * vecKronParam->Scaling;
+
+		opKronParam->DeltaPair = thisKronParam->DeltaPair;
+
+		// First just combine the list of delta pairs
+		opKronParam->DeltaPair.insert(
+				opKronParam->DeltaPair.begin(),
+				vecKronParam->DeltaPair.begin(), vecKronParam->DeltaPair.end());
+
+		// Make it valid by increasing the the vecKron indices by size of thisKron indices
+		size_t vecKronOffset = thisKronParam->DeltaPair.size();
+		for(size_t dPair = vecKronOffset; dPair < opKronParam->DeltaPair.size(); dPair++)
+		{
+			opKronParam->DeltaPair[dPair] += vecKronOffset;
+		}
+
+		// Contract the DeltaPairs
+		for(size_t contrFactor = 0; contrFactor < lfactors.size(); contrFactor++)
+		{
+			const uint32_t lfactor = lfactors[contrFactor];
+			const uint32_t rfactor = rfactors[contrFactor] + vecKronOffset;
+
+			uint32_t tmp = opKronParam->DeltaPair[opKronParam->DeltaPair[lfactor]];
+			opKronParam->DeltaPair[opKronParam->DeltaPair[lfactor]] = opKronParam->DeltaPair[opKronParam->DeltaPair[rfactor]];
+			opKronParam->DeltaPair[opKronParam->DeltaPair[rfactor]] = tmp;
+
+			opKronParam->DeltaPair.erase(opKronParam->DeltaPair.begin() + lfactor);
+			opKronParam->DeltaPair.erase(opKronParam->DeltaPair.begin() + rfactor - 1);
+
+			for(uint32_t &dPair: opKronParam->DeltaPair)
+			{
+				if(rfactor < dPair)
+				{
+					dPair -= 2;
+				}
+				else if(lfactor < dPair)
+				{
+					dPair -= 1;
+				}
+			}
+
+			opKronParam->Scaling *= __space_->factors_[lfactors[contrFactor]].dim_;
+		}
+
+		node.type = Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT;
+		node.typeParameters = opKronParam;
+	}
+	else
+	{
+		contractValue_t * opParameters = new contractValue_t;
+		opParameters->lfactors = lfactors;
+		opParameters->rfactors = rfactors;
+
+		node.parents.push_back(nodeId_);
+		node.parents.push_back(vec->nodeId_);
+		node.type = Node::Type::VECTOR_CONTRACTION;
+		node.typeParameters = opParameters;
+	}
+
 	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
 	node.object = retVec;
 
@@ -603,15 +675,15 @@ VectorSpace::Vector* VectorSpace::Vector::AddDerivative(const Vector* vecValuedF
 	Node node;
 	node.type = Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT;
 	KroneckerDeltaParameters_t * opParameters = new KroneckerDeltaParameters_t;
-	opParameters->factorPair.resize(factors.size());
-	for(size_t factor = 0; factor < opParameters->factorPair.size() / 2; factor++)
+	opParameters->DeltaPair.resize(factors.size());
+	for(size_t factor = 0; factor < opParameters->DeltaPair.size() / 2; factor++)
 	{
-		opParameters->factorPair[factor] = opParameters->factorPair.size() / 2 + factor ;
+		opParameters->DeltaPair[factor] = opParameters->DeltaPair.size() / 2 + factor ;
 	}
 
-	for(size_t factor = opParameters->factorPair.size() / 2; factor < opParameters->factorPair.size(); factor++)
+	for(size_t factor = opParameters->DeltaPair.size() / 2; factor < opParameters->DeltaPair.size(); factor++)
 	{
-		opParameters->factorPair[factor] = factor - opParameters->factorPair.size() / 2;
+		opParameters->DeltaPair[factor] = factor - opParameters->DeltaPair.size() / 2;
 	}
 
 	node.typeParameters = opParameters;
