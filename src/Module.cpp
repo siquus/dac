@@ -588,10 +588,17 @@ VectorSpace::Vector* VectorSpace::Vector::Contract(const Vector* vec, const std:
 		}
 
 		// Contract the DeltaPairs
-		for(size_t contrFactor = 0; contrFactor < lfactors.size(); contrFactor++)
+		std::vector<uint32_t> lfactorsNew = lfactors;
+		std::vector<uint32_t> rfactorsNew = rfactors;
+		for(uint32_t &rfactor: rfactorsNew)
 		{
-			const uint32_t lfactor = lfactors[contrFactor];
-			const uint32_t rfactor = rfactors[contrFactor] + vecKronOffset;
+			rfactor += vecKronOffset;
+		}
+
+		for(size_t contrFactor = 0; contrFactor < lfactorsNew.size(); contrFactor++)
+		{
+			const uint32_t lfactor = lfactorsNew[contrFactor];
+			const uint32_t rfactor = rfactorsNew[contrFactor];
 
 			uint32_t tmp = opKronParam->DeltaPair[opKronParam->DeltaPair[lfactor]];
 			opKronParam->DeltaPair[opKronParam->DeltaPair[lfactor]] = opKronParam->DeltaPair[opKronParam->DeltaPair[rfactor]];
@@ -610,9 +617,24 @@ VectorSpace::Vector* VectorSpace::Vector::Contract(const Vector* vec, const std:
 				{
 					dPair -= 1;
 				}
-
-#error "Same needs to be done for lfactors and rfactors!"
 			}
+
+			for(uint32_t &lfactorNew: lfactorsNew)
+			{
+				if(lfactor < lfactorNew)
+				{
+					lfactorNew -= 1;
+				}
+			}
+
+			for(uint32_t &rfactorNew: rfactorsNew)
+			{
+				if(rfactor < rfactorNew)
+				{
+					rfactorNew -= 1;
+				}
+			}
+
 
 			opKronParam->Scaling *= __space_->factors_[lfactors[contrFactor]].dim_;
 		}
