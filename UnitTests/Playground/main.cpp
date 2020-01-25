@@ -36,6 +36,14 @@ int main()
 	auto matrixProdOutput = Interface::Output(&graph, "matrixProd");
 	matrixProdOutput.Set(matrixProd);
 
+	auto kron_init = Algebra::Module::VectorSpace::KroneckerDeltaParameters_t{.DeltaPair{1, 0}, .Scaling = 2};
+	auto kron = myMatrixSpace.Element(&graph, kron_init);
+
+	auto matrixKronProd = matrix1->Contract(kron, 0, 1);
+
+	auto matrixKronProdOutput = Interface::Output(&graph, "matrixKronProd");
+	matrixKronProdOutput.Set(matrixKronProd);
+
 	auto vec1_init = std::vector<float>{1, 2, 3};
 	auto vec2_init = std::vector<float>{4, 5, 6};
 

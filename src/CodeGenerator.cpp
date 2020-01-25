@@ -856,6 +856,16 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 		resultIsArray = true;
 	}
 
+	// Copy delta pairs array into file
+	std::string deltaPairs = "const uint32_t deltaPairs[] = {";
+	for(size_t paramPos = 0; paramPos < kroneckerParam->DeltaPair.size(); paramPos++)
+	{
+		deltaPairs += std::to_string(kroneckerParam->DeltaPair[paramPos]) + ", ";
+	}
+	deltaPairs.erase(deltaPairs.end() - 2, deltaPairs.end()); // remove last ", "
+	deltaPairs += "};";
+	fprintProtect(file->PrintfLine("%s", deltaPairs.c_str()));
+
 	if(resultIsArray)
 	{
 		fprintProtect(file->PrintfLine("for(int opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
@@ -955,6 +965,16 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 	kronIndexTuple += "};";
 	fprintProtect(file->PrintfLine(kronIndexTuple.c_str()));
 
+	// A_ijk	= B_ijm d_mk
+	//			= B_ijk
+	//
+	// A_ijkl	= B_ijmn d_ml d_nk
+	//			= B_ijlk
+	//
+	// This is the weird case:
+	// A_ijkl	= B_ijmn d_mn d_kl
+	//			= B_ijnn d_kl
+
 	std::string sum = "sum += ";
 	sum += *(varArgVec->GetIdentifier()) + "[";
 	for(uint32_t argIndex = 0; argIndex < argVec->__space_->factors_.size(); argIndex++)
@@ -964,10 +984,17 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 				+  argStridesId + "[" +  std::to_string(argIndex) + "] + ";
 	}
 	sum.erase(sum.end() - 3, sum.end()); // remove last " +"
-	sum += "]";
+	sum += "] *";
 
-	Error("This is where kronecker-vector-contraction implementation stops..\n"); // TODO: Finish code!
-	return false;
+	for(size_t paramPos = 0; paramPos < kroneckerParam->DeltaPair.size(); paramPos++)
+	{
+		if(kroneckerParam->DeltaPair[paramPos] > paramPos) // Remember, we save the partner for every factor, but only half the information is needed
+		{
+			sum += " (kronIndexTuple[" + std::to_string(paramPos) + "] ==";
+			sum += " kronIndexTuple[deltaPairs[" + std::to_string(paramPos) + "]]) *";
+		}
+	}
+	sum += " " + std::to_string(kroneckerParam->Scaling) + ";";
 
 	fprintProtect(file->PrintfLine(sum.c_str()));
 
