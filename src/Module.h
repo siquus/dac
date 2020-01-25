@@ -39,6 +39,12 @@ public:
 	Ring::type_t GetRing() const;
 	void GetStrides(std::vector<uint32_t> * strides) const;
 
+	typedef struct {
+		std::vector<uint32_t> DeltaPair; // I.e. for delta^i_j * delta^k_l * , ... position i will contain j and vice versa.
+		float Scaling = 1.;
+	} KroneckerDeltaParameters_t;
+
+
 	class Vector : public NodeRef {
 	public:
 		const VectorSpace * __space_;
@@ -60,11 +66,6 @@ public:
 
 		Vector* Derivative(const Vector* vec);
 
-		typedef struct {
-			std::vector<uint32_t> DeltaPair; // I.e. for delta^i_j * delta^k_l * , ... position i will contain j and vice versa.
-			float Scaling = 1.;
-		} KroneckerDeltaParameters_t;
-
 	private:
 		static bool AreCompatible(const Vector* vec1, const Vector* vec2);
 
@@ -80,7 +81,9 @@ public:
 	};
 
 	template<typename T>
-	Vector * Element(Graph* graph, const std::vector<T>* initializer);
+	Vector * Element(Graph* graph, const std::vector<T> &initializer);
+
+	Vector * Element(Graph* graph, const KroneckerDeltaParameters_t &initializer);
 };
 }
 }

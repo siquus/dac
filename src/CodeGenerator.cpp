@@ -824,7 +824,7 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 		kronContractFactors = &contractValue->lfactors;
 	}
 
-	const Algebra::Module::VectorSpace::Vector::KroneckerDeltaParameters_t * kroneckerParam = (const Algebra::Module::VectorSpace::Vector::KroneckerDeltaParameters_t *) kronNode->typeParameters;
+	const Algebra::Module::VectorSpace::KroneckerDeltaParameters_t * kroneckerParam = (const Algebra::Module::VectorSpace::KroneckerDeltaParameters_t *) kronNode->typeParameters;
 
 	// Calculate Strides, assume Row-Major Layout
 	// https://en.wikipedia.org/wiki/Row-_and_column-major_order#Address_calculation_in_general

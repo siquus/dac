@@ -25,7 +25,7 @@ typedef enum {
 extern type_t GetSuperiorRing(type_t t1, type_t t2);
 
 template<typename inType>
-bool IsCompatible(type_t type, const std::vector<inType>  * dataVector)
+bool IsCompatible(type_t type, const std::vector<inType>  &dataVector)
 {
 	switch(type)
 	{

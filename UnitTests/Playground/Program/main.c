@@ -9,13 +9,15 @@ static const float expectedProduct[] = {210, 294, 378};
 static const float expectedSum[] = {221, 315, 409};
 static const int expectedIsSmaller = 0;
 static const int expectedLoopCnt = 10;
+static const float expectedMatrixProduct[] = {1, 2, 3, 4, 5, 6, 7, 8, 9};
 
 typedef enum {
 	CALLED_PRODUCT = 1 << 0,
 	CALLED_SUM = 1 << 1,
 	CALLED_IS_SMALLER = 1 << 2,
 	CALLED_WHILE_DONE = 1 << 3,
-	CALLED_NROF = 1 << 4,
+	CALLED_MATRIX_PROD = 1 << 4,
+	CALLED_NROF = 1 << 5,
 } called_t;
 
 static called_t called = 0;
@@ -30,6 +32,18 @@ static void productCallback(const float* pt, size_t size)
 	}
 
 	called |= CALLED_PRODUCT;
+}
+
+static void matrixProductCallback(const float* pt, size_t size)
+{
+	if(memcmp(pt, expectedMatrixProduct, sizeof(expectedMatrixProduct)) || (size != sizeof(expectedMatrixProduct)))
+	{
+		fprintf(stderr, "Unexpected product result!\n");
+		fflush(stderr);
+		exit(1);
+	}
+
+	called |= CALLED_MATRIX_PROD;
 }
 
 static void sumCallback(const float* pt, size_t size)
@@ -104,7 +118,7 @@ int main() {
 	DacOutputCallbackProduct_Register(productCallback);
 	DacOutputCallbackSum_Register(sumCallback);
 	DacOutputCallbackSmallerThan_Register(isSmallerCallback);
-
+	DacOutputCallbackmatrixProd_Register(matrixProductCallback);
 	DacOutputCallbackWhile_Register(whileCallback);
 
 	DacRun();

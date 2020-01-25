@@ -19,7 +19,7 @@
 using namespace Algebra;
 using namespace Module;
 
-template VectorSpace::Vector * VectorSpace::Element<float>(Graph * graph, const std::vector<float>* initializer);
+template VectorSpace::Vector * VectorSpace::Element<float>(Graph * graph, const std::vector<float> &initializer);
 
 template<typename T>
 static bool hasDublicates(const std::vector<T> &vec)
@@ -81,7 +81,7 @@ void VectorSpace::GetStrides(std::vector<uint32_t> * strides) const
 }
 
 template<typename inType>
-VectorSpace::Vector * VectorSpace::Element(Graph * graph, const std::vector<inType>* initializer)
+VectorSpace::Vector * VectorSpace::Element(Graph * graph, const std::vector<inType>  &initializer)
 {
 	if(nullptr == graph)
 	{
@@ -89,10 +89,10 @@ VectorSpace::Vector * VectorSpace::Element(Graph * graph, const std::vector<inTy
 		return nullptr;
 	}
 
-	if(initializer->size() != GetDim())
+	if(initializer.size() != GetDim())
 	{
 		Error("Initializer dimensions do not match (%lu vs %i)!\n",
-				initializer->size(), GetDim());
+				initializer.size(), GetDim());
 		return nullptr;
 	}
 
@@ -121,7 +121,53 @@ VectorSpace::Vector * VectorSpace::Element(Graph * graph, const std::vector<inTy
 		return nullptr;
 	}
 
-	retVec->__value_ = initializer->data();
+	retVec->__value_ = initializer.data();
+	retVec->__space_ = this;
+	retVec->graph_ = graph;
+	retVec->nodeId_ = nodeId;
+
+	return retVec;
+}
+
+VectorSpace::Vector * VectorSpace::Element(Graph* graph, const KroneckerDeltaParameters_t &initializer)
+{
+	if(nullptr == graph)
+	{
+		Error("nullptr\n");
+		return nullptr;
+	}
+
+	if(initializer.DeltaPair.size() != factors_.size())
+	{
+		Error("Initializer dimensions do not match (%lu vs %i)!\n",
+				initializer.DeltaPair.size(), factors_.size());
+		return nullptr;
+	}
+
+	Vector * retVec = new Vector;
+	if(nullptr == retVec)
+	{
+		Error("Could not malloc Vec\n");
+		return nullptr;
+	}
+
+	Node node;
+	node.type = Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT;
+	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
+
+	KroneckerDeltaParameters_t * param = new KroneckerDeltaParameters_t;
+	*param = initializer;
+
+	node.typeParameters = param;
+	node.object = retVec;
+
+	Node::Id_t nodeId = graph->AddNode(&node);
+	if(Node::ID_NONE == nodeId)
+	{
+		Error("Could not add node!\n");
+		return nullptr;
+	}
+
 	retVec->__space_ = this;
 	retVec->graph_ = graph;
 	retVec->nodeId_ = nodeId;

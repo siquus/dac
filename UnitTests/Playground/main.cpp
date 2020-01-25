@@ -28,28 +28,31 @@ int main()
 	auto matrix1_init = std::vector<float>{1, 2, 3, 4, 5, 6, 7, 8, 9};
 	auto matrix2_init = std::vector<float>{1, 0, 0, 0, 1, 0, 0, 0, 1};
 
-	auto matrix1 = myMatrixSpace.Element(&graph, &matrix1_init);
-	auto matrix2 = myMatrixSpace.Element(&graph, &matrix2_init);
+	auto matrix1 = myMatrixSpace.Element(&graph, matrix1_init);
+	auto matrix2 = myMatrixSpace.Element(&graph, matrix2_init);
 
 	auto matrixProd = matrix1->Contract(matrix2, 1, 0);
+
+	auto matrixProdOutput = Interface::Output(&graph, "matrixProd");
+	matrixProdOutput.Set(matrixProd);
 
 	auto vec1_init = std::vector<float>{1, 2, 3};
 	auto vec2_init = std::vector<float>{4, 5, 6};
 
-	auto vec1 = myVs.Element(&graph, &vec1_init);
-	auto vec2 = myVs.Element(&graph, &vec2_init);
+	auto vec1 = myVs.Element(&graph, vec1_init);
+	auto vec2 = myVs.Element(&graph, vec2_init);
 
 	auto sum = vec1->Add(vec2); // {5, 7, 9}
 
 	auto myScalarSpace = Algebra::Module::VectorSpace(Algebra::Ring::Float32, 1);
 	auto vec3_init = std::vector<float>{42};
-	auto vec3 = myScalarSpace.Element(&graph, &vec3_init);
+	auto vec3 = myScalarSpace.Element(&graph, vec3_init);
 
 	auto vec4_init = std::vector<float>{10, 20, 30};
 	auto vec5_init = std::vector<float>{1, 1, 1};
 
-	auto vec4 = myVs.Element(&graph, &vec4_init);
-	auto vec5 = myVs.Element(&graph, &vec5_init);
+	auto vec4 = myVs.Element(&graph, vec4_init);
+	auto vec5 = myVs.Element(&graph, vec5_init);
 
 	auto sum45 = vec4->Add(vec5); // {11, 21, 31}
 
@@ -98,10 +101,10 @@ int main()
 	auto vec8_init = std::vector<float>{2, 2, 2};
 	auto vec9_init = std::vector<float>{-1, -1, -1};
 
-	auto vec6 = myVs.Element(&graph, &vec6_init);
-	auto vec7 = myVs.Element(&graph, &vec7_init);
-	auto vec8 = myVs.Element(&graph, &vec8_init);
-	auto vec9 = myVs.Element(&graph, &vec9_init);
+	auto vec6 = myVs.Element(&graph, vec6_init);
+	auto vec7 = myVs.Element(&graph, vec7_init);
+	auto vec8 = myVs.Element(&graph, vec8_init);
+	auto vec9 = myVs.Element(&graph, vec9_init);
 
 	auto add69 = vec6->Add(vec9); // TODO: Add ->Self->Add()
 	add69->StoreIn(vec6);
