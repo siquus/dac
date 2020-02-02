@@ -17,7 +17,6 @@
 
 #include "Graph.h"
 #include "Module.h"
-#include "Parallizer.h"
 
 class FileWriter {
 	std::string path_;
@@ -80,7 +79,6 @@ class CodeGenerator {
 	FileWriter fileNodes_;
 	FileWriter fileInstructions_;
 	FileWriter fileInstructionsH_;
-	FileWriter fileCommonH_;
 
 	const Graph* graph_ = nullptr;
 
@@ -121,11 +119,12 @@ class CodeGenerator {
 	std::map<Node::Id_t, const Node*> nodesInstructionMap_;
 	std::map<Node::Id_t, uint32_t> nodeArrayPos_;
 
+	size_t ThreadsNrOf_;
 public:
 	CodeGenerator(const std::string* path);
 	virtual ~CodeGenerator();
 
-	bool Generate(const Graph* graph, const Parallizer* parallizer);
+	bool Generate(const Graph* graph, size_t ThreadsNrOf);
 };
 
 #endif /* SRC_CODEGENERATOR_H_ */

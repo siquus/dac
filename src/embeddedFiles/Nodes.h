@@ -22,6 +22,10 @@ typedef struct node_s {
 	const uint16_t id;
 } node_t;
 
-extern node_t nodes[];
+typedef struct jobPoolInit_s {
+	node_t * Nodes;
+	size_t NodesNrOf;
+	size_t ThreadsNrOf;
+} jobPoolInit_t;
 
 #endif /* SRC_EMBEDDEDFILES_NODES_H_ */

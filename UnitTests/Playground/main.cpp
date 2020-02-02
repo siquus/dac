@@ -16,7 +16,6 @@
 #include "Ring.h"
 #include "Interface.h"
 #include "CodeGenerator.h"
-#include "Parallizer.h"
 
 int main()
 {
@@ -136,14 +135,6 @@ int main()
 		return 1;
 	}
 
-	Parallizer parallizer;
-	bool parSuccess = parallizer.Parallize(&graph);
-	if(!parSuccess)
-	{
-		printf("Could not run parallizer\n");
-		return 1;
-	}
-
 	struct stat stCodePath = {0};
 
 	char path[] = "Program/dac";
@@ -156,7 +147,7 @@ int main()
 	auto outpath = std::string(path) + "/";
 	CodeGenerator codeGenerator(&outpath);
 
-	bool GenSuccess = codeGenerator.Generate(&graph, &parallizer);
+	bool GenSuccess = codeGenerator.Generate(&graph, 4);
 	if(!GenSuccess)
 	{
 		printf("Could not generate Code\n");

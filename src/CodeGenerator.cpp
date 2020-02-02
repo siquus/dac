@@ -181,9 +181,10 @@ CodeGenerator::~CodeGenerator() {
 
 }
 
-bool CodeGenerator::Generate(const Graph* graph, const Parallizer* parallizer)
+bool CodeGenerator::Generate(const Graph* graph, size_t ThreadsNrOf)
 {
 	graph_ = graph;
+	ThreadsNrOf_ = ThreadsNrOf;
 
 	// From here on we assume that the graph will no longer change
 	// this means we may use pointers to nodes now!
@@ -259,12 +260,11 @@ bool CodeGenerator::Generate(const Graph* graph, const Parallizer* parallizer)
 		return false;
 	}
 
-	std::string CommonPath = path_;
-	CommonPath += "Common.h";
-	success = fileCommonH_.Init(&CommonPath);
+	std::string InstructionsH = InstructionsPath + ".h";
+	success = fileInstructionsH_.Init(&InstructionsH);
 	if(!success)
 	{
-		Error("Could not initialize %s!", CommonPath.c_str());
+		Error("Could not initialize %s!", InstructionsH.c_str());
 		return false;
 	}
 
@@ -274,17 +274,6 @@ bool CodeGenerator::Generate(const Graph* graph, const Parallizer* parallizer)
 	// Generate Includes
 	retFalseOnFalse(GenerateIncludes(), "Could not generate Includes\n");
 	fprintProtect(fileDacC_.PrintfLine(""));
-
-	// Generate #defines
-	auto cpuInfo = parallizer->GetCpuInfo();
-	if(1 != cpuInfo->size())
-	{
-		Error("Only one CPU supported currently!\n");
-		return false;
-	}
-
-	const Parallizer::cpu_t * cpu = &cpuInfo->begin()->second;
-	fprintProtect(fileCommonH_.PrintfLine("#define THREADS_NROF %uu", cpu->coresNrOf));
 
 	fprintProtect(fileInstructions_.PrintfLine("#include <stdint.h>\n"));
 	fprintProtect(fileInstructions_.PrintfLine("#include \"dac.h\""));
@@ -378,9 +367,8 @@ bool CodeGenerator::GenerateNodesArray()
 	std::set<Node::Id_t> firstNodes;
 	GetFirstNodesToExecute(&firstNodes);
 
-	std::string jobPoolInitStr;
-	jobPoolInitStr += "#define JOB_POOL_INIT {";
-
+	std::string jobPoolInitNodesId = "jobPoolInitNodes";
+	std::string jobPoolInitNodes = "node_t " + jobPoolInitNodesId + " " + graph_->Name() + "[] = ";
 	for(const auto &node: firstNodes)
 	{
 		const auto &arrayPos = nodeArrayPos_.find(node);
@@ -390,17 +378,25 @@ bool CodeGenerator::GenerateNodesArray()
 			return false;
 		}
 
-		jobPoolInitStr += "&nodes[";
-		jobPoolInitStr += std::to_string(arrayPos->second);
-		jobPoolInitStr += "]";
-		jobPoolInitStr += ", ";
+		jobPoolInitNodes += "&nodes[";
+		jobPoolInitNodes += std::to_string(arrayPos->second);
+		jobPoolInitNodes += "]";
+		jobPoolInitNodes += ", ";
 	}
 
-	jobPoolInitStr.erase(jobPoolInitStr.size() - 2); // Remove last ", "
-	jobPoolInitStr += "}";
+	jobPoolInitNodes.erase(jobPoolInitNodes.size() - 2); // Remove last ", "
+	jobPoolInitNodes += "}";
 
-	fprintProtect(fileCommonH_.PrintfLine(jobPoolInitStr.c_str()));
-	fprintProtect(fileCommonH_.PrintfLine("#define JOB_POOL_INIT_NROF %u", firstNodes.size()));
+	std::string jobPoolInitId = "jobPoolInit_t jobPoolInit" + graph_->Name();
+	fprintProtect(fileInstructions_.PrintfLine("%s = {", jobPoolInitId.c_str()));
+	fileInstructions_.Outdent();
+	fprintProtect(fileInstructions_.PrintfLine(".Nodes = %s,", jobPoolInitNodesId.c_str()));
+	fprintProtect(fileInstructions_.PrintfLine(".NodesNrOf = %lu,", firstNodes.size()));
+	fprintProtect(fileInstructions_.PrintfLine(".ThreadsNrOf = %lu,", ThreadsNrOf_));
+	fileInstructions_.Indent();
+	fprintProtect(fileInstructions_.PrintfLine("};"));
+
+	fprintProtect(fileInstructionsH_.PrintfLine("extern %s;", jobPoolInitId.c_str()));
 
 	return true;
 }
