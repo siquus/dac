@@ -8,9 +8,22 @@
 #include "GlobalDefines.h"
 #include "Graph.h"
 
-Graph::Graph() {
-	// TODO Auto-generated constructor stub
+const std::string &Graph::Name() const
+{
+	return name_;
+}
 
+void Graph::Init(const std::string &name)
+{
+	name_ = name;
+}
+
+Graph::Graph(const std::string &name) {
+	Init(name);
+}
+
+Graph::Graph(const char * name) {
+	Init(std::string(name));
 }
 
 Graph::~Graph() {

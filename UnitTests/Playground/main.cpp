@@ -20,7 +20,7 @@
 
 int main()
 {
-	Graph graph;
+	Graph graph("Test");
 
 	auto myVs = Algebra::Module::VectorSpace(Algebra::Ring::Float32, 3);
 

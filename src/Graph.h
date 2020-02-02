@@ -10,6 +10,7 @@
 
 #include <vector>
 #include <stdint.h>
+#include <string>
 
 class Node {
 public:
@@ -63,7 +64,9 @@ public:
 
 class Graph {
 public:
-	Graph();
+	Graph(const std::string &name);
+	Graph(const char * name);
+
 	virtual ~Graph();
 
 	Node::Id_t nextNodeId_ = Node::ID_NONE + 1;
@@ -74,10 +77,13 @@ public:
 	const Node * GetNode(Node::Id_t id) const;
 	std::vector<Node> * GetNodesModifyable();
 	bool DeleteChildReferences(Node::Id_t child);
+	const std::string &Name() const;
 
 private:
 	std::vector<Node> nodes_;
+	std::string name_;
 
+	void Init(const std::string &name);
 	bool AddChild(Node::Id_t parent, Node::Id_t child);
 };
 
