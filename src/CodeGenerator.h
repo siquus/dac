@@ -76,7 +76,6 @@ class CodeGenerator {
 
 	FileWriter fileDacC_;
 	FileWriter fileDacH_;
-	FileWriter fileNodes_;
 	FileWriter fileInstructions_;
 	FileWriter fileInstructionsH_;
 

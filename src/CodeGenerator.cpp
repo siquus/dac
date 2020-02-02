@@ -76,8 +76,8 @@ static const char includeFilesBrackets[][42] = {
 
 static const char includeFilesQuotes[][42] = {
 		HEADER_NAME,
-		"Helpers.h",
 		"error_functions.h",
+		"Instructions.h"
 };
 
 static const char fileHeader[] = \
@@ -103,7 +103,6 @@ static const char fileHeader[] = \
 */\n\
 \n";
 
-static const char nodesId[] = "nodes";
 static const uint32_t NODE_T_MAX_EDGE_NUMBER = 42;
 
 FileWriter::~FileWriter()
@@ -233,15 +232,6 @@ bool CodeGenerator::Generate(const Graph* graph, size_t ThreadsNrOf)
 		return false;
 	}
 
-	std::string nodesPath = path_;
-	nodesPath += "Nodes.c";
-	success = fileNodes_.Init(&nodesPath);
-	if(!success)
-	{
-		Error("Could not initialize %s!", nodesPath.c_str());
-		return false;
-	}
-
 	std::string InstructionsPath = path_;
 	InstructionsPath += "Instructions.c";
 	success = fileInstructions_.Init(&InstructionsPath);
@@ -257,14 +247,6 @@ bool CodeGenerator::Generate(const Graph* graph, size_t ThreadsNrOf)
 	if(!success)
 	{
 		Error("Could not initialize %s!", InstructionsPath.c_str());
-		return false;
-	}
-
-	std::string InstructionsH = InstructionsPath + ".h";
-	success = fileInstructionsH_.Init(&InstructionsH);
-	if(!success)
-	{
-		Error("Could not initialize %s!", InstructionsH.c_str());
 		return false;
 	}
 
@@ -297,9 +279,9 @@ bool CodeGenerator::Generate(const Graph* graph, size_t ThreadsNrOf)
 
 	retFalseOnFalse(GenerateRunFunction(), "Could not generate Run Function!\n");
 
-	fprintProtect(fileNodes_.PrintfLine("#include <stdint.h>\n"));
-	fprintProtect(fileNodes_.PrintfLine("#include \"Instructions.h\"\n"));
-	fprintProtect(fileNodes_.PrintfLine("#include \"Nodes.h\""));
+	fprintProtect(fileInstructions_.PrintfLine("extern node_t nodes%s[];", graph_->Name().c_str()))
+
+	fprintProtect(fileInstructionsH_.PrintfLine("#include \"Nodes.h\"\n"));
 
 	retFalseOnFalse(GenerateInstructions(), "Could not generate Instructions!\n");
 
@@ -310,8 +292,8 @@ bool CodeGenerator::Generate(const Graph* graph, size_t ThreadsNrOf)
 
 bool CodeGenerator::GenerateNodesArray()
 {
-	fprintProtect(fileNodes_.PrintfLine("node_t %s[] = {", nodesId));
-	fileNodes_.Indent();
+	fprintProtect(fileInstructions_.PrintfLine("node_t nodes%s[] = {", graph_->Name().c_str()));
+	fileInstructions_.Indent();
 
 	// Write array
 	for(const auto &nodePair: nodesInstructionMap_)
@@ -360,42 +342,44 @@ bool CodeGenerator::GenerateNodesArray()
 				"Could not generate Nodes Element!");
 	}
 
-	fileNodes_.Outdent();
-	fprintProtect(fileNodes_.PrintfLine("};\n"));
+	fileInstructions_.Outdent();
+	fprintProtect(fileInstructions_.PrintfLine("};\n"));
 
 	// Create node-list to initialize job pool
 	std::set<Node::Id_t> firstNodes;
 	GetFirstNodesToExecute(&firstNodes);
 
-	std::string jobPoolInitNodesId = "jobPoolInitNodes";
-	std::string jobPoolInitNodes = "node_t " + jobPoolInitNodesId + " " + graph_->Name() + "[] = ";
+	std::string jobPoolInitNodesId = "jobPoolInitNodes" + graph_->Name();
+	std::string jobPoolInitNodes = "node_t * " + jobPoolInitNodesId + "[] = {";
 	for(const auto &node: firstNodes)
 	{
 		const auto &arrayPos = nodeArrayPos_.find(node);
 		if(nodeArrayPos_.end() == arrayPos)
 		{
-			Error("Couldn't find array position");
+			Error("Couldn't find array position\n");
 			return false;
 		}
 
-		jobPoolInitNodes += "&nodes[";
+		jobPoolInitNodes += "&nodes" + graph_->Name() + "[";
 		jobPoolInitNodes += std::to_string(arrayPos->second);
 		jobPoolInitNodes += "]";
 		jobPoolInitNodes += ", ";
 	}
 
 	jobPoolInitNodes.erase(jobPoolInitNodes.size() - 2); // Remove last ", "
-	jobPoolInitNodes += "}";
+	jobPoolInitNodes += "};\n";
+
+	fprintProtect(fileInstructions_.PrintfLine("%s", jobPoolInitNodes.c_str()));
 
 	std::string jobPoolInitId = "jobPoolInit_t jobPoolInit" + graph_->Name();
 	fprintProtect(fileInstructions_.PrintfLine("%s = {", jobPoolInitId.c_str()));
-	fileInstructions_.Outdent();
+	fileInstructions_.Indent();
 	fprintProtect(fileInstructions_.PrintfLine(".Nodes = %s,", jobPoolInitNodesId.c_str()));
 	fprintProtect(fileInstructions_.PrintfLine(".NodesNrOf = %lu,", firstNodes.size()));
-	fprintProtect(fileInstructions_.PrintfLine(".ThreadsNrOf = %lu,", ThreadsNrOf_));
-	fileInstructions_.Indent();
+	fileInstructions_.Outdent();
 	fprintProtect(fileInstructions_.PrintfLine("};"));
 
+	fprintProtect(fileInstructionsH_.PrintfLine("\n"));
 	fprintProtect(fileInstructionsH_.PrintfLine("extern %s;", jobPoolInitId.c_str()));
 
 	return true;
@@ -481,9 +465,9 @@ bool CodeGenerator::GenerateInstructions()
 		std::string fctId;
 		GenerateInstructionId(&fctId, node.id);
 
-		fileInstructionsH_.PrintfLine("void %s();", fctId.c_str());
+		fileInstructionsH_.PrintfLine("void %s(instructionParam_t * param);", fctId.c_str());
 
-		fileInstructions_.PrintfLine("void %s()", fctId.c_str());
+		fileInstructions_.PrintfLine("void %s(instructionParam_t * param)", fctId.c_str());
 		fileInstructions_.PrintfLine("{");
 		fileInstructions_.Indent();
 
@@ -566,7 +550,7 @@ bool CodeGenerator::GenerateNodesElem(
 	for(uint32_t parent = 0; parent < parentsArrayPosition->size(); parent++)
 	{
 		buffer += "&";
-		buffer += nodesId;
+		buffer += "nodes" + graph_->Name();
 		buffer += "[";
 		buffer += std::to_string((*parentsArrayPosition)[parent]);
 		buffer += "]";
@@ -588,7 +572,7 @@ bool CodeGenerator::GenerateNodesElem(
 	for(uint32_t child = 0; child < childrenArrayPosition->size(); child++)
 	{
 		buffer += "&";
-		buffer += nodesId;
+		buffer += "nodes" + graph_->Name();
 		buffer += "[";
 		buffer += std::to_string((*childrenArrayPosition)[child]);
 		buffer += "]";
@@ -606,7 +590,7 @@ bool CodeGenerator::GenerateNodesElem(
 	buffer += ", ";
 	buffer += std::to_string(nodeId);
 
-	fprintProtect(fileNodes_.PrintfLine("{%s},", buffer.c_str()));
+	fprintProtect(fileInstructions_.PrintfLine("{%s},", buffer.c_str()));
 
 	return true;
 }
@@ -614,20 +598,20 @@ bool CodeGenerator::GenerateNodesElem(
 bool CodeGenerator::GenerateRunFunction()
 {
 	// Add prototype to header
-	fprintProtect(fileDacH_.PrintfLine("extern int DacRun(void);"));
+	fprintProtect(fileDacH_.PrintfLine("extern int DacRun(size_t threadsNrOf);"));
 
 	// Define function
-	fprintProtect(fileDacC_.PrintfLine("int DacRun(void)\n{"));
+	fprintProtect(fileDacC_.PrintfLine("int DacRun(size_t threadsNrOf)\n{"));
 	fileDacC_.Indent();
 
 	// Check that callbacks have been set
 	GenerateCallbackPtCheck(&fileDacC_);
 
 	// Fire up threads
-	fprintProtect(fileDacC_.PrintfLine("StartThreads();"));
+	fprintProtect(fileDacC_.PrintfLine("void * instance = StartThreads(threadsNrOf, &jobPoolInit%s);", graph_->Name().c_str()));
 
 	// Join threads, create return values and closing brackets
-	fprintProtect(fileDacC_.PrintfLine("JoinThreads();\n"));
+	fprintProtect(fileDacC_.PrintfLine("JoinThreads(instance);\n"));
 
 	// Return 0 to show success.
 	fprintProtect(fileDacC_.PrintfLine("return 0;\n}\n"));
@@ -1337,11 +1321,11 @@ bool CodeGenerator::ControlTransferWhileCode(const Node* node, FileWriter * file
 
 	fprintProtect(file->PrintfLine("if(%s)", varCond->GetIdentifier()->c_str()));
 	fprintProtect(file->PrintfLine("{"));
-	fprintProtect(file->PrintfLine("\taddPossiblyDeferredJob(&nodes[%u]);", arrayPosTrue->second));
+	fprintProtect(file->PrintfLine("\tparam->addPossiblyDeferredNode(param->instance, &nodes%s[%u]);", graph_->Name().c_str(), arrayPosTrue->second));
 	fprintProtect(file->PrintfLine("}"));
 	fprintProtect(file->PrintfLine("else"));
 	fprintProtect(file->PrintfLine("{"));
-	fprintProtect(file->PrintfLine("\taddPossiblyDeferredJob(&nodes[%u]);", arrayPosFalse->second));
+	fprintProtect(file->PrintfLine("\tparam->addPossiblyDeferredNode(param->instance, &nodes%s[%u]);", graph_->Name().c_str(), arrayPosFalse->second));
 	fprintProtect(file->PrintfLine("}"));
 
 	return true;

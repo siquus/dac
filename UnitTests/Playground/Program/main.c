@@ -136,7 +136,7 @@ int main() {
 	DacOutputCallbackmatrixKronProd_Register(matrixKronProductCallback);
 	DacOutputCallbackWhile_Register(whileCallback);
 
-	DacRun();
+	DacRun(4);
 
 	if(CALLED_NROF - 1 != called)
 	{

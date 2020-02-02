@@ -10,9 +10,8 @@
 
 #include "Nodes.h"
 
-extern void addPossiblyDeferredJob(const node_t* node);
 extern void * threadFunction(void * arg);
-extern void StartThreads();
-extern void JoinThreads();
+extern void * StartThreads(size_t threadsNrOf, jobPoolInit_t * jobPoolInit);
+extern void JoinThreads(void * instance);
 
 #endif /* SRC_HELPERS_H_ */

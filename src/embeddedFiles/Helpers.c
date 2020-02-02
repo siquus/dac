@@ -12,7 +12,6 @@
 #include <pthread.h>
 
 #include "error_functions.h"
-#include "Common.h"
 
 #include "Helpers.h"
 
@@ -20,10 +19,6 @@
 	printf(__VA_ARGS__); \
 	fflush(stdout);
 
-static pthread_t threads[THREADS_NROF];
-static atomic_uchar threadActive[THREADS_NROF] = {0};
-
-const uint16_t ALL_JOBS_COMPLETED = UINT16_MAX;
 typedef struct {
 	pthread_mutex_t mutex;
 	pthread_cond_t condition;
@@ -31,23 +26,30 @@ typedef struct {
 	node_t * deferredJobs[42];
 	uint16_t jobsNrOf;
 	uint16_t deferredJobsNrOf;
-} nodeJobPool_t;
+} jobPool_t;
 
-static nodeJobPool_t nodeJobPool = {
-		.mutex = PTHREAD_MUTEX_INITIALIZER,
-		.condition = PTHREAD_COND_INITIALIZER,
-		.jobs = JOB_POOL_INIT,
-		.jobsNrOf = JOB_POOL_INIT_NROF
-};
+typedef struct {
+	pthread_t * pthreads;
+	atomic_uchar * threadActive;
+	size_t threadsNrOf;
+	jobPool_t jobPool;
+} threads_t;
 
-static void addJobWithinMutex(const node_t* node)
+typedef struct {
+	threads_t * threads;
+	uint16_t arrayPos;
+} threadInit_t;
+
+static const uint16_t ALL_JOBS_COMPLETED = UINT16_MAX;
+
+static void addJobWithinMutex(threads_t * threads, const node_t* node)
 {
-	if(sizeof(nodeJobPool.jobs) / sizeof(nodeJobPool.jobs[0]) > nodeJobPool.jobsNrOf)
+	if(sizeof(threads->jobPool.jobs) / sizeof(threads->jobPool.jobs[0]) > threads->jobPool.jobsNrOf)
 	{
-		nodeJobPool.jobs[nodeJobPool.jobsNrOf] = node;
-		nodeJobPool.jobsNrOf++;
+		threads->jobPool.jobs[threads->jobPool.jobsNrOf] = node;
+		threads->jobPool.jobsNrOf++;
 	}
-	else if(ALL_JOBS_COMPLETED == nodeJobPool.jobsNrOf)
+	else if(ALL_JOBS_COMPLETED == threads->jobPool.jobsNrOf)
 	{
 		fatal("Program terminated before being done! Node%u missing!", node->id);
 	}
@@ -57,19 +59,19 @@ static void addJobWithinMutex(const node_t* node)
 	}
 }
 
-static void addJob(const node_t* node)
+static void addJob(threads_t * threads, const node_t* node)
 {
 	int mutexLockRet;
-	mutexLockRet = pthread_mutex_lock(&nodeJobPool.mutex);
+	mutexLockRet = pthread_mutex_lock(&threads->jobPool.mutex);
 	if(0 != mutexLockRet)
 	{
 		errExitEN(mutexLockRet, "pthread_mutex_lock");
 	}
 
-	addJobWithinMutex(node);
+	addJobWithinMutex(threads, node);
 
 	int mutexUnlockRet;
-	mutexUnlockRet = pthread_mutex_unlock(&nodeJobPool.mutex);
+	mutexUnlockRet = pthread_mutex_unlock(&threads->jobPool.mutex);
 	if(0 != mutexUnlockRet)
 	{
 		errExitEN(mutexUnlockRet, "pthread_mutex_unlock");
@@ -90,19 +92,19 @@ static uint8_t allChildrenConsumedParent(const node_t* parent)
 	return 1;
 }
 
-static void addPossiblyDeferredJobWithinMutex(const node_t* node)
+static void addPossiblyDeferredJobWithinMutex(threads_t * threads, const node_t* node)
 {
 	if(allChildrenConsumedParent(node))
 	{
-		addJobWithinMutex(node);
+		addJobWithinMutex(threads, node);
 	}
 	else
 	{
-		// Defer this job, as parents are ready!
-		if(sizeof(nodeJobPool.deferredJobs) / sizeof(nodeJobPool.deferredJobs[0]) > nodeJobPool.deferredJobsNrOf)
+		// Defer this job, as parents aren't ready!
+		if(sizeof(threads->jobPool.deferredJobs) / sizeof(threads->jobPool.deferredJobs[0]) > threads->jobPool.deferredJobsNrOf)
 		{
-			nodeJobPool.deferredJobs[nodeJobPool.deferredJobsNrOf] = node;
-			nodeJobPool.deferredJobsNrOf++;
+			threads->jobPool.deferredJobs[threads->jobPool.deferredJobsNrOf] = node;
+			threads->jobPool.deferredJobsNrOf++;
 		}
 		else
 		{
@@ -111,19 +113,19 @@ static void addPossiblyDeferredJobWithinMutex(const node_t* node)
 	}
 }
 
-void addPossiblyDeferredJob(const node_t* node)
+void addPossiblyDeferredJob(threads_t * threads, const node_t* node)
 {
 	int mutexLockRet;
-	mutexLockRet = pthread_mutex_lock(&nodeJobPool.mutex);
+	mutexLockRet = pthread_mutex_lock(&threads->jobPool.mutex);
 	if(0 != mutexLockRet)
 	{
 		errExitEN(mutexLockRet, "pthread_mutex_lock");
 	}
 
-	addPossiblyDeferredJobWithinMutex(node);
+	addPossiblyDeferredJobWithinMutex(threads, node);
 
 	int mutexUnlockRet;
-	mutexUnlockRet = pthread_mutex_unlock(&nodeJobPool.mutex);
+	mutexUnlockRet = pthread_mutex_unlock(&threads->jobPool.mutex);
 	if(0 != mutexUnlockRet)
 	{
 		errExitEN(mutexUnlockRet, "pthread_mutex_unlock");
@@ -132,14 +134,22 @@ void addPossiblyDeferredJob(const node_t* node)
 
 void * threadFunction(void * arg)
 {
-	uint16_t threadArrayIndex = *((uint16_t*) arg);
+	threadInit_t * init = (threadInit_t *) arg;
+
+	const uint16_t threadArrayIndex = init->arrayPos;
+	threads_t * threads = init->threads;
 
 	node_t * nodeJob = NULL;
+
+	instructionParam_t instructionParam = {
+			.instance = threads,
+			.addPossiblyDeferredNode = addPossiblyDeferredJob
+	};
 
 	while(1)
 	{
 		int mutexLockRet;
-		mutexLockRet = pthread_mutex_lock(&nodeJobPool.mutex);
+		mutexLockRet = pthread_mutex_lock(&threads->jobPool.mutex);
 		if(0 != mutexLockRet)
 		{
 			errExitEN(mutexLockRet, "pthread_mutex_lock");
@@ -147,7 +157,7 @@ void * threadFunction(void * arg)
 
 		// In case we generate new jobs for other threads with this:
 		uint8_t jobsWereEmptyBefore = 0;
-		if(0 == nodeJobPool.jobsNrOf)
+		if(0 == threads->jobPool.jobsNrOf)
 		{
 			jobsWereEmptyBefore = 1;
 		}
@@ -190,12 +200,12 @@ void * threadFunction(void * arg)
 				if(!allChildrenConsumedParent(pChild))
 				{
 					// Defer this job, as parents are ready!
-					if(sizeof(nodeJobPool.deferredJobs) / sizeof(nodeJobPool.deferredJobs[0]) > nodeJobPool.deferredJobsNrOf)
+					if(sizeof(threads->jobPool.deferredJobs) / sizeof(threads->jobPool.deferredJobs[0]) > threads->jobPool.deferredJobsNrOf)
 					{
 						DPRINTF("(%u) ", pChild->id);
 
-						nodeJobPool.deferredJobs[nodeJobPool.deferredJobsNrOf] = pChild;
-						nodeJobPool.deferredJobsNrOf++;
+						threads->jobPool.deferredJobs[threads->jobPool.deferredJobsNrOf] = pChild;
+						threads->jobPool.deferredJobsNrOf++;
 					}
 					else
 					{
@@ -205,44 +215,44 @@ void * threadFunction(void * arg)
 				else // Child is ready for execution!
 				{
 					DPRINTF("%u ", pChild->id);
-					addJobWithinMutex(pChild);
+					addJobWithinMutex(threads, pChild);
 				}
 			}
 
 			// Check out all deferred jobs
-			for(int defJob = nodeJobPool.deferredJobsNrOf - 1; defJob >= 0; defJob--)
+			for(int defJob = threads->jobPool.deferredJobsNrOf - 1; defJob >= 0; defJob--)
 			{
-				node_t * pDefJob = nodeJobPool.deferredJobs[defJob];
+				node_t * pDefJob = threads->jobPool.deferredJobs[defJob];
 				if(!allChildrenConsumedParent(pDefJob))
 				{
 					continue;
 				}
 
-				addJobWithinMutex(pDefJob);
+				addJobWithinMutex(threads, pDefJob);
 				DPRINTF("%u ", pDefJob->id);
 
-				for(uint16_t cpyJob = nodeJobPool.deferredJobsNrOf - 1; cpyJob > defJob; cpyJob--)
+				for(uint16_t cpyJob = threads->jobPool.deferredJobsNrOf - 1; cpyJob > defJob; cpyJob--)
 				{
-					nodeJobPool.deferredJobs[cpyJob - 1] = nodeJobPool.deferredJobs[cpyJob];
+					threads->jobPool.deferredJobs[cpyJob - 1] = threads->jobPool.deferredJobs[cpyJob];
 				}
 
-				nodeJobPool.deferredJobsNrOf--;
+				threads->jobPool.deferredJobsNrOf--;
 			}
 
 			DPRINTF("} to job list\n");
 
-			if(0 == nodeJobPool.jobsNrOf)
+			if(0 == threads->jobPool.jobsNrOf)
 			{
 				// Any other thread still working or are we out of work?
 				uint8_t stillWorking = 0;
-				for(uint16_t thread = 0; thread < sizeof(threads) / sizeof(threads[0]); thread++)
+				for(uint16_t thread = 0; thread < threads->threadsNrOf; thread++)
 				{
 					if(threadArrayIndex == thread)
 					{
 						continue; // this is us
 					}
 
-					if(threadActive[thread])
+					if(threads->threadActive[thread])
 					{
 						stillWorking = 1;
 						break;
@@ -259,40 +269,40 @@ void * threadFunction(void * arg)
 			}
 		}
 
-		while (0 == nodeJobPool.jobsNrOf)
+		while (0 == threads->jobPool.jobsNrOf)
 		{
-			threadActive[threadArrayIndex] = 0;
+			threads->threadActive[threadArrayIndex] = 0;
 
-			int waitRet = pthread_cond_wait(&nodeJobPool.condition, &nodeJobPool.mutex);
+			int waitRet = pthread_cond_wait(&threads->jobPool.condition, &threads->jobPool.mutex);
 			if(waitRet != 0)
 			{
 				errExitEN(waitRet, "pthread_cond_wait");
 			}
 		}
 
-		if(ALL_JOBS_COMPLETED == nodeJobPool.jobsNrOf)
+		if(ALL_JOBS_COMPLETED == threads->jobPool.jobsNrOf)
 		{
 			goto SIGNAL_DONE_AND_TERMINATE;
 		}
 		else
 		{
-			nodeJob = nodeJobPool.jobs[nodeJobPool.jobsNrOf - 1];
-			nodeJobPool.jobsNrOf--;
+			nodeJob = threads->jobPool.jobs[threads->jobPool.jobsNrOf - 1];
+			threads->jobPool.jobsNrOf--;
 
-			threadActive[threadArrayIndex] = 1;
+			threads->threadActive[threadArrayIndex] = 1;
 
 			DPRINTF("Thread %2u: picking up Node %2u. ", threadArrayIndex, nodeJob->id);
-			DPRINTF("%2u Nodes remaining: ", nodeJobPool.jobsNrOf);
+			DPRINTF("%2u Nodes remaining: ", threads->jobPool.jobsNrOf);
 
-			for(uint32_t node = 0; node < nodeJobPool.jobsNrOf; node++)
+			for(uint32_t node = 0; node < threads->jobPool.jobsNrOf; node++)
 			{
-				DPRINTF("%u, ", (nodeJobPool.jobs[node])->id);
+				DPRINTF("%u, ", (threads->jobPool.jobs[node])->id);
 			}
 
 			DPRINTF("\tThread active: ");
-			for(uint16_t thread = 0; thread < sizeof(threadActive) / sizeof(threadActive[0]); thread++)
+			for(uint16_t thread = 0; thread < threads->threadsNrOf; thread++)
 			{
-				if(threadActive[thread])
+				if(threads->threadActive[thread])
 				{
 					DPRINTF("1 ");
 				}
@@ -305,13 +315,13 @@ void * threadFunction(void * arg)
 		}
 
 		uint8_t signalJobsAvailable = 0;
-		if(jobsWereEmptyBefore && nodeJobPool.jobsNrOf)
+		if(jobsWereEmptyBefore && threads->jobPool.jobsNrOf)
 		{
 			signalJobsAvailable = 1;
 		}
 
 		int mutexUnlockRet;
-		mutexUnlockRet = pthread_mutex_unlock(&nodeJobPool.mutex);
+		mutexUnlockRet = pthread_mutex_unlock(&threads->jobPool.mutex);
 		if(0 != mutexUnlockRet)
 		{
 			errExitEN(mutexUnlockRet, "pthread_mutex_unlock");
@@ -319,7 +329,7 @@ void * threadFunction(void * arg)
 
 		if(signalJobsAvailable)
 		{
-			int condSignalReturn = pthread_cond_signal(&nodeJobPool.condition); // Wake sleeping consumer
+			int condSignalReturn = pthread_cond_signal(&threads->jobPool.condition); // Wake sleeping consumer
 			if (condSignalReturn != 0)
 			{
 				errExitEN(condSignalReturn, "pthread_cond_signal");
@@ -327,20 +337,20 @@ void * threadFunction(void * arg)
 		}
 
 		// Run instruction
-		nodeJob->instruction();
+		nodeJob->instruction(&instructionParam);
 	}
 
 	SIGNAL_DONE_AND_TERMINATE:
-	nodeJobPool.jobsNrOf = ALL_JOBS_COMPLETED;
+	threads->jobPool.jobsNrOf = ALL_JOBS_COMPLETED;
 
 	int mutexUnlockRet;
-	mutexUnlockRet = pthread_mutex_unlock(&nodeJobPool.mutex);
+	mutexUnlockRet = pthread_mutex_unlock(&threads->jobPool.mutex);
 	if(0 != mutexUnlockRet)
 	{
 		errExitEN(mutexUnlockRet, "pthread_mutex_unlock");
 	}
 
-	int condSignalReturn = pthread_cond_signal(&nodeJobPool.condition); // Wake sleeping consumer
+	int condSignalReturn = pthread_cond_signal(&threads->jobPool.condition); // Wake sleeping consumer
 	if (condSignalReturn != 0)
 	{
 		errExitEN(condSignalReturn, "pthread_cond_signal");
@@ -349,43 +359,88 @@ void * threadFunction(void * arg)
 	return NULL;
 }
 
-void StartThreads()
+void * StartThreads(size_t threadsNrOf, jobPoolInit_t * jobPoolInit)
 {
-	DPRINTF("Job pool is initialized with nodes {");
-	for(uint16_t node = 0; node < JOB_POOL_INIT_NROF; node++)
+	threads_t * threads = malloc(sizeof(threads_t));
+	if(NULL == threads)
 	{
-		DPRINTF("%u ", nodeJobPool.jobs[node]->id);
+		fatal("Could not malloc threads_t!\n");
 	}
+
+	threads->threadsNrOf = threadsNrOf;
+
+	pthread_t * pthreads = malloc(sizeof(pthread_t) * threadsNrOf);
+	if(NULL == pthreads)
+	{
+		fatal("Could not malloc pthread_t!\n");
+	}
+
+	threads->pthreads = pthreads;
+
+	atomic_uchar * threadActive = malloc(sizeof(atomic_uchar) * threadsNrOf);
+	if(NULL == threadActive)
+	{
+		fatal("Could not malloc atomic_uchar!\n");
+	}
+
+	threads->threadActive = threadActive;
+
+	for(size_t thread = 0; thread < threads->threadsNrOf; thread++)
+	{
+		threads->threadActive[thread] = 0;
+	}
+
+	pthread_mutex_init(&threads->jobPool.mutex, NULL);
+	pthread_cond_init(&threads->jobPool.condition, NULL);
+
+	if(sizeof(threads->jobPool.jobs) / sizeof(threads->jobPool.jobs[0]) < jobPoolInit->NodesNrOf)
+	{
+		fatal("Too many jobs to initialize job pool!");
+	}
+
+	DPRINTF("Job pool is initialized with nodes {");
+	for(uint16_t node = 0; node < jobPoolInit->NodesNrOf; node++)
+	{
+		threads->jobPool.jobs[node] = jobPoolInit->Nodes[node];
+		DPRINTF("%u ", jobPoolInit->Nodes[node]->id);
+	}
+	threads->jobPool.jobsNrOf = jobPoolInit->NodesNrOf;
 	DPRINTF("}\n");
 
-	const size_t threadsNrOf = sizeof(threads) / sizeof(threads[0]);
-	DPRINTF("Starting %lu threads\n", threadsNrOf);
+	threads->jobPool.deferredJobsNrOf = 0;
 
-	uint16_t* threadNumbers = malloc(sizeof(uint16_t) * threadsNrOf);
-	if(NULL == threadNumbers)
+	DPRINTF("Starting %lu threads\n", threads->threadsNrOf);
+
+	threadInit_t* threadInits = malloc(sizeof(threadInit_t) * threads->threadsNrOf);
+	if(NULL == threadInits)
 	{
-		fatal("Could not malloc thread numbers!\n");
+		fatal("Could not malloc threadInit_t!\n");
 	}
 
-	for(uint16_t thread = 0; thread < sizeof(threads) / sizeof(threads[0]); thread++)
+	for(uint16_t arrayPos = 0; arrayPos < threads->threadsNrOf; arrayPos++)
 	{
-		threadNumbers[thread] = thread;
+		threadInits[arrayPos].threads = threads;
+		threadInits[arrayPos].arrayPos = arrayPos;
 
 		int threadCreateRet;
-		threadCreateRet = pthread_create(&threads[thread], NULL, threadFunction, &threadNumbers[thread]);
+		threadCreateRet = pthread_create(&threads->pthreads[arrayPos], NULL, threadFunction, &threadInits[arrayPos]);
 		if(0 != threadCreateRet)
 		{
 			errExitEN(threadCreateRet, "pthread_create");
 		}
 	}
+
+	return threads;
 }
 
-void JoinThreads()
+void JoinThreads(void * instance)
 {
-	for(uint16_t thread = 0; thread < sizeof(threads) / sizeof(threads[0]); thread++)
+	threads_t * threads = (threads_t * ) instance;
+
+	for(uint16_t thread = 0; thread < threads->threadsNrOf; thread++)
 	{
 		int joinRet;
-		joinRet = pthread_join(threads[thread], NULL);
+		joinRet = pthread_join(threads->pthreads[thread], NULL);
 		if(0 != joinRet)
 		{
 			errExitEN(joinRet, "pthread_join");

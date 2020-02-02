@@ -8,9 +8,12 @@
 #ifndef SRC_EMBEDDEDFILES_NODES_H_
 #define SRC_EMBEDDEDFILES_NODES_H_
 
+#include <stdatomic.h>
+#include <pthread.h>
+
 #define NODE_T_MAX_EDGE_NUMBER 42u
 
-typedef void (*instruction_t)(void);
+typedef void (*instruction_t)(struct instructionParam_s * param);
 
 typedef struct node_s {
 	instruction_t instruction;
@@ -22,10 +25,16 @@ typedef struct node_s {
 	const uint16_t id;
 } node_t;
 
+typedef void (*addPossiblyDeferredNode_t)(void * instance, struct node_s * node);
+
+typedef struct instructionParam_s {
+	void * instance;
+	addPossiblyDeferredNode_t addPossiblyDeferredNode;
+} instructionParam_t;
+
 typedef struct jobPoolInit_s {
-	node_t * Nodes;
+	node_t ** Nodes;
 	size_t NodesNrOf;
-	size_t ThreadsNrOf;
 } jobPoolInit_t;
 
 #endif /* SRC_EMBEDDEDFILES_NODES_H_ */
