@@ -359,13 +359,17 @@ void * threadFunction(void * arg)
 	return NULL;
 }
 
-void * StartThreads(size_t threadsNrOf, jobPoolInit_t * jobPoolInit)
+void StartThreads(void ** instance, size_t threadsNrOf, jobPoolInit_t * jobPoolInit)
 {
-	threads_t * threads = malloc(sizeof(threads_t));
-	if(NULL == threads)
+	// Why this weird way of assigning the pointer? Because otherwise we can't hand it over to
+	// to JoinThreads. See https://www.viva64.com/en/b/0576/
+	*instance = malloc(sizeof(threads_t));
+	if(NULL == *instance)
 	{
 		fatal("Could not malloc threads_t!\n");
 	}
+
+	threads_t * threads = (threads_t*) *instance;
 
 	threads->threadsNrOf = threadsNrOf;
 
@@ -430,7 +434,7 @@ void * StartThreads(size_t threadsNrOf, jobPoolInit_t * jobPoolInit)
 		}
 	}
 
-	return threads;
+	return;
 }
 
 void JoinThreads(void * instance)
@@ -446,5 +450,7 @@ void JoinThreads(void * instance)
 			errExitEN(joinRet, "pthread_join");
 		}
 	}
+
+	// TODO: Free stuff!
 }
 

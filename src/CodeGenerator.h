@@ -123,7 +123,7 @@ public:
 	CodeGenerator(const std::string* path);
 	virtual ~CodeGenerator();
 
-	bool Generate(const Graph* graph, size_t ThreadsNrOf);
+	bool Generate(const Graph* graph);
 };
 
 #endif /* SRC_CODEGENERATOR_H_ */

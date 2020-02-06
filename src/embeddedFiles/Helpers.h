@@ -11,7 +11,7 @@
 #include "Nodes.h"
 
 extern void * threadFunction(void * arg);
-extern void * StartThreads(size_t threadsNrOf, jobPoolInit_t * jobPoolInit);
+extern void StartThreads(void ** instance, size_t threadsNrOf, jobPoolInit_t * jobPoolInit);
 extern void JoinThreads(void * instance);
 
 #endif /* SRC_HELPERS_H_ */

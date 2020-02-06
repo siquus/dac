@@ -147,7 +147,7 @@ int main()
 	auto outpath = std::string(path) + "/";
 	CodeGenerator codeGenerator(&outpath);
 
-	bool GenSuccess = codeGenerator.Generate(&graph, 4);
+	bool GenSuccess = codeGenerator.Generate(&graph);
 	if(!GenSuccess)
 	{
 		printf("Could not generate Code\n");

@@ -180,10 +180,9 @@ CodeGenerator::~CodeGenerator() {
 
 }
 
-bool CodeGenerator::Generate(const Graph* graph, size_t ThreadsNrOf)
+bool CodeGenerator::Generate(const Graph* graph)
 {
 	graph_ = graph;
-	ThreadsNrOf_ = ThreadsNrOf;
 
 	// From here on we assume that the graph will no longer change
 	// this means we may use pointers to nodes now!
@@ -608,7 +607,8 @@ bool CodeGenerator::GenerateRunFunction()
 	GenerateCallbackPtCheck(&fileDacC_);
 
 	// Fire up threads
-	fprintProtect(fileDacC_.PrintfLine("void * instance = StartThreads(threadsNrOf, &jobPoolInit%s);", graph_->Name().c_str()));
+	fprintProtect(fileDacC_.PrintfLine("void * instance = NULL;"));
+	fprintProtect(fileDacC_.PrintfLine("StartThreads(&instance, threadsNrOf, &jobPoolInit%s);", graph_->Name().c_str()));
 
 	// Join threads, create return values and closing brackets
 	fprintProtect(fileDacC_.PrintfLine("JoinThreads(instance);\n"));
