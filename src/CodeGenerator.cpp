@@ -62,22 +62,11 @@
 	} \
 
 
-#define HEADER_NAME "dac.h"
-
-static const char fileName[] = "dac";
-
-
 static const char includeFilesBrackets[][42] = {
 		"stdint.h",
 		"stddef.h",
 		"linux/types.h",
 		"pthread.h"
-};
-
-static const char includeFilesQuotes[][42] = {
-		HEADER_NAME,
-		"error_functions.h",
-		"Instructions.h"
 };
 
 static const char fileHeader[] = \
@@ -213,7 +202,7 @@ bool CodeGenerator::Generate(const Graph* graph)
 
 	retFalseOnFalse(FetchVariables(), "Could not fetch variables\n");
 
-	std::string pathAndFileName = path_ + fileName;
+	std::string pathAndFileName = path_ + "Dac" + graph->Name();
 	std::string dacCPath = pathAndFileName + ".c";
 
 	bool success = fileDacC_.Init(&dacCPath);
@@ -231,21 +220,20 @@ bool CodeGenerator::Generate(const Graph* graph)
 		return false;
 	}
 
-	std::string InstructionsPath = path_;
-	InstructionsPath += "Instructions.c";
-	success = fileInstructions_.Init(&InstructionsPath);
+	std::string InstructionsPath = path_ + "Instructions" + graph->Name();
+	std::string InstructionsC = InstructionsPath + ".c";
+	success = fileInstructions_.Init(&InstructionsC);
 	if(!success)
 	{
-		Error("Could not initialize %s!", InstructionsPath.c_str());
+		Error("Could not initialize %s!", InstructionsC.c_str());
 		return false;
 	}
 
-	InstructionsPath = path_;
-	InstructionsPath += "Instructions.h";
-	success = fileInstructionsH_.Init(&InstructionsPath);
+	std::string InstructionsH = InstructionsPath + ".h";
+	success = fileInstructionsH_.Init(&InstructionsH);
 	if(!success)
 	{
-		Error("Could not initialize %s!", InstructionsPath.c_str());
+		Error("Could not initialize %s!", InstructionsH.c_str());
 		return false;
 	}
 
@@ -257,10 +245,10 @@ bool CodeGenerator::Generate(const Graph* graph)
 	fprintProtect(fileDacC_.PrintfLine(""));
 
 	fprintProtect(fileInstructions_.PrintfLine("#include <stdint.h>\n"));
-	fprintProtect(fileInstructions_.PrintfLine("#include \"dac.h\""));
+	fprintProtect(fileInstructions_.PrintfLine("#include \"Dac%s.h\"", graph_->Name().c_str()));
 	fprintProtect(fileInstructions_.PrintfLine("#include \"Nodes.h\"\n"));
 	fprintProtect(fileInstructions_.PrintfLine("#include \"Helpers.h\"\n"));
-	fprintProtect(fileInstructions_.PrintfLine("#include \"Instructions.h\"\n"));
+	fprintProtect(fileInstructions_.PrintfLine("#include \"Instructions%s.h\"\n", graph_->Name().c_str()));
 
 	// Generate Functions
 	fprintProtect(fileDacH_.PrintfLine("#include <stddef.h>\n"));
@@ -278,7 +266,7 @@ bool CodeGenerator::Generate(const Graph* graph)
 
 	retFalseOnFalse(GenerateRunFunction(), "Could not generate Run Function!\n");
 
-	fprintProtect(fileInstructions_.PrintfLine("extern node_t nodes%s[];", graph_->Name().c_str()))
+	fprintProtect(fileInstructions_.PrintfLine("static node_t nodes%s[]; // Initialized below\n", graph_->Name().c_str())) // TODO: This seems dirty.
 
 	fprintProtect(fileInstructionsH_.PrintfLine("#include \"Nodes.h\"\n"));
 
@@ -291,7 +279,7 @@ bool CodeGenerator::Generate(const Graph* graph)
 
 bool CodeGenerator::GenerateNodesArray()
 {
-	fprintProtect(fileInstructions_.PrintfLine("node_t nodes%s[] = {", graph_->Name().c_str()));
+	fprintProtect(fileInstructions_.PrintfLine("static node_t nodes%s[] = {", graph_->Name().c_str()));
 	fileInstructions_.Indent();
 
 	// Write array
@@ -464,9 +452,7 @@ bool CodeGenerator::GenerateInstructions()
 		std::string fctId;
 		GenerateInstructionId(&fctId, node.id);
 
-		fileInstructionsH_.PrintfLine("void %s(instructionParam_t * param);", fctId.c_str());
-
-		fileInstructions_.PrintfLine("void %s(instructionParam_t * param)", fctId.c_str());
+		fileInstructions_.PrintfLine("static void %s(instructionParam_t * param)", fctId.c_str());
 		fileInstructions_.PrintfLine("{");
 		fileInstructions_.Indent();
 
@@ -1644,10 +1630,11 @@ bool CodeGenerator::GenerateIncludes()
 		fprintProtect(fileDacC_.PrintfLine("#include <%s>", includeFilesBrackets[incl]));
 	}
 
-	for(uint16_t incl = 0; incl < sizeof(includeFilesQuotes) / sizeof(includeFilesQuotes[0]); incl++)
-	{
-		fprintProtect(fileDacC_.PrintfLine("#include \"%s\"", includeFilesQuotes[incl]));
-	}
+	fprintProtect(fileDacC_.PrintfLine("\n"));
+
+	fprintProtect(fileDacC_.PrintfLine("#include \"error_functions.h\"\n"));
+	fprintProtect(fileDacC_.PrintfLine("#include \"Instructions%s.h\"\n", graph_->Name().c_str()));
+	fprintProtect(fileDacC_.PrintfLine("#include \"Dac%s.h\"\n", graph_->Name().c_str()));
 
 	return true;
 }

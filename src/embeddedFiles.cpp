@@ -6,6 +6,7 @@
  */
 
 #include <string.h>
+#include <unistd.h>
 
 #include "GlobalDefines.h"
 #include "embeddedFiles.h"
@@ -113,6 +114,13 @@ bool GenerateEmbeddedFiles(const std::string* path)
 	for(uint8_t file = 0; file < sizeof(embeddedFiles) / sizeof(embeddedFiles[0]); file++)
 	{
 		std::string copyFilePath = *path + embeddedFiles[file].name;
+
+		// Has the file already been generated for another graph?
+		if(0 == access(copyFilePath.c_str(), F_OK))
+		{
+			break;
+		}
+
 		FILE* outFile = fopen(copyFilePath.c_str(), "w");
 		if(nullptr == outFile)
 		{

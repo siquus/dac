@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-#include "dac.h"
+#include "DacTest.h"
 
 static const float expectedProduct[] = {210, 294, 378};
 static const float expectedSum[] = {221, 315, 409};
