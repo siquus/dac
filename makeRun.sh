@@ -1,7 +1,7 @@
 #!/bin/bash
 
 printf "\n\nBuilding Code Generator...\n\n"
-cd UnitTests/Playground
+cd UnitTests/
 make clean
 rc=$?; if [[ $rc != 0 ]]; then exit $rc; fi
 make -j3

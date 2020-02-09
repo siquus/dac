@@ -69,6 +69,7 @@ static const char includeFilesBrackets[][42] = {
 		"pthread.h"
 };
 
+// TODO: Add Version and commit hash
 static const char fileHeader[] = \
 "/*\n\
 * Distributed Algebraic Computations\n\

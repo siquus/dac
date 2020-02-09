@@ -1,7 +1,7 @@
 TARGET_EXEC ?= main.out
 
 BUILD_DIR ?= ./build
-DAC_DIR_REL ?= ../../src
+DAC_DIR_REL ?= ../src
 
 DAC_DIR ?= $(shell realpath $(DAC_DIR_REL))# otherwise the *.o files end up anywhere
 SRC_DIRS ?= ./ $(DAC_DIR)
