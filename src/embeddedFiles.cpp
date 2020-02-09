@@ -38,9 +38,6 @@ extern const char _binary____src_embeddedFiles_tlpi_hdr_h_end;
 
 extern const char _binary____src_embeddedFiles_ename_c_inc_start;
 extern const char _binary____src_embeddedFiles_ename_c_inc_end;
-
-extern const char _binary____src_embeddedFiles_Nodes_h_start;
-extern const char _binary____src_embeddedFiles_Nodes_h_end;
 }
 
 typedef enum {
@@ -52,7 +49,6 @@ typedef enum {
 	EMBEDDED_FILES_GET_NUM_H,
 	EMBEDDED_FILES_TLPI_HDR_H,
 	EMBEDDED_FILES_ENAME_C_INC,
-	EMBEDDED_FILES_NODES_H,
 	EMBEDDED_FILES_NROF,
 } embeddedFiles_t;
 
@@ -102,11 +98,6 @@ const embeddedFile_t embeddedFiles[] = {
 				&_binary____src_embeddedFiles_ename_c_inc_start,
 				&_binary____src_embeddedFiles_ename_c_inc_end,
 				"ename.c.inc"
-		},
-		[EMBEDDED_FILES_NODES_H] = {
-				&_binary____src_embeddedFiles_Nodes_h_start,
-				&_binary____src_embeddedFiles_Nodes_h_end,
-				"Nodes.h"
 		},
 };
 

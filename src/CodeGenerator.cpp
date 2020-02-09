@@ -247,8 +247,6 @@ bool CodeGenerator::Generate(const Graph* graph)
 
 	fprintProtect(fileInstructions_.PrintfLine("#include <stdint.h>\n"));
 	fprintProtect(fileInstructions_.PrintfLine("#include \"Dac%s.h\"", graph_->Name().c_str()));
-	fprintProtect(fileInstructions_.PrintfLine("#include \"Nodes.h\"\n"));
-	fprintProtect(fileInstructions_.PrintfLine("#include \"Helpers.h\"\n"));
 	fprintProtect(fileInstructions_.PrintfLine("#include \"Instructions%s.h\"\n", graph_->Name().c_str()));
 
 	// Generate Functions
@@ -268,8 +266,6 @@ bool CodeGenerator::Generate(const Graph* graph)
 	retFalseOnFalse(GenerateRunFunction(), "Could not generate Run Function!\n");
 
 	fprintProtect(fileInstructions_.PrintfLine("static node_t nodes%s[]; // Initialized below\n", graph_->Name().c_str())) // TODO: This seems dirty.
-
-	fprintProtect(fileInstructionsH_.PrintfLine("#include \"Nodes.h\"\n"));
 
 	retFalseOnFalse(GenerateInstructions(), "Could not generate Instructions!\n");
 
@@ -367,6 +363,7 @@ bool CodeGenerator::GenerateNodesArray()
 	fileInstructions_.Outdent();
 	fprintProtect(fileInstructions_.PrintfLine("};"));
 
+	fprintProtect(fileInstructionsH_.PrintfLine("#include \"Helpers.h\"\n"));
 	fprintProtect(fileInstructionsH_.PrintfLine("\n"));
 	fprintProtect(fileInstructionsH_.PrintfLine("extern %s;", jobPoolInitId.c_str()));
 
