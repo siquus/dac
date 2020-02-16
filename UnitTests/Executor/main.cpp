@@ -5,6 +5,8 @@
 
 #include "error_functions.h"
 
+#include "ModuleContract.h"
+
 #include "DacTest.h"
 
 static const float expectedProduct[] = {210, 294, 378};
@@ -145,6 +147,15 @@ static void whileCallback(const float * pt, size_t size)
 }
 
 int main() {
+
+	ModuleContract moduleContract;
+	moduleContract.Execute(4);
+	if(!moduleContract.Success())
+	{
+		fatal("Not all tests passed!\n");
+	}
+
+#if 0
 	DacTestOutputCallbackProduct_Register(productCallback);
 	DacTestOutputCallbackSum_Register(sumCallback);
 	DacTestOutputCallbackSmallerThan_Register(isSmallerCallback);
@@ -171,9 +182,11 @@ int main() {
 		exit(1);
 	}
 #endif // DEBUG_CALLED
+#endif
 
 	fprintf(stdout, "SUCCESS!!\n");
 	fflush(stdout);
+
 
 	return 0;
 }

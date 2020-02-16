@@ -28,7 +28,7 @@ bool ModuleContract::Generate(const std::string &path)
 
 	auto matrixProd = matrix1->Contract(matrix2, 1, 0);
 
-	auto matrixProdOutput = Interface::Output(&graph, "matrixProd");
+	auto matrixProdOutput = Interface::Output(&graph, "matrixProd1");
 	matrixProdOutput.Set(matrixProd);
 
 	CodeGenerator codeGenerator(&path);
