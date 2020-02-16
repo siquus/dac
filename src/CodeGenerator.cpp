@@ -250,6 +250,9 @@ bool CodeGenerator::Generate(const Graph* graph)
 	fprintProtect(fileInstructions_.PrintfLine("#include \"Instructions%s.h\"\n", graph_->Name().c_str()));
 
 	// Generate Functions
+	fprintProtect(fileDacH_.PrintfLine("#ifdef __cplusplus"));
+	fprintProtect(fileDacH_.PrintfLine("extern \"C\" {"));
+	fprintProtect(fileDacH_.PrintfLine("#endif // __cplusplus\n"));
 	fprintProtect(fileDacH_.PrintfLine("#include <stddef.h>\n"));
 	retFalseOnFalse(GenerateOutputFunctions(), "Could not generate Output Functions\n!");
 	fprintProtect(fileInstructions_.PrintfLine(""));
@@ -270,6 +273,10 @@ bool CodeGenerator::Generate(const Graph* graph)
 	retFalseOnFalse(GenerateInstructions(), "Could not generate Instructions!\n");
 
 	retFalseOnFalse(GenerateNodesArray(), "Could not generate Nodes Array");
+
+	fprintProtect(fileDacH_.PrintfLine("#ifdef __cplusplus"));
+	fprintProtect(fileDacH_.PrintfLine("}"));
+	fprintProtect(fileDacH_.PrintfLine("#endif // __cplusplus\n"));
 
 	return true;
 }

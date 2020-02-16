@@ -17,6 +17,10 @@
 #ifndef ERROR_FUNCTIONS_H
 #define ERROR_FUNCTIONS_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif // __cplusplus
+
 /* Error diagnostic routines */
 
 void errMsg(const char *format, ...);
@@ -44,4 +48,8 @@ void usageErr(const char *format, ...) NORETURN ;
 
 void cmdLineErr(const char *format, ...) NORETURN ;
 
-#endif
+#ifdef __cplusplus
+}
+#endif // __cplusplus
+
+#endif // ERROR_FUNCTIONS_H
