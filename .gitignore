@@ -23,3 +23,5 @@ build/
 UnitTests/Playground/Program/dac/
 
 src/ename\.c\.inc
+
+UnitTests/Program/dac/
