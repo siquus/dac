@@ -1,7 +1,7 @@
 #!/bin/bash
 
 printf "\n\nBuilding Code Generator...\n\n"
-cd UnitTests/
+cd Generator
 make clean
 rc=$?; if [[ $rc != 0 ]]; then exit $rc; fi
 make -j3
@@ -12,7 +12,7 @@ build/main.out
 rc=$?; if [[ $rc != 0 ]]; then exit $rc; fi
 
 printf "\n\nBuilding generated Code...\n\n"
-cd Program
+cd ../Executor
 make clean
 rc=$?; if [[ $rc != 0 ]]; then exit $rc; fi
 make -j3

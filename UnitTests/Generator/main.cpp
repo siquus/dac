@@ -17,8 +17,25 @@
 #include "Interface.h"
 #include "CodeGenerator.h"
 
+#include "ModuleContract.h"
+
+#include "main.h"
+
 int main()
 {
+	struct stat stCodePath = {0};
+	const char path[] = "../Executor/dac";
+	// Test if folder already exsists
+	if (stat(path, &stCodePath) == -1)
+	{
+		mkdir(path, 0700);
+	}
+
+	auto outpath = std::string(path) + "/";
+
+	ModuleContract moduleContract;
+	moduleContract.Generate(outpath);
+
 	Graph graph("Test");
 
 	auto myVs = Algebra::Module::VectorSpace(Algebra::Ring::Float32, 3);
@@ -135,16 +152,6 @@ int main()
 		return 1;
 	}
 
-	struct stat stCodePath = {0};
-
-	char path[] = "Program/dac";
-	// Test if folder already exsists
-	if (stat(path, &stCodePath) == -1)
-	{
-	    mkdir(path, 0700);
-	}
-
-	auto outpath = std::string(path) + "/";
 	CodeGenerator codeGenerator(&outpath);
 
 	bool GenSuccess = codeGenerator.Generate(&graph);

@@ -15,29 +15,29 @@
 // See https://csl.name/post/embedding-binary-data/
 // TODO: The identifiers below depend on the path to that file.
 extern "C" {
-extern const char _binary____src_embeddedFiles_Helpers_c_start;
-extern const char _binary____src_embeddedFiles_Helpers_c_end;
+extern const char _binary_______src_embeddedFiles_Helpers_c_start;
+extern const char _binary_______src_embeddedFiles_Helpers_c_end;
 
-extern const char _binary____src_embeddedFiles_Helpers_h_start;
-extern const char _binary____src_embeddedFiles_Helpers_h_end;
+extern const char _binary_______src_embeddedFiles_Helpers_h_start;
+extern const char _binary_______src_embeddedFiles_Helpers_h_end;
 
-extern const char _binary____src_embeddedFiles_error_functions_c_start;
-extern const char _binary____src_embeddedFiles_error_functions_c_end;
+extern const char _binary_______src_embeddedFiles_error_functions_c_start;
+extern const char _binary_______src_embeddedFiles_error_functions_c_end;
 
-extern const char _binary____src_embeddedFiles_error_functions_h_start;
-extern const char _binary____src_embeddedFiles_error_functions_h_end;
+extern const char _binary_______src_embeddedFiles_error_functions_h_start;
+extern const char _binary_______src_embeddedFiles_error_functions_h_end;
 
-extern const char _binary____src_embeddedFiles_get_num_c_start;
-extern const char _binary____src_embeddedFiles_get_num_c_end;
+extern const char _binary_______src_embeddedFiles_get_num_c_start;
+extern const char _binary_______src_embeddedFiles_get_num_c_end;
 
-extern const char _binary____src_embeddedFiles_get_num_h_start;
-extern const char _binary____src_embeddedFiles_get_num_h_end;
+extern const char _binary_______src_embeddedFiles_get_num_h_start;
+extern const char _binary_______src_embeddedFiles_get_num_h_end;
 
-extern const char _binary____src_embeddedFiles_tlpi_hdr_h_start;
-extern const char _binary____src_embeddedFiles_tlpi_hdr_h_end;
+extern const char _binary_______src_embeddedFiles_tlpi_hdr_h_start;
+extern const char _binary_______src_embeddedFiles_tlpi_hdr_h_end;
 
-extern const char _binary____src_embeddedFiles_ename_c_inc_start;
-extern const char _binary____src_embeddedFiles_ename_c_inc_end;
+extern const char _binary_______src_embeddedFiles_ename_c_inc_start;
+extern const char _binary_______src_embeddedFiles_ename_c_inc_end;
 }
 
 typedef enum {
@@ -60,43 +60,43 @@ typedef struct {
 
 const embeddedFile_t embeddedFiles[] = {
 		[EMBEDDED_FILES_HELPERS_C] = {
-				&_binary____src_embeddedFiles_Helpers_c_start,
-				&_binary____src_embeddedFiles_Helpers_c_end,
+				&_binary_______src_embeddedFiles_Helpers_c_start,
+				&_binary_______src_embeddedFiles_Helpers_c_end,
 				"Helpers.c"
 		},
 		[EMBEDDED_FILES_HELPERS_H] = {
-				&_binary____src_embeddedFiles_Helpers_h_start,
-				&_binary____src_embeddedFiles_Helpers_h_end,
+				&_binary_______src_embeddedFiles_Helpers_h_start,
+				&_binary_______src_embeddedFiles_Helpers_h_end,
 				"Helpers.h"
 		},
 		[EMBEDDED_FILES_ERROR_FUNCTIONS_C] = {
-				&_binary____src_embeddedFiles_error_functions_c_start,
-				&_binary____src_embeddedFiles_error_functions_c_end,
+				&_binary_______src_embeddedFiles_error_functions_c_start,
+				&_binary_______src_embeddedFiles_error_functions_c_end,
 				"error_functions.c"
 		},
 		[EMBEDDED_FILES_ERROR_FUNCTIONS_H] = {
-				&_binary____src_embeddedFiles_error_functions_h_start,
-				&_binary____src_embeddedFiles_error_functions_h_end,
+				&_binary_______src_embeddedFiles_error_functions_h_start,
+				&_binary_______src_embeddedFiles_error_functions_h_end,
 				"error_functions.h"
 		},
 		[EMBEDDED_FILES_GET_NUM_C] = {
-				&_binary____src_embeddedFiles_get_num_c_start,
-				&_binary____src_embeddedFiles_get_num_c_end,
+				&_binary_______src_embeddedFiles_get_num_c_start,
+				&_binary_______src_embeddedFiles_get_num_c_end,
 				"get_num.c"
 		},
 		[EMBEDDED_FILES_GET_NUM_H] = {
-				&_binary____src_embeddedFiles_get_num_h_start,
-				&_binary____src_embeddedFiles_get_num_h_end,
+				&_binary_______src_embeddedFiles_get_num_h_start,
+				&_binary_______src_embeddedFiles_get_num_h_end,
 				"get_num.h"
 		},
 		[EMBEDDED_FILES_TLPI_HDR_H] = {
-				&_binary____src_embeddedFiles_tlpi_hdr_h_start,
-				&_binary____src_embeddedFiles_tlpi_hdr_h_end,
+				&_binary_______src_embeddedFiles_tlpi_hdr_h_start,
+				&_binary_______src_embeddedFiles_tlpi_hdr_h_end,
 				"tlpi_hdr.h"
 		},
 		[EMBEDDED_FILES_ENAME_C_INC] = {
-				&_binary____src_embeddedFiles_ename_c_inc_start,
-				&_binary____src_embeddedFiles_ename_c_inc_end,
+				&_binary_______src_embeddedFiles_ename_c_inc_start,
+				&_binary_______src_embeddedFiles_ename_c_inc_end,
 				"ename.c.inc"
 		},
 };
