@@ -129,14 +129,14 @@ static void whileCallback(const float * pt, size_t size)
 }
 
 int main() {
-	DacOutputCallbackProduct_Register(productCallback);
-	DacOutputCallbackSum_Register(sumCallback);
-	DacOutputCallbackSmallerThan_Register(isSmallerCallback);
-	DacOutputCallbackmatrixProd_Register(matrixProductCallback);
-	DacOutputCallbackmatrixKronProd_Register(matrixKronProductCallback);
-	DacOutputCallbackWhile_Register(whileCallback);
+	DacTestOutputCallbackProduct_Register(productCallback);
+	DacTestOutputCallbackSum_Register(sumCallback);
+	DacTestOutputCallbackSmallerThan_Register(isSmallerCallback);
+	DacTestOutputCallbackmatrixProd_Register(matrixProductCallback);
+	DacTestOutputCallbackmatrixKronProd_Register(matrixKronProductCallback);
+	DacTestOutputCallbackWhile_Register(whileCallback);
 
-	DacRun(4);
+	DacTestRun(4);
 
 	if(CALLED_NROF - 1 != called)
 	{

@@ -486,10 +486,12 @@ bool CodeGenerator::GenerateCallbackPtCheck(FileWriter* file) const
 
 		auto output = (const Interface::Output*) node.object;
 
-		fprintProtect(file->PrintfLine("if(NULL == DacOutputCallback%s)",
+		fprintProtect(file->PrintfLine("if(NULL == Dac%sOutputCallback%s)",
+				graph_->Name().c_str(),
 				output->GetOutputName()->c_str()));
 		fprintProtect(file->PrintfLine("{"));
-		fprintProtect(file->PrintfLine("\tfatal(\"DacOutputCallback%s == NULL\");",
+		fprintProtect(file->PrintfLine("\tfatal(\"Dac%sOutputCallback%s == NULL\");",
+				graph_->Name().c_str(),
 				output->GetOutputName()->c_str()));
 		fprintProtect(file->PrintfLine("}\n"));
 	}
@@ -581,10 +583,10 @@ bool CodeGenerator::GenerateNodesElem(
 bool CodeGenerator::GenerateRunFunction()
 {
 	// Add prototype to header
-	fprintProtect(fileDacH_.PrintfLine("extern int DacRun(size_t threadsNrOf);"));
+	fprintProtect(fileDacH_.PrintfLine("extern int Dac%sRun(size_t threadsNrOf);", graph_->Name().c_str()));
 
 	// Define function
-	fprintProtect(fileDacC_.PrintfLine("int DacRun(size_t threadsNrOf)\n{"));
+	fprintProtect(fileDacC_.PrintfLine("int Dac%sRun(size_t threadsNrOf)\n{", graph_->Name().c_str()));
 	fileDacC_.Indent();
 
 	// Check that callbacks have been set
@@ -629,7 +631,8 @@ bool CodeGenerator::OutputCode(const Node* node, FileWriter * file)
 		}
 		NodeStr += *varIdentifier;
 
-		fprintProtect(file->PrintfLine("DacOutputCallback%s(%s, sizeof(%s));\n",
+		fprintProtect(file->PrintfLine("Dac%sOutputCallback%s(%s, sizeof(%s));\n",
+				graph_->Name().c_str(),
 				output->GetOutputName()->c_str(),
 				NodeStr.c_str(),
 				varIdentifier->c_str()));
@@ -1551,7 +1554,7 @@ bool CodeGenerator::GenerateOutputFunctions()
 		// Get Variable attached to node
 		getVarRetFalseOnError(var, node.parents[0]);
 
-		std::string fctPtTypeId = "DacOutputCallback";
+		std::string fctPtTypeId = "Dac" + graph_->Name() + "OutputCallback";
 		fctPtTypeId += *(output->GetOutputName());
 
 		std::string callbackTypedef;
@@ -1578,7 +1581,7 @@ bool CodeGenerator::GenerateOutputFunctions()
 				fctPtTypeId.c_str()));
 
 		// Define Function
-		char tmpBuff[100];
+		char tmpBuff[200];
 		SNPRINTF(tmpBuff, sizeof(tmpBuff), "void %s_Register(%s_t callback)\n{\n",
 				fctPtTypeId.c_str(),
 				fctPtTypeId.c_str());
