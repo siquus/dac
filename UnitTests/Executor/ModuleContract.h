@@ -18,12 +18,23 @@ public:
 
 	void MatrixProd1(const float * data, size_t size);
 	void MatrixVecProd(const float * data, size_t size);
+	void VecMatrixProd(const float * data, size_t size);
+	void TensorVecContr2(const float * data, size_t size);
+	void TensorVecContr1(const float * data, size_t size);
 
 private:
 	size_t ThreadsNrOf_ = 0;
 
-	bool MatrixProd1Called_ = false;
-	bool MatrixVecProdCalled_ = false;
+	enum {
+		CALLED_MatrixProd1,
+		CALLED_MatrixVecProd,
+		CALLED_VecMatrixProd,
+		CALLED_TensorVecContr2,
+		CALLED_TensorVecContr1,
+		CALLED_NrOf,
+	};
+
+	bool called_[CALLED_NrOf] = {false};
 };
 
 #endif /* MODULECONTRACT_H_ */
