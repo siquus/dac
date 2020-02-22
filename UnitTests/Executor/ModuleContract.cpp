@@ -26,6 +26,16 @@ static void matrixProd1(const float * data, size_t size)
 	ModuleContractPt->MatrixProd1(data, size);
 }
 
+static void matrixVecProd(const float * data, size_t size)
+{
+	if(NULL == ModuleContractPt)
+	{
+		fatal("Nullpointer!");
+	}
+
+	ModuleContractPt->MatrixVecProd(data, size);
+}
+
 void ModuleContract::MatrixProd1(const float * data, size_t size)
 {
 	const float expected[] = {
@@ -46,9 +56,26 @@ void ModuleContract::MatrixProd1(const float * data, size_t size)
 	MatrixProd1Called_ = true;
 }
 
+void ModuleContract::MatrixVecProd(const float * data, size_t size)
+{
+	const float expected[] = {14, 32, 50};
+
+	if(sizeof(expected) != size)
+	{
+		Error("Size Mismatch! %lu vs %lu\n", sizeof(expected), size);
+	}
+	else if(memcmp(data, expected, sizeof(expected)))
+	{
+		Error("Unexpected result (%f, %f, %f)\n", data[0], data[1], data[2]);
+	}
+
+	MatrixVecProdCalled_ = true;
+}
+
 ModuleContract::ModuleContract() {
 	ModuleContractPt = this;
 
+	DacModuleContractOutputCallbackmatrixVecProd_Register(&matrixVecProd);
 	DacModuleContractOutputCallbackmatrixProd1_Register(&matrixProd1);
 }
 
@@ -57,5 +84,10 @@ void ModuleContract::Execute(size_t threadsNrOf)
 	ThreadsNrOf_ = threadsNrOf;
 
 	DacModuleContractRun(ThreadsNrOf_);
+
+	if(!MatrixProd1Called_ || !MatrixVecProdCalled_)
+	{
+		Error("Not all callbacks executed!\n");
+	}
 }
 

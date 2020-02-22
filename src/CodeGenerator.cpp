@@ -1043,7 +1043,7 @@ bool CodeGenerator::VectorContractionCode(const Node* node, FileWriter * file)
 	fprintProtect(file->PrintfLine("};"));
 
 	std::vector<uint32_t> rStrides;
-	lVec->__space_->GetStrides(&rStrides);
+	rVec->__space_->GetStrides(&rStrides);
 	const char rstridesId[] = "rStrides";
 	fprintProtect(file->PrintfLine("const uint32_t %s[] = {", rstridesId));
 	for(const uint32_t &stride: rStrides)

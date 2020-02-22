@@ -17,11 +17,13 @@ public:
 	void Execute(size_t threadsNrOf);
 
 	void MatrixProd1(const float * data, size_t size);
+	void MatrixVecProd(const float * data, size_t size);
 
 private:
 	size_t ThreadsNrOf_ = 0;
 
 	bool MatrixProd1Called_ = false;
+	bool MatrixVecProdCalled_ = false;
 };
 
 #endif /* MODULECONTRACT_H_ */
