@@ -86,6 +86,26 @@ static void tensorMatrixContr12(const float * data, size_t size)
 	ModuleContractPt->TensorMatrixContr12(data, size);
 }
 
+static void matrixIdProd(const float * data, size_t size)
+{
+	if(NULL == ModuleContractPt)
+	{
+		fatal("Nullpointer!");
+	}
+
+	ModuleContractPt->MatrixIdProd(data, size);
+}
+
+static void twoMatrixTrace(const float * data, size_t size)
+{
+	if(NULL == ModuleContractPt)
+	{
+		fatal("Nullpointer!");
+	}
+
+	ModuleContractPt->TwoMatrixTrace(data, size);
+}
+
 void ModuleContract::MatrixProd1(const float * data, size_t size)
 {
 	const float expected[] = {
@@ -225,6 +245,39 @@ void ModuleContract::TensorMatrixContr12(const float * data, size_t size)
 	called_[CALLED_TensorMatrixContr12] = true;
 }
 
+void ModuleContract::MatrixIdProd(const float * data, size_t size)
+{
+	const float expected[] = {2, 4, 6, 8, 10, 12, 14, 16, 18};
+
+	if(sizeof(expected) != size)
+	{
+		Error("Size Mismatch! %lu vs %lu\n", sizeof(expected), size);
+	}
+	else if(memcmp(data, expected, sizeof(expected)))
+	{
+		Error("Unexpected result! (%f, %f, %f, %f, %f, %f, %f, %f, %f\n",
+				data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8]);
+	}
+
+	called_[CALLED_MatrixIdProd] = true;
+}
+
+void ModuleContract::TwoMatrixTrace(const float * data, size_t size)
+{
+	const float expected = 30.;
+
+	if(sizeof(expected) != size)
+	{
+		Error("Size Mismatch! %lu vs %lu\n", sizeof(expected), size);
+	}
+	else if(*data != expected)
+	{
+		Error("Unexpected result! %f", *data);
+	}
+
+	called_[CALLED_TwoMatrixTrace] = true;
+}
+
 ModuleContract::ModuleContract() {
 	ModuleContractPt = this;
 
@@ -235,6 +288,8 @@ ModuleContract::ModuleContract() {
 	DacModuleContractOutputCallbacktensorVecContr1_Register(&tensorVecContr1);
 	DacModuleContractOutputCallbacktensorMatrixContr1_Register(&tensorMatrixContr1);
 	DacModuleContractOutputCallbacktensorMatrixContr12_Register(&tensorMatrixContr12);
+	DacModuleContractOutputCallbackmatrixIdProd_Register(&matrixIdProd);
+	DacModuleContractOutputCallbacktwoMatrixTrace_Register(&twoMatrixTrace);
 }
 
 void ModuleContract::Execute(size_t threadsNrOf)

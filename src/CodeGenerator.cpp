@@ -767,13 +767,13 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 	{
 		argVecNode = rnode->second;
 		kronNode = lnode->second;
-		argVecIsLeftArg = true;
+		argVecIsLeftArg = false;
 	}
 	else
 	{
 		argVecNode = lnode->second;
 		kronNode = rnode->second;
-		argVecIsLeftArg = false;
+		argVecIsLeftArg = true;
 	}
 
 	getVarRetFalseOnError(varOp, node->id);
@@ -889,7 +889,6 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 	std::string argIndexTuple = "const uint32_t argIndexTuple[] = {";
 	for(uint32_t lDim = 0; lDim < argVec->__space_->factors_.size(); lDim++)
 	{
-
 		auto it = std::find(
 				argContractFactors->begin(),
 				argContractFactors->end(),

@@ -23,6 +23,8 @@ public:
 	void TensorVecContr1(const float * data, size_t size);
 	void TensorMatrixContr1(const float * data, size_t size);
 	void TensorMatrixContr12(const float * data, size_t size);
+	void MatrixIdProd(const float * data, size_t size);
+	void TwoMatrixTrace(const float * data, size_t size);
 
 private:
 	size_t ThreadsNrOf_ = 0;
@@ -35,6 +37,8 @@ private:
 		CALLED_TensorVecContr1,
 		CALLED_TensorMatrixContr1,
 		CALLED_TensorMatrixContr12,
+		CALLED_MatrixIdProd,
+		CALLED_TwoMatrixTrace,
 		CALLED_NrOf,
 	};
 

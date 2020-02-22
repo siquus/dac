@@ -83,6 +83,25 @@ bool ModuleContract::Generate(const std::string &path)
 	auto tensorMatrixContr12Output = Interface::Output(&graph, "tensorMatrixContr12");
 	tensorMatrixContr12Output.Set(tensorMatrixContr12);
 
+	// Kronecker
+	Algebra::Module::VectorSpace::KroneckerDeltaParameters_t kronParam = {
+			.DeltaPair{1, 0},
+			.Scaling = 2
+	};
+	auto TwoDelta_ij = myMatrixSpace.Element(&graph, kronParam);
+
+	auto matrixIdProd = matrix1->Contract(TwoDelta_ij, 1, 0);
+
+	auto matrixIdProdOutput = Interface::Output(&graph, "matrixIdProd");
+	matrixIdProdOutput.Set(matrixIdProd);
+
+	auto twoMatrixTrace = matrix1->Contract(TwoDelta_ij,
+			std::vector<uint32_t>{0, 1},
+			std::vector<uint32_t>{0, 1});
+
+	auto twoMatrixTraceOutput = Interface::Output(&graph, "twoMatrixTrace");
+	twoMatrixTraceOutput.Set(twoMatrixTrace);
+
 	// Generate Code
 
 	CodeGenerator codeGenerator(&path);
