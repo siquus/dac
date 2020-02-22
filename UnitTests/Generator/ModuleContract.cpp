@@ -68,6 +68,21 @@ bool ModuleContract::Generate(const std::string &path)
 	auto tensorVecContr1Output = Interface::Output(&graph, "tensorVecContr1");
 	tensorVecContr1Output.Set(tensorVecContr1);
 
+	// 3-Tensor and Matrix
+	// Single Index
+	auto tensorMatrixContr1 = tensor->Contract(matrix1, 1, 0);
+
+	auto tensorMatrixContr1Output = Interface::Output(&graph, "tensorMatrixContr1");
+	tensorMatrixContr1Output.Set(tensorMatrixContr1);
+
+	// Multi Index
+	auto tensorMatrixContr12 = tensor->Contract(matrix1,
+			std::vector<uint32_t>{1, 2},
+			std::vector<uint32_t>{0, 1});
+
+	auto tensorMatrixContr12Output = Interface::Output(&graph, "tensorMatrixContr12");
+	tensorMatrixContr12Output.Set(tensorMatrixContr12);
+
 	// Generate Code
 
 	CodeGenerator codeGenerator(&path);

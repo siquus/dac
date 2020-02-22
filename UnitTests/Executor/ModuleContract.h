@@ -21,6 +21,8 @@ public:
 	void VecMatrixProd(const float * data, size_t size);
 	void TensorVecContr2(const float * data, size_t size);
 	void TensorVecContr1(const float * data, size_t size);
+	void TensorMatrixContr1(const float * data, size_t size);
+	void TensorMatrixContr12(const float * data, size_t size);
 
 private:
 	size_t ThreadsNrOf_ = 0;
@@ -31,6 +33,8 @@ private:
 		CALLED_VecMatrixProd,
 		CALLED_TensorVecContr2,
 		CALLED_TensorVecContr1,
+		CALLED_TensorMatrixContr1,
+		CALLED_TensorMatrixContr12,
 		CALLED_NrOf,
 	};
 

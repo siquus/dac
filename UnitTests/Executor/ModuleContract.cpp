@@ -66,6 +66,26 @@ static void tensorVecContr1(const float * data, size_t size)
 	ModuleContractPt->TensorVecContr1(data, size);
 }
 
+static void tensorMatrixContr1(const float * data, size_t size)
+{
+	if(NULL == ModuleContractPt)
+	{
+		fatal("Nullpointer!");
+	}
+
+	ModuleContractPt->TensorMatrixContr1(data, size);
+}
+
+static void tensorMatrixContr12(const float * data, size_t size)
+{
+	if(NULL == ModuleContractPt)
+	{
+		fatal("Nullpointer!");
+	}
+
+	ModuleContractPt->TensorMatrixContr12(data, size);
+}
+
 void ModuleContract::MatrixProd1(const float * data, size_t size)
 {
 	const float expected[] = {
@@ -159,6 +179,52 @@ void ModuleContract::TensorVecContr1(const float * data, size_t size)
 	called_[CALLED_TensorVecContr1] = true;
 }
 
+void ModuleContract::TensorMatrixContr1(const float * data, size_t size)
+{
+	const float expected[] = {
+			66., 78., 90., 78., 93., 108., 90., 108., 126.,
+			174., 213., 252., 193., 236., 279., 205., 251., 297.,
+			294., 363., 432., 306., 378., 450., 318., 393., 468.};
+
+	if(sizeof(expected) != size)
+	{
+		Error("Size Mismatch! %lu vs %lu\n", sizeof(expected), size);
+	}
+	else if(memcmp(data, expected, sizeof(expected)))
+	{
+		Error("Unexpected result! (\n");
+
+		for(size_t entry = 0; entry < sizeof(expected) / sizeof(expected[0]); entry++)
+		{
+			fprintf(stderr, "%f, ", data[entry]);
+
+			if((0 == (entry % 9)) && entry)
+			{
+				fprintf(stderr, "\n");
+			}
+		}
+		fprintf(stderr, ")\n");
+	}
+
+	called_[CALLED_TensorMatrixContr1] = true;
+}
+
+void ModuleContract::TensorMatrixContr12(const float * data, size_t size)
+{
+	const float expected[] = {285, 707, 1140};
+
+	if(sizeof(expected) != size)
+	{
+		Error("Size Mismatch! %lu vs %lu\n", sizeof(expected), size);
+	}
+	else if(memcmp(data, expected, sizeof(expected)))
+	{
+		Error("Unexpected result (%f, %f, %f)\n", data[0], data[1], data[2]);
+	}
+
+	called_[CALLED_TensorMatrixContr12] = true;
+}
+
 ModuleContract::ModuleContract() {
 	ModuleContractPt = this;
 
@@ -167,6 +233,8 @@ ModuleContract::ModuleContract() {
 	DacModuleContractOutputCallbackmatrixProd1_Register(&matrixProd1);
 	DacModuleContractOutputCallbacktensorVecContr2_Register(&tensorVecContr2);
 	DacModuleContractOutputCallbacktensorVecContr1_Register(&tensorVecContr1);
+	DacModuleContractOutputCallbacktensorMatrixContr1_Register(&tensorMatrixContr1);
+	DacModuleContractOutputCallbacktensorMatrixContr12_Register(&tensorMatrixContr12);
 }
 
 void ModuleContract::Execute(size_t threadsNrOf)
