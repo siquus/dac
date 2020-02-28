@@ -19,7 +19,7 @@
 using namespace Algebra;
 using namespace Module;
 
-template VectorSpace::Vector * VectorSpace::Element<float>(Graph * graph, const std::vector<float> &initializer);
+template VectorSpace::Vector * VectorSpace::Element<float>(Graph * graph, const std::vector<float> &initializer) const;
 
 template<typename T>
 static bool hasDublicates(const std::vector<T> &vec)
@@ -81,7 +81,7 @@ void VectorSpace::GetStrides(std::vector<uint32_t> * strides) const
 }
 
 template<typename inType>
-VectorSpace::Vector * VectorSpace::Element(Graph * graph, const std::vector<inType>  &initializer)
+VectorSpace::Vector * VectorSpace::Element(Graph * graph, const std::vector<inType>  &initializer) const
 {
 	if(nullptr == graph)
 	{
@@ -129,7 +129,7 @@ VectorSpace::Vector * VectorSpace::Element(Graph * graph, const std::vector<inTy
 	return retVec;
 }
 
-VectorSpace::Vector * VectorSpace::Element(Graph* graph, const KroneckerDeltaParameters_t &initializer)
+VectorSpace::Vector * VectorSpace::Element(Graph* graph, const KroneckerDeltaParameters_t &initializer) const
 {
 	if(nullptr == graph)
 	{
@@ -496,7 +496,6 @@ VectorSpace::Vector* VectorSpace::Vector::CreateDerivative(const Vector* vecValu
 	case Node::Type::VECTOR_SCALAR_MULTIPLICATION: // no break intended
 		Error("Node Type %s not yet supported taking its derivative!\n", Node::getName(fctNode->type));
 		return nullptr;
-		break;
 
 	default:
 		Error("Node Type %s does not support taking its derivative!\n", Node::getName(fctNode->type));

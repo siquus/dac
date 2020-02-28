@@ -81,9 +81,9 @@ public:
 	};
 
 	template<typename T>
-	Vector * Element(Graph* graph, const std::vector<T> &initializer);
+	Vector * Element(Graph* graph, const std::vector<T> &initializer) const;
 
-	Vector * Element(Graph* graph, const KroneckerDeltaParameters_t &initializer);
+	Vector * Element(Graph* graph, const KroneckerDeltaParameters_t &initializer) const;
 };
 }
 }
