@@ -721,6 +721,53 @@ VectorSpace::Vector* VectorSpace::Vector::Contract(const Vector* vec, uint32_t l
 	return Contract(vec, lfactors, rfactors);
 }
 
+VectorSpace::Vector* VectorSpace::Vector::Permute(const std::vector<uint32_t> &indices)
+{
+	if(hasDublicates(indices))
+	{
+		Error("Dublicate permute indices!\n");
+		return nullptr;
+	}
+
+	for(const auto &index: indices)
+	{
+		if(index >= __space_->factors_.size())
+		{
+			Error("Index is larger than number of factors!\n");
+		}
+	}
+
+	if(indices.size() != __space_->factors_.size())
+	{
+		Error("Number of permutation indices does not match number of factors!\n");
+	}
+
+	Vector* retVec = new Vector;
+	retVec->graph_ = graph_;
+	retVec->__space_ = __space_;
+
+	Node node;
+	node.parents.push_back(nodeId_);
+	node.type = Node::Type::VECTOR_PERMUTATION;
+	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
+	node.object = retVec;
+
+	permuteParameters_t * opParameters = new permuteParameters_t;
+	opParameters->indices = indices;
+
+	node.typeParameters = opParameters;
+
+	retVec->nodeId_ = graph_->AddNode(&node);
+
+	if(Node::ID_NONE == retVec->nodeId_)
+	{
+		Error("Could not add Node!\n");
+		return nullptr;
+	}
+
+	return retVec;
+}
+
 VectorSpace::Vector* VectorSpace::Vector::AddDerivative(const Vector* vecValuedFct, const Vector* arg)
 {
 	Vector* retVec = new Vector;

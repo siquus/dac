@@ -44,7 +44,6 @@ public:
 		float Scaling = 1.;
 	} KroneckerDeltaParameters_t;
 
-
 	class Vector : public NodeRef {
 	public:
 		const VectorSpace * __space_;
@@ -63,6 +62,11 @@ public:
 
 		Vector* Contract(const Vector* vec, uint32_t lfactor = 0, uint32_t rfactor = 0);
 		Vector* Contract(const Vector* vec, const std::vector<uint32_t> &lfactors, const std::vector<uint32_t> &rfactors);
+
+		typedef struct {
+			std::vector<uint32_t> indices;
+		} permuteParameters_t;
+		Vector* Permute(const std::vector<uint32_t> &indices); // I.e. for {0, 1, 2, ...} -> {2, 1, 0, ...},  position i will contain j and vice versa
 
 		Vector* Derivative(const Vector* vec);
 

@@ -144,6 +144,9 @@ const char* Node::getName(Type type)
 	case Type::VECTOR_KRONECKER_DELTA_PRODUCT:
 		return "VECTOR_KRONECKER_DELTA_PRODUCT";
 
+	case Type::VECTOR_PERMUTATION:
+		return "VECTOR_PERMUTATION";
+
 	case Type::OUTPUT:
 		return "OUTPUT";
 

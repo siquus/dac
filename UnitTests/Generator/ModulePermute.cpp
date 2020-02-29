@@ -1,0 +1,60 @@
+/*
+ * ModulePermute.cpp
+ *
+ *  Created on: Feb 29, 2020
+ *      Author: derommo
+ */
+
+#include "Graph.h"
+#include "Module.h"
+#include "Ring.h"
+#include "Interface.h"
+#include "CodeGenerator.h"
+
+#include "ModulePermute.h"
+
+bool ModulePermute::Generate(const std::string &path)
+{
+	Graph graph("ModulePermute");
+
+	auto myVs = Algebra::Module::VectorSpace(Algebra::Ring::Float32, 3);
+
+	// Matrix transpose
+	auto myMatrixSpace = Algebra::Module::VectorSpace({&myVs, &myVs});
+
+	auto matrix_init = std::vector<float>{1, 2, 3, 4, 5, 6, 7, 8, 9};
+	auto matrix = myMatrixSpace.Element(&graph, matrix_init);
+
+	auto matrixTranspose = matrix->Permute(std::vector<uint32_t>{1, 0});
+
+	auto matrixTransposeOutput = Interface::Output(&graph, "matrixTranspose");
+	matrixTransposeOutput.Set(matrixTranspose);
+
+	// Tensor Reordering
+	auto myTensorSpace = Algebra::Module::VectorSpace({&myVs, &myVs, &myVs});
+
+	auto tensor_init = std::vector<float>{
+		1, 2, 3, 4, 5, 6, 7, 8, 9,
+		10 , 11, 12, 13, 14, 15, 16, 18, 19,
+		20, 21, 22, 23, 24, 25, 26, 27, 28};
+
+	auto tensor = myTensorSpace.Element(&graph, tensor_init);
+
+	auto tensorPermute = tensor->Permute(std::vector<uint32_t>{2, 1, 0});
+
+	auto tensorPermuteOutput = Interface::Output(&graph, "tensorPermute");
+	tensorPermuteOutput.Set(tensorPermute);
+
+	// Generate Code
+
+	CodeGenerator codeGenerator(&path);
+	bool GenSuccess = codeGenerator.Generate(&graph);
+	if(!GenSuccess)
+	{
+		printf("Could not generate Code\n");
+		return 1;
+	}
+
+	return true;
+}
+

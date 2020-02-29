@@ -6,8 +6,11 @@
 #include "error_functions.h"
 
 #include "ModuleContract.h"
+#include "ModulePermute.h"
 
+#if 0
 #include "DacTest.h"
+#endif
 
 static const float expectedProduct[] = {210, 294, 378};
 static const float expectedSum[] = {221, 315, 409};
@@ -151,6 +154,13 @@ int main() {
 	ModuleContract moduleContract;
 	moduleContract.Execute(4);
 	if(!moduleContract.Success())
+	{
+		fatal("Not all tests passed!\n");
+	}
+
+	ModulePermute modulePermute;
+	modulePermute.Execute(4);
+	if(!modulePermute.Success())
 	{
 		fatal("Not all tests passed!\n");
 	}

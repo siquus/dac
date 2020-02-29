@@ -16,6 +16,4 @@ public:
 	bool Generate(const std::string &path);
 };
 
-
-
 #endif /* UNITTESTS_MODULECONTRACT_H_ */

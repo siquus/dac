@@ -18,8 +18,20 @@
 #include "CodeGenerator.h"
 
 #include "ModuleContract.h"
+#include "ModulePermute.h"
 
 #include "main.h"
+
+#define FATAL_ON_FALSE(arg) if(!arg){fatalLine(__FILE__, __LINE__, #arg);}
+
+static void fatalLine(const char * file, int line, const char * lineString)
+{
+	fprintf(stderr, "%s:%i: Code generation failed for \"%s\"!\n",
+			file, line, lineString);
+	fflush(stderr);
+	exit(1);
+}
+
 
 int main()
 {
@@ -34,8 +46,12 @@ int main()
 	auto outpath = std::string(path) + "/";
 
 	ModuleContract moduleContract;
-	moduleContract.Generate(outpath);
+	FATAL_ON_FALSE(moduleContract.Generate(outpath));
 
+	ModulePermute modulePermute;
+	FATAL_ON_FALSE(modulePermute.Generate(outpath));
+
+#if 0
 	Graph graph("Test");
 
 	auto myVs = Algebra::Module::VectorSpace(Algebra::Ring::Float32, 3);
@@ -160,6 +176,7 @@ int main()
 		printf("Could not generate Code\n");
 		return 1;
 	}
+#endif
 
 	printf("Success!\n");
 	return 0;

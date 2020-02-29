@@ -449,6 +449,7 @@ bool CodeGenerator::GenerateInstructions()
 		case Node::Type::VECTOR_SCALAR_MULTIPLICATION: // no break intended
 		case Node::Type::VECTOR_CONTRACTION: // no break intended
 		case Node::Type::VECTOR_COMPARISON_IS_SMALLER: // no break intended
+		case Node::Type::VECTOR_PERMUTATION: // no break intended
 		case Node::Type::OUTPUT:
 			break; // create instruction
 		}
@@ -685,6 +686,11 @@ bool CodeGenerator::GenerateOperationCode(const Node* node, FileWriter * file)
 	case Node::Type::VECTOR_CONTRACTION:
 		retFalseOnFalse(VectorContractionCode(node, file),
 		"Could not generate vector contraction Code!\n");
+		break;
+
+	case Node::Type::VECTOR_PERMUTATION:
+		retFalseOnFalse(VectorPermutationCode(node, file),
+				"Could not generate vector contraction Code!\n");
 		break;
 
 	default:
@@ -991,6 +997,101 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 	{
 		fprintProtect(file->PrintfLine("%s = sum;", varOpId));
 	}
+
+	return true;
+}
+
+bool CodeGenerator::VectorPermutationCode(const Node* node, FileWriter * file)
+{
+	file->PrintfLine("// %s\n", __func__);
+
+	const Algebra::Module::VectorSpace::Vector::permuteParameters_t * permuteParam = (const Algebra::Module::VectorSpace::Vector::permuteParameters_t *) node->typeParameters;
+
+	const auto argNode = nodeMap_.find(node->parents[0]);
+	if(nodeMap_.end() == argNode)
+	{
+		Error("Could not find Node for id %u\n", node->parents[0]);
+		return false;
+	}
+
+	const Algebra::Module::VectorSpace::Vector* vec = (const Algebra::Module::VectorSpace::Vector*) argNode->second->object;
+
+	getVarRetFalseOnError(varOp, node->id);
+	getVarRetFalseOnError(varArg, node->parents[0]);
+
+	const char * varOpId = varOp->GetIdentifier()->c_str();
+	const char * varArgId = varArg->GetIdentifier()->c_str();
+
+	std::vector<uint32_t> strides;
+	vec->__space_->GetStrides(&strides);
+	const char stridesId[] = "strides";
+	fprintProtect(file->PrintfLine("const uint32_t %s[] = {", stridesId));
+	for(const uint32_t &stride: strides)
+	{
+		fprintProtect(file->PrintfLine("\t %u,", stride));
+	}
+	fprintProtect(file->PrintfLine("};\n"));
+
+	fprintProtect(file->PrintfLine("for(int opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
+			varOpId, varOpId));
+	fprintProtect(file->PrintfLine("{"));
+	file->Indent();
+
+	std::string opIndexTuple = "const uint32_t opIndexTuple[] = {";
+	for(uint32_t stride = 0; stride < strides.size(); stride++)
+	{
+		if(0 == stride)
+		{
+			opIndexTuple += "opIndex / ";
+			opIndexTuple += stridesId;
+			opIndexTuple += "[";
+			opIndexTuple += std::to_string(stride);
+			opIndexTuple += "]";
+			opIndexTuple += ", ";
+		}
+		else
+		{
+			opIndexTuple += "(opIndex % strides[";
+			opIndexTuple += std::to_string(stride - 1);
+			opIndexTuple += "]) / strides[";
+			opIndexTuple += std::to_string(stride);
+			opIndexTuple += "], ";
+		}
+	}
+	opIndexTuple.erase(opIndexTuple.end() - 2, opIndexTuple.end()); // remove last ", "
+	opIndexTuple += "};";
+
+	fprintProtect(file->PrintfLine("%s", opIndexTuple.c_str()));
+
+	std::string argIndexTuple = "const uint32_t argIndexTuple[] = {";
+
+	for(size_t argIndex = 0; argIndex < permuteParam->indices.size(); argIndex++)
+	{
+		argIndexTuple += "opIndexTuple[" + std::to_string(permuteParam->indices[argIndex]) + "], ";
+	}
+
+	argIndexTuple.erase(argIndexTuple.end() - 2, argIndexTuple.end()); // remove last ", "
+	argIndexTuple += "};\n";
+
+	fprintProtect(file->PrintfLine("%s", argIndexTuple.c_str()));
+
+	std::string opValue = varOpId;
+	opValue += "[opIndex]";
+	opValue += " = ";
+	opValue += varArgId;
+	opValue += "[";
+
+	for(size_t argIndex = 0; argIndex < vec->__space_->factors_.size(); argIndex++)
+	{
+		opValue += "argIndexTuple[" + std::to_string(argIndex) + "] * " + stridesId + "[" + std::to_string(argIndex) + "] + ";
+	}
+	opValue.erase(opValue.end() - 3, opValue.end()); // remove last " + "
+	opValue += "];";
+
+	fprintProtect(file->PrintfLine("%s", opValue.c_str()));
+
+	file->Outdent();
+	fprintProtect(file->PrintfLine("}"));
 
 	return true;
 }
