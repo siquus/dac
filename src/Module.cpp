@@ -492,7 +492,9 @@ VectorSpace::Vector* VectorSpace::Vector::CreateDerivative(const Vector* vecValu
 	case Node::Type::VECTOR_ADDITION:
 		return AddDerivative(vecValuedFct, arg);
 
-	case Node::Type::VECTOR_CONTRACTION: // no break intended
+	case Node::Type::VECTOR_CONTRACTION:
+		return ContractDerivative(vecValuedFct, arg);
+
 	case Node::Type::VECTOR_SCALAR_MULTIPLICATION: // no break intended
 		Error("Node Type %s not yet supported taking its derivative!\n", Node::getName(fctNode->type));
 		return nullptr;
@@ -581,7 +583,7 @@ VectorSpace::Vector* VectorSpace::Vector::Contract(const Vector* vec, const std:
 	}
 
 	VectorSpace * retSpace = nullptr;
-	retSpace = new VectorSpace(&factorsVec);
+	retSpace = new VectorSpace(factorsVec);
 	if(nullptr == retSpace)
 	{
 		Error("Could not create VectorSpace");
@@ -597,7 +599,7 @@ VectorSpace::Vector* VectorSpace::Vector::Contract(const Vector* vec, const std:
 
 	Node node;
 	if((Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == thisNode->type) &&
-			(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == thisNode->type))
+			(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == vecNode->type))
 	{
 		// Example:
 		// Say we have C_jklmnp = A_ijkl B_mnip = d_ij d_kl d_mi d_np
@@ -768,6 +770,81 @@ VectorSpace::Vector* VectorSpace::Vector::Permute(const std::vector<uint32_t> &i
 	return retVec;
 }
 
+VectorSpace::Vector* VectorSpace::Vector::ContractDerivative(const Vector* vecValuedFct, const Vector* arg)
+{
+	// C_ijkmn = d/dB_ij D_kmn = d/dB_ij (A_klm B_ln) = delta(i,l) delta(j,n) A_klm
+	// So basically, for each of arg's indices, we'll get a delta
+	// Now, care needs to be taken with the index ordering: If we take our contraction algorithm
+	// Contract(delta(i,l)delta(j,n), A_klm) = C_ijnkm != C_ijkmn
+	// So what we need to do is:
+	// E_kmijn = Contract(A, delta(..))
+	// C_ijkmn = Permute(E_kmijn)
+
+	// On which side of the contraction is the non-arg node?
+	const Node * fctNode = vecValuedFct->graph_->GetNode(vecValuedFct->nodeId_);
+	if(nullptr == fctNode)
+	{
+		Error("Could not find node!\n");
+		return nullptr;
+	}
+
+	const contractValue_t * contractValue = (const contractValue_t *) fctNode->typeParameters;
+
+	const std::vector<uint32_t> * argContrFactors;
+	const std::vector<uint32_t> * otherContrFactors;
+	const Node * otherNode = nullptr;
+	if(fctNode->parents[0] == arg->nodeId_)
+	{
+		argContrFactors = &contractValue->lfactors;
+		otherContrFactors = &contractValue->rfactors;
+		otherNode = vecValuedFct->graph_->GetNode(fctNode->parents[1]);
+	}
+	else
+	{
+		otherContrFactors = &contractValue->lfactors;
+		argContrFactors = &contractValue->rfactors;
+		otherNode = vecValuedFct->graph_->GetNode(fctNode->parents[0]);
+	}
+
+	if(nullptr == otherNode)
+	{
+		Error("Could not find node!\n");
+		return nullptr;
+	}
+
+	const Vector * otherVec = (const Vector *) otherNode->object;
+
+	// Create the Kronecker the otherVec (i.e. non-arg factor of contraction) will be contracted with
+	// d/dB_lmn (A_opqr B_ops) = d(l,o) d(m,p) d(n,s) A_opqr
+	KroneckerDeltaParameters_t kronParameters;
+	kronParameters.DeltaPair.resize(2 * arg->__space_->factors_.size());
+
+	for(size_t deltaFactor = 0; deltaFactor < kronParameters.DeltaPair.size() / 2; deltaFactor++)
+	{
+		kronParameters.DeltaPair[deltaFactor] = deltaFactor + kronParameters.DeltaPair.size() / 2;
+		kronParameters.DeltaPair[deltaFactor + kronParameters.DeltaPair.size() / 2] = deltaFactor;
+	}
+
+	VectorSpace * kronVectorSpace = new VectorSpace(*arg->__space_, 2);
+	Vector * kronVec = kronVectorSpace->Element(arg->graph_, kronParameters);
+
+	std::vector<uint32_t> lFactors;
+	lFactors.resize(otherContrFactors->size());
+
+	for(size_t factor = 0; factor < lFactors.size(); factor++)
+	{
+		lFactors[factor] = argContrFactors->at(factor) + arg->__space_->factors_.size();
+	}
+
+	const Vector* contracted = kronVec->Contract(otherVec, lFactors, *otherContrFactors);
+
+	// Create Permutation
+	std::vector<uint32_t> permutation(sizeof(contracted->__space_->factors_.size()));
+	std::iota(permutation.begin(), permutation.end(), 0);
+
+
+}
+
 VectorSpace::Vector* VectorSpace::Vector::AddDerivative(const Vector* vecValuedFct, const Vector* arg)
 {
 	Vector* retVec = new Vector;
@@ -785,7 +862,7 @@ VectorSpace::Vector* VectorSpace::Vector::AddDerivative(const Vector* vecValuedF
 		return nullptr;
 	}
 
-	retVec->__space_ = new VectorSpace(&factors);
+	retVec->__space_ = new VectorSpace(factors);
 
 	// Derivative of Add is easy: Just the product of Kronecker Deltas
 	Node node;
@@ -864,9 +941,9 @@ VectorSpace::Vector* VectorSpace::Vector::Add(const Vector* vec)
 	return retVec;
 }
 
-VectorSpace::VectorSpace(const std::vector<simpleVs_t>* factors)
+VectorSpace::VectorSpace(const std::vector<simpleVs_t> &factors)
 {
-	factors_ = *factors;
+	factors_ = factors;
 }
 
 VectorSpace::VectorSpace(std::initializer_list<const VectorSpace*> list)
@@ -874,6 +951,14 @@ VectorSpace::VectorSpace(std::initializer_list<const VectorSpace*> list)
 	for(const VectorSpace * vSpace: list)
 	{
 		factors_.insert(factors_.end(), vSpace->factors_.begin(), vSpace->factors_.end());
+	}
+}
+
+VectorSpace::VectorSpace(const VectorSpace &vSpace, size_t nTimes)
+{
+	while(nTimes--)
+	{
+		factors_.insert(factors_.end(), vSpace.factors_.begin(), vSpace.factors_.end());
 	}
 }
 

@@ -29,8 +29,9 @@ public:
 	} simpleVs_t;
 
 	VectorSpace(Ring::type_t ring, dimension_t dim);
-	VectorSpace(const std::vector<simpleVs_t>* factors); // TODO: Don'T expose simpleVs.
+	VectorSpace(const std::vector<simpleVs_t> &factors); // TODO: Don'T expose simpleVs.
 	VectorSpace(std::initializer_list<const VectorSpace*> list);
+	VectorSpace(const VectorSpace &vSpace, size_t nTimes);
 
 	// Vector space created by the tensor product of given factors
 	std::vector<simpleVs_t> factors_; // TODO: Currently not allowed to take the product of product spaces
@@ -82,6 +83,7 @@ public:
 
 		static VectorSpace::Vector* CreateDerivative(const Vector* vecValuedFct, const Vector* arg);
 		static Vector* AddDerivative(const Vector* vecValuedFct, const Vector* arg);
+		static Vector* ContractDerivative(const Vector* vecValuedFct, const Vector* arg);
 	};
 
 	template<typename T>

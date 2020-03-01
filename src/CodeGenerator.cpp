@@ -760,7 +760,7 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 	}
 
 	if((Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lnode->second->type) &&
-			(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lnode->second->type))
+			(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == rnode->second->type))
 	{
 		Error("Contraction of two KroneckerDeltas not supported: Should be handled in graph creation!\n");
 		return false;

@@ -18,7 +18,7 @@ bool ModuleContract::Generate(const std::string &path)
 	Graph graph("ModuleContract");
 
 	auto myVs = Algebra::Module::VectorSpace(Algebra::Ring::Float32, 3);
-	auto myMatrixSpace = Algebra::Module::VectorSpace({&myVs, &myVs});
+	auto myMatrixSpace = Algebra::Module::VectorSpace(myVs ,2);
 
 	auto matrix1_init = std::vector<float>{1, 2, 3, 4, 5, 6, 7, 8, 9};
 	auto matrix1 = myMatrixSpace.Element(&graph, matrix1_init);
@@ -101,6 +101,27 @@ bool ModuleContract::Generate(const std::string &path)
 
 	auto twoMatrixTraceOutput = Interface::Output(&graph, "twoMatrixTrace");
 	twoMatrixTraceOutput.Set(twoMatrixTrace);
+
+	// Derivation
+
+	// Matrix Product
+	Algebra::Module::VectorSpace::KroneckerDeltaParameters_t deltaKronParam = {
+			.DeltaPair{1, 0},
+			.Scaling = 1,
+	};
+	auto delta_ij = myMatrixSpace.Element(&graph, deltaKronParam);
+
+	auto dMatrixProdRight = matrixProd->Derivative(matrix2);
+	auto matrixProdRight = dMatrixProdRight->Contract(delta_ij, std::vector<uint32_t>{0, 1}, std::vector<uint32_t>{0, 1});
+
+	auto matrixProdRightOutput = Interface::Output(&graph, "matrixProdRight");
+	matrixProdRightOutput.Set(matrixProdRight);
+
+	auto dMatrixProdLeft = matrixProd->Derivative(matrix1);
+	auto matrixProdLeft = dMatrixProdLeft->Contract(delta_ij, std::vector<uint32_t>{0, 1}, std::vector<uint32_t>{0, 1});
+
+	auto matrixProdLeftOutput = Interface::Output(&graph, "matrixProdLeft");
+	matrixProdLeftOutput.Set(matrixProdLeft);
 
 	// Generate Code
 

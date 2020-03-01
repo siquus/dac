@@ -106,6 +106,26 @@ static void twoMatrixTrace(const float * data, size_t size)
 	ModuleContractPt->TwoMatrixTrace(data, size);
 }
 
+static void matrixProdLeft(const float * data, size_t size)
+{
+	if(NULL == ModuleContractPt)
+	{
+		fatal("Nullpointer!");
+	}
+
+	ModuleContractPt->MatrixProdLeft(data, size);
+}
+
+static void matrixProdRight(const float * data, size_t size)
+{
+	if(NULL == ModuleContractPt)
+	{
+		fatal("Nullpointer!");
+	}
+
+	ModuleContractPt->MatrixProdRight(data, size);
+}
+
 void ModuleContract::MatrixProd1(const float * data, size_t size)
 {
 	const float expected[] = {
@@ -278,6 +298,48 @@ void ModuleContract::TwoMatrixTrace(const float * data, size_t size)
 	called_[CALLED_TwoMatrixTrace] = true;
 }
 
+void ModuleContract::MatrixProdLeft(const float * data, size_t size)
+{
+	const float expected[] = {
+			1, 2, 3,
+			4, 5, 6,
+			7, 8, 9,
+	};
+
+	if(sizeof(expected) != size)
+	{
+		Error("Size Mismatch! %lu vs %lu\n", sizeof(expected), size);
+	}
+	else if(memcmp(data, expected, sizeof(expected)))
+	{
+		Error("Unexpected result! (%f, %f, %f, %f, %f, %f, %f, %f, %f\n",
+				data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8]);
+	}
+
+	called_[CALLED_MatrixProdLeft] = true;
+}
+
+void ModuleContract::MatrixProdRight(const float * data, size_t size)
+{
+	const float expected[] = {
+			1, 2, 3,
+			4, 5, 6,
+			7, 8, 9,
+	};
+
+	if(sizeof(expected) != size)
+	{
+		Error("Size Mismatch! %lu vs %lu\n", sizeof(expected), size);
+	}
+	else if(memcmp(data, expected, sizeof(expected)))
+	{
+		Error("Unexpected result! (%f, %f, %f, %f, %f, %f, %f, %f, %f\n",
+				data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8]);
+	}
+
+	called_[CALLED_MatrixProdRight] = true;
+}
+
 ModuleContract::ModuleContract() {
 	ModuleContractPt = this;
 
@@ -290,6 +352,8 @@ ModuleContract::ModuleContract() {
 	DacModuleContractOutputCallbacktensorMatrixContr12_Register(&tensorMatrixContr12);
 	DacModuleContractOutputCallbackmatrixIdProd_Register(&matrixIdProd);
 	DacModuleContractOutputCallbacktwoMatrixTrace_Register(&twoMatrixTrace);
+	DacModuleContractOutputCallbackmatrixProdRight_Register(&matrixProdRight);
+	DacModuleContractOutputCallbackmatrixProdLeft_Register(&matrixProdLeft);
 }
 
 void ModuleContract::Execute(size_t threadsNrOf)
