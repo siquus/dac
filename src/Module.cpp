@@ -793,17 +793,20 @@ VectorSpace::Vector* VectorSpace::Vector::ContractDerivative(const Vector* vecVa
 	const std::vector<uint32_t> * argContrFactors;
 	const std::vector<uint32_t> * otherContrFactors;
 	const Node * otherNode = nullptr;
+	bool argOnRightSide;
 	if(fctNode->parents[0] == arg->nodeId_)
 	{
 		argContrFactors = &contractValue->lfactors;
 		otherContrFactors = &contractValue->rfactors;
 		otherNode = vecValuedFct->graph_->GetNode(fctNode->parents[1]);
+		argOnRightSide = false;
 	}
 	else
 	{
 		otherContrFactors = &contractValue->lfactors;
 		argContrFactors = &contractValue->rfactors;
 		otherNode = vecValuedFct->graph_->GetNode(fctNode->parents[0]);
+		argOnRightSide = true;
 	}
 
 	if(nullptr == otherNode)
@@ -836,13 +839,32 @@ VectorSpace::Vector* VectorSpace::Vector::ContractDerivative(const Vector* vecVa
 		lFactors[factor] = argContrFactors->at(factor) + arg->__space_->factors_.size();
 	}
 
-	const Vector* contracted = kronVec->Contract(otherVec, lFactors, *otherContrFactors);
+	Vector* returnVec = kronVec->Contract(otherVec, lFactors, *otherContrFactors);
 
-	// Create Permutation
-	std::vector<uint32_t> permutation(sizeof(contracted->__space_->factors_.size()));
-	std::iota(permutation.begin(), permutation.end(), 0);
+	// Now we only have one problem: The indices of arg that were not contracted!
+	// That is, we now have a vector, D, with wrong ordering:
+	// C_lmnqrs := d/dB_lmn (A_opqr B_ops) = d(l,o) d(m,p) d(n,s) A_opqr = D_lmnsqr
+	// This can only happen when arg was on the right side of the contraction:
+	if(argOnRightSide)
+	{
+		// All of arg's non-contracted indices need to be moved to the right
+		// But since we know the position in the contraction result above, we only need to know how many there are
+		uint32_t nrOfUncontractedArgFactors = arg->__space_->factors_.size() - argContrFactors->size();
 
+		// Create Permutation:
+		std::vector<uint32_t> permutation(returnVec->__space_->factors_.size());
+		std::iota(permutation.begin(), permutation.end(), 0);
 
+		for(uint32_t uncontracted = 0; uncontracted < nrOfUncontractedArgFactors; uncontracted++)
+		{
+			permutation[arg->__space_->factors_.size() + uncontracted] = permutation.size() - nrOfUncontractedArgFactors + uncontracted;
+			permutation[permutation.size() - nrOfUncontractedArgFactors + uncontracted] = arg->__space_->factors_.size() + uncontracted;
+		}
+
+		returnVec = returnVec->Permute(permutation);
+	}
+
+	return returnVec;
 }
 
 VectorSpace::Vector* VectorSpace::Vector::AddDerivative(const Vector* vecValuedFct, const Vector* arg)
