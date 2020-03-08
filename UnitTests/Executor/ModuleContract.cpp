@@ -301,9 +301,9 @@ void ModuleContract::TwoMatrixTrace(const float * data, size_t size)
 void ModuleContract::MatrixProdLeft(const float * data, size_t size)
 {
 	const float expected[] = {
-			1, 2, 3,
-			4, 5, 6,
-			7, 8, 9,
+			3, 0, 0,
+			0, 3, 0,
+			0, 0, 3,
 	};
 
 	if(sizeof(expected) != size)
@@ -322,9 +322,9 @@ void ModuleContract::MatrixProdLeft(const float * data, size_t size)
 void ModuleContract::MatrixProdRight(const float * data, size_t size)
 {
 	const float expected[] = {
-			1, 2, 3,
-			4, 5, 6,
-			7, 8, 9,
+			3, 12, 21,
+			6, 15, 24,
+			9, 18, 27,
 	};
 
 	if(sizeof(expected) != size)
@@ -333,7 +333,7 @@ void ModuleContract::MatrixProdRight(const float * data, size_t size)
 	}
 	else if(memcmp(data, expected, sizeof(expected)))
 	{
-		Error("Unexpected result! (%f, %f, %f, %f, %f, %f, %f, %f, %f\n",
+		Error("Unexpected result! (%f, %f, %f, %f, %f, %f, %f, %f, %f)\n",
 				data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8]);
 	}
 

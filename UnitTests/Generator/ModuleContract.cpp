@@ -112,13 +112,17 @@ bool ModuleContract::Generate(const std::string &path)
 	auto delta_ij = myMatrixSpace.Element(&graph, deltaKronParam);
 
 	auto dMatrixProdRight = matrixProd->Derivative(matrix2);
-	auto matrixProdRight = dMatrixProdRight->Contract(delta_ij, std::vector<uint32_t>{0, 1}, std::vector<uint32_t>{0, 1});
+
+	// The result will be C_ijkl = A_ki delta_jl, we want to make the test easy
+	// So we contract delta_jl away to get back A_ki * delta_jl * delta_jl = A_ki * 3, so 3 * Transpose(A)
+	auto matrixProdRight = dMatrixProdRight->Contract(delta_ij, std::vector<uint32_t>{1, 3}, std::vector<uint32_t>{0, 1});
 
 	auto matrixProdRightOutput = Interface::Output(&graph, "matrixProdRight");
 	matrixProdRightOutput.Set(matrixProdRight);
 
 	auto dMatrixProdLeft = matrixProd->Derivative(matrix1);
-	auto matrixProdLeft = dMatrixProdLeft->Contract(delta_ij, std::vector<uint32_t>{0, 1}, std::vector<uint32_t>{0, 1});
+	// Here we have C_ijkl = B_jl delta_ik
+	auto matrixProdLeft = dMatrixProdLeft->Contract(delta_ij, std::vector<uint32_t>{0, 2}, std::vector<uint32_t>{0, 1});
 
 	auto matrixProdLeftOutput = Interface::Output(&graph, "matrixProdLeft");
 	matrixProdLeftOutput.Set(matrixProdLeft);

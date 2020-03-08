@@ -885,13 +885,18 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 	{
 		fprintProtect(file->PrintfLine("for(int dim%u = 0; dim%u < %u; dim%u++)",
 				factorIndex, factorIndex,
-				argVec->__space_->factors_[contractValue->lfactors[factorIndex]].dim_,
+				argVec->__space_->factors_[argContractFactors->at(factorIndex)].dim_,
 				factorIndex));
 		fprintProtect(file->PrintfLine("{"));
 		file->Indent();
 	}
 
 	uint32_t opIndex = 0;
+	if(!argVecIsLeftArg)
+	{
+		opIndex = opVec->__space_->factors_.size() - argContractFactors->size();
+	}
+
 	std::string argIndexTuple = "const uint32_t argIndexTuple[] = {";
 	for(uint32_t lDim = 0; lDim < argVec->__space_->factors_.size(); lDim++)
 	{
@@ -917,6 +922,11 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 	argIndexTuple.erase(argIndexTuple.end() - 2, argIndexTuple.end()); // remove last ", "
 	argIndexTuple += "};";
 	fprintProtect(file->PrintfLine(argIndexTuple.c_str()));
+
+	if(!argVecIsLeftArg)
+	{
+		opIndex = 0;
+	}
 
 	std::string kronIndexTuple = "const uint32_t kronIndexTuple[] = {";
 	for(uint32_t rDim = 0; rDim < kronVec->__space_->factors_.size(); rDim++)
