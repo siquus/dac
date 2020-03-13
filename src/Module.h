@@ -84,6 +84,7 @@ public:
 		static VectorSpace::Vector* CreateDerivative(const Vector* vecValuedFct, const Vector* arg);
 		static Vector* AddDerivative(const Vector* vecValuedFct, const Vector* arg);
 		static Vector* ContractDerivative(const Vector* vecValuedFct, const Vector* arg);
+		static Vector* PermuteDerivative(const Vector* vecValuedFct, const Vector* arg);
 	};
 
 	template<typename T>

@@ -495,6 +495,9 @@ VectorSpace::Vector* VectorSpace::Vector::CreateDerivative(const Vector* vecValu
 	case Node::Type::VECTOR_CONTRACTION:
 		return ContractDerivative(vecValuedFct, arg);
 
+	case Node::Type::VECTOR_PERMUTATION:
+		return PermuteDerivative(vecValuedFct, arg);
+
 	case Node::Type::VECTOR_SCALAR_MULTIPLICATION: // no break intended
 		Error("Node Type %s not yet supported taking its derivative!\n", Node::getName(fctNode->type));
 		return nullptr;
@@ -768,6 +771,32 @@ VectorSpace::Vector* VectorSpace::Vector::Permute(const std::vector<uint32_t> &i
 	}
 
 	return retVec;
+}
+
+VectorSpace::Vector* VectorSpace::Vector::PermuteDerivative(const Vector* vecValuedFct, const Vector* arg)
+{
+	const Node * fctNode = vecValuedFct->graph_->GetNode(vecValuedFct->nodeId_);
+	if(nullptr == fctNode)
+	{
+		Error("Could not find node!\n");
+		return nullptr;
+	}
+
+	const permuteParameters_t * permutation = (const permuteParameters_t *) fctNode->typeParameters;
+
+	// The result will just be a Kronecker product
+	KroneckerDeltaParameters_t kronParameters;
+	kronParameters.DeltaPair.resize(2 * arg->__space_->factors_.size());
+
+	for(size_t deltaFactor = 0; deltaFactor < kronParameters.DeltaPair.size() / 2; deltaFactor++)
+	{
+		kronParameters.DeltaPair[deltaFactor] = permutation->indices[deltaFactor] + kronParameters.DeltaPair.size() / 2;
+		kronParameters.DeltaPair[permutation->indices[deltaFactor] + kronParameters.DeltaPair.size() / 2] = deltaFactor;
+	}
+
+	VectorSpace * kronVectorSpace = new VectorSpace(*arg->__space_, 2);
+
+	return kronVectorSpace->Element(arg->graph_, kronParameters);
 }
 
 VectorSpace::Vector* VectorSpace::Vector::ContractDerivative(const Vector* vecValuedFct, const Vector* arg)

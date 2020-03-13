@@ -16,6 +16,7 @@ public:
 
 	void Execute(size_t threadsNrOf);
 	void MatrixTranspose(const float * data, size_t size);
+	void DMatrixTransposeContracted(const float * data, size_t size);
 	void TensorPermute(const float * data, size_t size);
 
 private:
@@ -23,6 +24,7 @@ private:
 
 	enum {
 		CALLED_MatrixTranspose,
+		CALLED_DMatrixTransposeContracted,
 		CALLED_TensorPermute,
 		CALLED_NrOf,
 	};

@@ -45,6 +45,19 @@ bool ModulePermute::Generate(const std::string &path)
 	auto tensorPermuteOutput = Interface::Output(&graph, "tensorPermute");
 	tensorPermuteOutput.Set(tensorPermute);
 
+	// Permute derivative
+	auto dMatrixTranspose = matrixTranspose->Derivative(matrix);
+
+	// Contract it with matrix so it's easier to test
+	// Since transposition is linear, we should get matrix transpose back from this
+	auto dMatrixTransposeContracted = dMatrixTranspose->Contract(
+			matrix,
+			std::vector<uint32_t>{0, 1},
+			std::vector<uint32_t>{0, 1});
+
+	auto dMatrixTransposeContractedOutput = Interface::Output(&graph, "dMatrixTransposeContracted");
+	dMatrixTransposeContractedOutput.Set(dMatrixTransposeContracted);
+
 	// Generate Code
 
 	CodeGenerator codeGenerator(&path);
