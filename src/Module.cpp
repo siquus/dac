@@ -177,31 +177,75 @@ VectorSpace::Vector * VectorSpace::Element(Graph* graph, const KroneckerDeltaPar
 
 VectorSpace::Vector* VectorSpace::Vector::Multiply(const Vector* vec)
 {
-	if(1 != vec->__space_->GetDim())
-	{
-		Error("Dimension Mismatch!\n");
-		return nullptr;
-	}
-
 	if(graph_ != vec->graph_)
 	{
 		Error("Not on the same Graph!\n");
 		return nullptr;
 	}
 
-	// Infer space
-	Ring::type_t inferredRing = Ring::GetSuperiorRing(__space_->GetRing(), vec->__space_->GetRing());
-	if(Ring::None == inferredRing)
+	// Vector - Scalar multiplication: Do not add V-Space factors
+	// Rationale for creating an exception by not adding factors: We need to be able to define the power of things.
+	bool lArgScalar = 1 == __space_->GetDim();
+	bool rArgScalar = 1 == vec->__space_->GetDim();
+
+	if((lArgScalar) || (rArgScalar))
 	{
-		Error("Incompatible Rings\n");
-		return nullptr;
+		// Infer space
+		Ring::type_t inferredRing = Ring::GetSuperiorRing(__space_->GetRing(), vec->__space_->GetRing());
+		if(Ring::None == inferredRing)
+		{
+			Error("Incompatible Rings\n");
+			return nullptr;
+		}
+
+		Vector* retVec = new Vector;
+		retVec->graph_ = graph_;
+
+		VectorSpace * retSpace = nullptr;
+		retSpace = new VectorSpace(inferredRing, __space_->GetDim());
+
+		if(nullptr == retSpace)
+		{
+			Error("Could not create VectorSpace");
+			return nullptr;
+		}
+
+		retVec->__space_ = retSpace;
+
+		Node node;
+
+		// Make sure scalar argument second parent
+		if(rArgScalar)
+		{
+			node.parents.push_back(nodeId_);
+			node.parents.push_back(vec->nodeId_);
+		}
+		else
+		{
+			node.parents.push_back(vec->nodeId_);
+			node.parents.push_back(nodeId_);
+		}
+
+		node.type = Node::Type::VECTOR_SCALAR_PRODUCT;
+		node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
+		node.object = retVec;
+
+		retVec->nodeId_ = graph_->AddNode(&node);
+
+		if(Node::ID_NONE == retVec->nodeId_)
+		{
+			Error("Could not add Node!\n");
+			return nullptr;
+		}
+
+		return retVec;
 	}
 
 	Vector* retVec = new Vector;
 	retVec->graph_ = graph_;
 
 	VectorSpace * retSpace = nullptr;
-	retSpace = new VectorSpace(inferredRing, __space_->GetDim());
+	retSpace = new VectorSpace(std::initializer_list<const VectorSpace*>{__space_, vec->__space_});
 
 	if(nullptr == retSpace)
 	{
@@ -214,7 +258,7 @@ VectorSpace::Vector* VectorSpace::Vector::Multiply(const Vector* vec)
 	Node node;
 	node.parents.push_back(nodeId_);
 	node.parents.push_back(vec->nodeId_);
-	node.type = Node::Type::VECTOR_SCALAR_MULTIPLICATION;
+	node.type = Node::Type::VECTOR_VECTOR_PRODUCT;
 	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
 	node.object = retVec;
 
@@ -498,7 +542,7 @@ VectorSpace::Vector* VectorSpace::Vector::CreateDerivative(const Vector* vecValu
 	case Node::Type::VECTOR_PERMUTATION:
 		return PermuteDerivative(vecValuedFct, arg);
 
-	case Node::Type::VECTOR_SCALAR_MULTIPLICATION: // no break intended
+	case Node::Type::VECTOR_SCALAR_PRODUCT: // no break intended
 		Error("Node Type %s not yet supported taking its derivative!\n", Node::getName(fctNode->type));
 		return nullptr;
 

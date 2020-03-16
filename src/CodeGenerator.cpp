@@ -446,7 +446,8 @@ bool CodeGenerator::GenerateInstructions()
 
 		case Node::Type::CONTROL_TRANSFER_WHILE: // no break intended
 		case Node::Type::VECTOR_ADDITION: // no break intended
-		case Node::Type::VECTOR_SCALAR_MULTIPLICATION: // no break intended
+		case Node::Type::VECTOR_SCALAR_PRODUCT: // no break intended
+		case Node::Type::VECTOR_VECTOR_PRODUCT: // no break intended
 		case Node::Type::VECTOR_CONTRACTION: // no break intended
 		case Node::Type::VECTOR_COMPARISON_IS_SMALLER: // no break intended
 		case Node::Type::VECTOR_PERMUTATION: // no break intended
@@ -664,9 +665,14 @@ bool CodeGenerator::GenerateOperationCode(const Node* node, FileWriter * file)
 				"Could not generatede Control Transfer While Code!\n");
 		break;
 
-	case Node::Type::VECTOR_SCALAR_MULTIPLICATION:
-		retFalseOnFalse(VectorScalarMultiplicationCode(node, file),
-				"Could not generate Vector Scalar Multiplication Code!\n");
+	case Node::Type::VECTOR_SCALAR_PRODUCT:
+		retFalseOnFalse(VectorScalarProductCode(node, file),
+				"Could not generate Vector Scalar Product Code!\n");
+		break;
+
+	case Node::Type::VECTOR_VECTOR_PRODUCT:
+		retFalseOnFalse(VectorVectorProductCode(node, file),
+				"Could not generate Vector Vector Product Code!\n");
 		break;
 
 	case Node::Type::VECTOR_COMPARISON_IS_SMALLER:
@@ -1435,7 +1441,158 @@ bool CodeGenerator::ControlTransferWhileCode(const Node* node, FileWriter * file
 	return true;
 }
 
-bool CodeGenerator::VectorScalarMultiplicationCode(const Node* node, FileWriter * file)
+bool CodeGenerator::VectorVectorProductCode(const Node* node, FileWriter * file)
+{
+	file->PrintfLine("// %s\n", __func__);
+
+	const auto lnode = nodeMap_.find(node->parents[0]);
+	if(nodeMap_.end() == lnode)
+	{
+		Error("Could not find Node for id %u\n", node->parents[0]);
+		return false;
+	}
+
+	const auto rnode = nodeMap_.find(node->parents[1]);
+	if(nodeMap_.end() == rnode)
+	{
+		Error("Could not find Node for id %u\n", node->parents[1]);
+		return false;
+	}
+
+	getVarRetFalseOnError(varOp, node->id);
+	getVarRetFalseOnError(varLVec, node->parents[0]);
+	getVarRetFalseOnError(varRVec, node->parents[1]);
+
+	const Algebra::Module::VectorSpace::Vector* lVec = (const Algebra::Module::VectorSpace::Vector*) lnode->second->object;
+	const Algebra::Module::VectorSpace::Vector* rVec = (const Algebra::Module::VectorSpace::Vector*) rnode->second->object;
+
+	const Algebra::Module::VectorSpace::Vector* opVec = (const Algebra::Module::VectorSpace::Vector*) node->object;
+	const Algebra::Module::VectorSpace::Vector::contractValue_t * contractValue = (const Algebra::Module::VectorSpace::Vector::contractValue_t *) node->typeParameters;
+
+	// Calculate Strides, assume Row-Major Layout
+	// https://en.wikipedia.org/wiki/Row-_and_column-major_order#Address_calculation_in_general
+	std::vector<uint32_t> lStrides;
+	lVec->__space_->GetStrides(&lStrides);
+	const char lstridesId[] = "lStrides";
+	fprintProtect(file->PrintfLine("const uint32_t %s[] = {", lstridesId));
+	for(const uint32_t &stride: lStrides)
+	{
+		fprintProtect(file->PrintfLine("\t %u,", stride));
+	}
+	fprintProtect(file->PrintfLine("};"));
+
+	std::vector<uint32_t> rStrides;
+	rVec->__space_->GetStrides(&rStrides);
+	const char rstridesId[] = "rStrides";
+	fprintProtect(file->PrintfLine("const uint32_t %s[] = {", rstridesId));
+	for(const uint32_t &stride: rStrides)
+	{
+		fprintProtect(file->PrintfLine("\t %u,", stride));
+	}
+	fprintProtect(file->PrintfLine("};"));
+
+	std::vector<uint32_t> opStrides;
+	opVec->__space_->GetStrides(&opStrides);
+	const char opstridesId[] = "opStrides";
+	fprintProtect(file->PrintfLine("const uint32_t %s[] = {", opstridesId));
+	for(const uint32_t &stride: opStrides)
+	{
+		fprintProtect(file->PrintfLine("\t %u,", stride));
+	}
+	fprintProtect(file->PrintfLine("};\n"));
+
+	const char * varOpId = varOp->GetIdentifier()->c_str();
+
+	fprintProtect(file->PrintfLine("for(int opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
+			varOpId, varOpId));
+	fprintProtect(file->PrintfLine("{"));
+	file->Indent();
+
+	std::string opIndexTuple = "const uint32_t opIndexTuple[] = {";
+	for(uint32_t stride = 0; stride < opStrides.size(); stride++)
+	{
+		if(0 == stride)
+		{
+			opIndexTuple += "opIndex / ";
+			opIndexTuple += opstridesId;
+			opIndexTuple += "[";
+			opIndexTuple += std::to_string(stride);
+			opIndexTuple += "]";
+			opIndexTuple += ", ";
+		}
+		else
+		{
+			opIndexTuple += "(opIndex % opStrides[";
+			opIndexTuple += std::to_string(stride - 1);
+			opIndexTuple += "]) / opStrides[";
+			opIndexTuple += std::to_string(stride);
+			opIndexTuple += "], ";
+		}
+	}
+	opIndexTuple.erase(opIndexTuple.end() - 2, opIndexTuple.end()); // remove last ", "
+	opIndexTuple += "};";
+
+	fprintProtect(file->PrintfLine("%s", opIndexTuple.c_str()));
+
+	std::string lIndexTuple = "const uint32_t lIndexTuple[] = {";
+	for(uint32_t lDim = 0; lDim < lVec->__space_->factors_.size(); lDim++)
+	{
+		lIndexTuple += "opIndexTuple[";
+		lIndexTuple += std::to_string(lDim);
+		lIndexTuple += "], ";
+	}
+
+	lIndexTuple.erase(lIndexTuple.end() - 2, lIndexTuple.end()); // remove last ", "
+	lIndexTuple += "};";
+	fprintProtect(file->PrintfLine(lIndexTuple.c_str()));
+
+	std::string rIndexTuple = "const uint32_t rIndexTuple[] = {";
+	for(uint32_t rDim = 0; rDim < rVec->__space_->factors_.size(); rDim++)
+	{
+		rIndexTuple += "opIndexTuple[";
+		rIndexTuple += std::to_string(rDim + lVec->__space_->factors_.size());
+		rIndexTuple += "], ";
+	}
+
+	rIndexTuple.erase(rIndexTuple.end() - 2, rIndexTuple.end()); // remove last ", "
+	rIndexTuple += "};";
+	fprintProtect(file->PrintfLine(rIndexTuple.c_str()));
+
+	std::string product = varOpId;
+	product += "[opIndex] = ";
+	product += *(varLVec->GetIdentifier()) + "[";
+	for(uint32_t lIndex = 0; lIndex < lVec->__space_->factors_.size(); lIndex++)
+	{
+		product += "lIndexTuple[" +
+				std::to_string(lIndex) + "] * "
+				+  lstridesId + "[" +  std::to_string(lIndex) + "] + ";
+	}
+	product.erase(product.end() - 3, product.end()); // remove last " +"
+	product += "]";
+
+	product += " * ";
+
+	product += *(varRVec->GetIdentifier()) + "[";
+	for(uint32_t rIndex = 0; rIndex < rVec->__space_->factors_.size(); rIndex++)
+	{
+		product += "rIndexTuple[" +
+				std::to_string(rIndex) + "] * "
+				+  rstridesId + "[" +  std::to_string(rIndex) + "] + ";
+	}
+	product.erase(product.end() - 3, product.end()); // remove last " +"
+	product += "];";
+
+	fprintProtect(file->PrintfLine(product.c_str()));
+
+	fprintProtect(file->PrintfLine(""));
+
+	file->Outdent();
+	fprintProtect(file->PrintfLine("}"));
+
+	return true;
+}
+
+bool CodeGenerator::VectorScalarProductCode(const Node* node, FileWriter * file)
 {
 	file->PrintfLine("// %s\n", __func__);
 

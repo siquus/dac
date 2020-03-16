@@ -19,6 +19,7 @@
 
 #include "ModuleContract.h"
 #include "ModulePermute.h"
+#include "ModuleProduct.h"
 
 #include "main.h"
 
@@ -50,6 +51,9 @@ int main()
 
 	ModulePermute modulePermute;
 	FATAL_ON_FALSE(modulePermute.Generate(outpath));
+
+	ModuleProduct moduleProduct;
+	FATAL_ON_FALSE(moduleProduct.Generate(outpath));
 
 #if 0
 	Graph graph("Test");

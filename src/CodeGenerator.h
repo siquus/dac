@@ -102,7 +102,8 @@ class CodeGenerator {
 	bool OutputCode(const Node* node, FileWriter * file);
 	bool GenerateCallbackPtCheck(FileWriter* file) const;
 	bool VectorAdditionCode(const Node* node, FileWriter* file);
-	bool VectorScalarMultiplicationCode(const Node* node, FileWriter * file);
+	bool VectorScalarProductCode(const Node* node, FileWriter * file);
+	bool VectorVectorProductCode(const Node* node, FileWriter * file);
 	bool VectorComparisonIsSmallerCode(const Node* node, FileWriter * file);
 	bool VectorContractionCode(const Node* node, FileWriter * file);
 	bool VectorContractionKroneckerDeltaCode(const Node* node, FileWriter * file);

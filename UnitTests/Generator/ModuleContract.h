@@ -12,7 +12,6 @@
 
 class ModuleContract: public TestGenerator {
 public:
-
 	bool Generate(const std::string &path);
 };
 

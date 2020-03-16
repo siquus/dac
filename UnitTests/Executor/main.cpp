@@ -7,6 +7,7 @@
 
 #include "ModuleContract.h"
 #include "ModulePermute.h"
+#include "ModuleProduct.h"
 
 #if 0
 #include "DacTest.h"
@@ -161,6 +162,13 @@ int main() {
 	ModulePermute modulePermute;
 	modulePermute.Execute(4);
 	if(!modulePermute.Success())
+	{
+		fatal("Not all tests passed!\n");
+	}
+
+	ModuleProduct moduleProduct;
+	moduleProduct.Execute(4);
+	if(!moduleProduct.Success())
 	{
 		fatal("Not all tests passed!\n");
 	}

@@ -12,6 +12,7 @@
 #include <vector>
 #include <map>
 #include <set>
+#include <initializer_list>
 
 #include "GlobalDefines.h"
 #include "Graph.h"
