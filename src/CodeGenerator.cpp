@@ -900,7 +900,7 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 	uint32_t opIndex = 0;
 	if(!argVecIsLeftArg)
 	{
-		opIndex = opVec->__space_->factors_.size() - argContractFactors->size();
+		opIndex = opVec->__space_->factors_.size() - (argVec->__space_->factors_.size() - argContractFactors->size());
 	}
 
 	std::string argIndexTuple = "const uint32_t argIndexTuple[] = {";
