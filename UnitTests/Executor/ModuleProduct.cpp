@@ -45,6 +45,26 @@ static void vecVecProd(const float * data, size_t size)
 	ModuleProductPt->VecVecProduct(data, size);
 }
 
+static void dVecScalarProdLeft(const float * data, size_t size)
+{
+	if(NULL == ModuleProductPt)
+	{
+		fatal("Nullpointer!");
+	}
+
+	ModuleProductPt->DVecScalarProdLeft(data, size);
+}
+
+static void dVecScalarProdRight(const float * data, size_t size)
+{
+	if(NULL == ModuleProductPt)
+	{
+		fatal("Nullpointer!");
+	}
+
+	ModuleProductPt->DVecScalarProdRight(data, size);
+}
+
 static void dVecVecProdRight(const float * data, size_t size)
 {
 	if(NULL == ModuleProductPt)
@@ -174,7 +194,44 @@ void ModuleProduct::VecKronProduct(const float * data, size_t size)
 	called_[CALLED_VecKronProduct] = true;
 }
 
+void ModuleProduct::DVecScalarProdLeft(const float * data, size_t size)
+{
+	const float expected[] = {
+			42, 0, 0,
+			0, 42, 0,
+			0, 0, 42};
 
+	if(sizeof(expected) != size)
+	{
+		Error("Size Mismatch! %lu vs %lu\n", sizeof(expected), size);
+	}
+	else if(memcmp(data, expected, sizeof(expected)))
+	{
+		Error("Unexpected result! (%f, %f, %f, %f, %f, %f, %f, %f, %f)\n",
+				data[0], data[1], data[2],
+				data[3], data[4], data[5],
+				data[6], data[7], data[8]);
+	}
+
+	called_[CALLED_DVecScalarProdLeft] = true;
+}
+
+void ModuleProduct::DVecScalarProdRight(const float * data, size_t size)
+{
+	const float expected[] = {1, 2, 3};
+
+	if(sizeof(expected) != size)
+	{
+		Error("Size Mismatch! %lu vs %lu\n", sizeof(expected), size);
+	}
+	else if(memcmp(data, expected, sizeof(expected)))
+	{
+		Error("Unexpected result! (%f, %f, %f)\n",
+				data[0], data[1], data[2]);
+	}
+
+	called_[CALLED_DVecScalarProdRight] = true;
+}
 
 void ModuleProduct::DVecVecProductLeft(const float * data, size_t size)
 {
@@ -218,6 +275,8 @@ ModuleProduct::ModuleProduct() {
 	DacModuleProductOutputCallbackvecVecProd_Register(&vecVecProd);
 	DacModuleProductOutputCallbackvecKronProd_Register(&vecKronProd);
 	DacModuleProductOutputCallbackkronVecProd_Register(&kronVecProd);
+	DacModuleProductOutputCallbackdVecScalarProdLeft_Register(&dVecScalarProdLeft);
+	DacModuleProductOutputCallbackdVecScalarProdRight_Register(&dVecScalarProdRight);
 	DacModuleProductOutputCallbackdVecVecProdLeft_Register(&dVecVecProdLeft);
 	DacModuleProductOutputCallbackdVecVecProdRight_Register(&dVecVecProdRight);
 }

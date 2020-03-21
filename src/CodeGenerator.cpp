@@ -1443,6 +1443,8 @@ bool CodeGenerator::ControlTransferWhileCode(const Node* node, FileWriter * file
 
 bool CodeGenerator::VectorScalarKroneckerDeltaCode(const Node* node, FileWriter * file)
 {
+	file->PrintfLine("// %s\n", __func__);
+
 	getVarRetFalseOnError(varOp, node->id);
 	getVarRetFalseOnError(varScalar, node->parents[1]);
 
@@ -1481,7 +1483,7 @@ bool CodeGenerator::VectorScalarKroneckerDeltaCode(const Node* node, FileWriter 
 	deltaPairs += "};";
 	fprintProtect(file->PrintfLine("%s", deltaPairs.c_str()));
 
-	fprintProtect(file->PrintfLine("for(uint32_t dim = 0; dim < %u; dim++)",
+	fprintProtect(file->PrintfLine("for(uint32_t opIndex = 0; opIndex < %u; opIndex++)",
 			opVec->__space_->GetDim()));
 
 	fprintProtect(file->PrintfLine("{"));
@@ -1516,13 +1518,13 @@ bool CodeGenerator::VectorScalarKroneckerDeltaCode(const Node* node, FileWriter 
 
 	std::string Result = *(varOp->GetIdentifier());
 	Result += "[opIndex] = ";
-
+	Result += *varScalar->GetIdentifier() + " * ";
 	for(size_t paramPos = 0; paramPos < kroneckerParam->DeltaPair.size(); paramPos++)
 	{
 		if(kroneckerParam->DeltaPair[paramPos] > paramPos) // Remember, we save the partner for every factor, but only half the information is needed
 		{
-			Result += " (kronIndexTuple[" + std::to_string(paramPos) + "] ==";
-			Result += " kronIndexTuple[deltaPairs[" + std::to_string(paramPos) + "]]) *";
+			Result += " (opIndexTuple[" + std::to_string(paramPos) + "] ==";
+			Result += " opIndexTuple[deltaPairs[" + std::to_string(paramPos) + "]]) *";
 		}
 	}
 	Result += " " + std::to_string(kroneckerParam->Scaling) + ";";

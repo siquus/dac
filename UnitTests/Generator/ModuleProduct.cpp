@@ -64,6 +64,14 @@ bool ModuleProduct::Generate(const std::string &path)
 	kronVecProdOutput.Set(kronVecProdContr);
 
 	// Take derivative
+	auto dVecScalarProdLeft = vecScalarProd->Derivative(vector1);
+	auto dVecScalarProdLeftOutput = Interface::Output(&graph, "dVecScalarProdLeft");
+	dVecScalarProdLeftOutput.Set(dVecScalarProdLeft);
+
+	auto dVecScalarProdRight = vecScalarProd->Derivative(scalar);
+	auto dVecScalarProdRightOutput = Interface::Output(&graph, "dVecScalarProdRight");
+	dVecScalarProdRightOutput.Set(dVecScalarProdRight);
+
 	auto dVecVecProdLeft = vecVecProd->Derivative(vector1);
 
 	// Contract with delta_ij to make it easier to check

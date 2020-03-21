@@ -21,6 +21,8 @@ public:
 	void VecVecProduct(const float * data, size_t size);
 	void KronVecProduct(const float * data, size_t size);
 	void VecKronProduct(const float * data, size_t size);
+	void DVecScalarProdLeft(const float * data, size_t size);
+	void DVecScalarProdRight(const float * data, size_t size);
 	void DVecVecProductLeft(const float * data, size_t size);
 	void DVecVecProductRight(const float * data, size_t size);
 
@@ -33,6 +35,8 @@ private:
 		CALLED_VecVecProduct,
 		CALLED_KronVecProduct,
 		CALLED_VecKronProduct,
+		CALLED_DVecScalarProdRight,
+		CALLED_DVecScalarProdLeft,
 		CALLED_DVecVecProductLeft,
 		CALLED_DVecVecProductRight,
 		CALLED_NrOf,

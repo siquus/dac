@@ -191,25 +191,30 @@ VectorSpace::Vector* VectorSpace::Vector::Multiply(const Vector* vec)
 	if((lArgScalar) || (rArgScalar))
 	{
 		// Infer space
-		Ring::type_t inferredRing = Ring::GetSuperiorRing(__space_->GetRing(), vec->__space_->GetRing());
-		if(Ring::None == inferredRing)
-		{
-			Error("Incompatible Rings\n");
-			return nullptr;
-		}
 
 		Vector* retVec = new Vector;
 		retVec->graph_ = graph_;
 
-		VectorSpace * retSpace = nullptr;
+		const VectorSpace * retSpace = nullptr;
 
-		if(lArgScalar)
+		if(lArgScalar && rArgScalar)
 		{
-			retSpace = new VectorSpace(inferredRing, vec->__space_->GetDim());
+			Ring::type_t inferredRing = Ring::GetSuperiorRing(__space_->GetRing(), vec->__space_->GetRing());
+			if(Ring::None == inferredRing)
+			{
+				Error("Incompatible Rings\n");
+				return nullptr;
+			}
+
+			retSpace = new VectorSpace(inferredRing, 1);
+		}
+		else if(lArgScalar)
+		{
+			retSpace = vec->__space_;
 		}
 		else
 		{
-			retSpace = new VectorSpace(inferredRing, __space_->GetDim());
+			retSpace = __space_;
 		}
 
 		if(nullptr == retSpace)
