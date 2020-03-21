@@ -62,7 +62,7 @@ static void dVecVecProdLeft(const float * data, size_t size)
 		fatal("Nullpointer!");
 	}
 
-	ModuleProductPt->KronVecProduct(data, size);
+	ModuleProductPt->DVecVecProductLeft(data, size);
 }
 
 static void vecKronProd(const float * data, size_t size)
@@ -82,7 +82,7 @@ static void kronVecProd(const float * data, size_t size)
 		fatal("Nullpointer!");
 	}
 
-	ModuleProductPt->DVecVecProductLeft(data, size);
+	ModuleProductPt->KronVecProduct(data, size);
 }
 
 void ModuleProduct::ScalarVecProduct(const float * data, size_t size)
@@ -142,7 +142,7 @@ void ModuleProduct::VecVecProduct(const float * data, size_t size)
 
 void ModuleProduct::KronVecProduct(const float * data, size_t size)
 {
-	const float expected[] = {4, 5, 6};
+	const float expected[] = {12, 24, 36};
 
 	if(sizeof(expected) != size)
 	{
@@ -159,7 +159,7 @@ void ModuleProduct::KronVecProduct(const float * data, size_t size)
 
 void ModuleProduct::VecKronProduct(const float * data, size_t size)
 {
-	const float expected[] = {4, 5, 6};
+	const float expected[] = {12, 24, 36};
 
 	if(sizeof(expected) != size)
 	{

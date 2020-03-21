@@ -52,7 +52,7 @@ bool ModuleProduct::Generate(const std::string &path)
 	auto delta_ij = myMatrixSpace.Element(&graph, deltaKronParam);
 
 	auto vecKronProd = vector1->Multiply(delta_ij);
-	auto vecKronProdContr = delta_ij->Contract(vecKronProd, std::vector<uint32_t>{0, 1}, std::vector<uint32_t>{0, 1});
+	auto vecKronProdContr = delta_ij->Contract(vecKronProd, std::vector<uint32_t>{0, 1}, std::vector<uint32_t>{1, 2});
 
 	auto vecKronProdOutput = Interface::Output(&graph, "vecKronProd");
 	vecKronProdOutput.Set(vecKronProdContr);
