@@ -76,7 +76,7 @@ bool ModuleProduct::Generate(const std::string &path)
 
 	auto dVecVecProdRight = vecVecProd->Derivative(vector2);
 
-	auto dVecVecProdRightContracted = delta_ij->Contract(dVecVecProdRight, std::vector<uint32_t>{0, 1}, std::vector<uint32_t>{0, 1});
+	auto dVecVecProdRightContracted = delta_ij->Contract(dVecVecProdRight, std::vector<uint32_t>{0, 1}, std::vector<uint32_t>{0, 2});
 
 	auto dVecVecProdRightOutput = Interface::Output(&graph, "dVecVecProdRight");
 	dVecVecProdRightOutput.Set(dVecVecProdRightContracted);

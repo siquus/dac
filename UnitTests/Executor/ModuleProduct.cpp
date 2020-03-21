@@ -178,7 +178,7 @@ void ModuleProduct::VecKronProduct(const float * data, size_t size)
 
 void ModuleProduct::DVecVecProductLeft(const float * data, size_t size)
 {
-	const float expected[] = {4, 5, 6};
+	const float expected[] = {24, 30, 36};
 
 	if(sizeof(expected) != size)
 	{
@@ -195,7 +195,7 @@ void ModuleProduct::DVecVecProductLeft(const float * data, size_t size)
 
 void ModuleProduct::DVecVecProductRight(const float * data, size_t size)
 {
-	const float expected[] = {4, 5, 6};
+	const float expected[] = {6, 12, 18};
 
 	if(sizeof(expected) != size)
 	{

@@ -900,7 +900,7 @@ VectorSpace::Vector* VectorSpace::Vector::MultiplyDerivative(const Vector* vecVa
 		return nullptr;
 	}
 
-	Vector * Product = kronVec->Multiply(arg);
+	Vector * Product = kronVec->Multiply(otherVec);
 	if(nullptr == kronVec)
 	{
 		Error("Could not multiply\n");
