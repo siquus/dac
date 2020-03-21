@@ -185,8 +185,8 @@ VectorSpace::Vector* VectorSpace::Vector::Multiply(const Vector* vec)
 
 	// Vector - Scalar multiplication: Do not add V-Space factors
 	// Rationale for creating an exception by not adding factors: We need to be able to define the power of things.
-	bool lArgScalar = 1 == __space_->GetDim();
-	bool rArgScalar = 1 == vec->__space_->GetDim();
+	bool lArgScalar = (1 == __space_->GetDim());
+	bool rArgScalar = (1 == vec->__space_->GetDim());
 
 	if((lArgScalar) || (rArgScalar))
 	{
@@ -202,7 +202,15 @@ VectorSpace::Vector* VectorSpace::Vector::Multiply(const Vector* vec)
 		retVec->graph_ = graph_;
 
 		VectorSpace * retSpace = nullptr;
-		retSpace = new VectorSpace(inferredRing, __space_->GetDim());
+
+		if(lArgScalar)
+		{
+			retSpace = new VectorSpace(inferredRing, vec->__space_->GetDim());
+		}
+		else
+		{
+			retSpace = new VectorSpace(inferredRing, __space_->GetDim());
+		}
 
 		if(nullptr == retSpace)
 		{
@@ -488,16 +496,25 @@ VectorSpace::Vector* VectorSpace::Vector::CreateDerivative(std::map<Node::Id_t, 
 			// the derivative is calculated
 			Vector * currentVecChainDerivative = CreateDerivative(depNodes, parentVec, depNodeId);
 
-			std::vector<uint32_t> lfactors(parentVec->__space_->factors_.size());
-			std::iota(lfactors.begin(), lfactors.end(), 0);
+			// Products are an exception, as these are not contracted.
+			if((Node::Type::VECTOR_SCALAR_PRODUCT != parentNode->type) &&
+					(Node::Type::VECTOR_VECTOR_PRODUCT != parentNode->type))
+			{
+				std::vector<uint32_t> lfactors(parentVec->__space_->factors_.size());
+				std::iota(lfactors.begin(), lfactors.end(), 0);
 
-			std::vector<uint32_t> rfactors(parentVec->__space_->factors_.size());
-			std::iota(rfactors.begin(), rfactors.end(),
-					currentVecChainDerivative->__space_->factors_.size() - lfactors.size());
+				std::vector<uint32_t> rfactors(parentVec->__space_->factors_.size());
+				std::iota(rfactors.begin(), rfactors.end(),
+						currentVecChainDerivative->__space_->factors_.size() - lfactors.size());
 
-			derivativeVec = derivativeVec->Contract(
-					currentVecChainDerivative,
-					lfactors, rfactors);
+				derivativeVec = derivativeVec->Contract(
+						currentVecChainDerivative,
+						lfactors, rfactors);
+			}
+			else
+			{
+				derivativeVec = derivativeVec->Multiply(currentVecChainDerivative);
+			}
 		}
 
 		if(nullptr == summandVec) // first run
@@ -542,9 +559,9 @@ VectorSpace::Vector* VectorSpace::Vector::CreateDerivative(const Vector* vecValu
 	case Node::Type::VECTOR_PERMUTATION:
 		return PermuteDerivative(vecValuedFct, arg);
 
-	case Node::Type::VECTOR_SCALAR_PRODUCT: // no break intended
-		Error("Node Type %s not yet supported taking its derivative!\n", Node::getName(fctNode->type));
-		return nullptr;
+	case Node::Type::VECTOR_SCALAR_PRODUCT:	// no break intended
+	case Node::Type::VECTOR_VECTOR_PRODUCT:
+		return MultiplyDerivative(vecValuedFct, arg);
 
 	default:
 		Error("Node Type %s does not support taking its derivative!\n", Node::getName(fctNode->type));
@@ -567,6 +584,12 @@ VectorSpace::Vector* VectorSpace::Vector::Contract(const Vector* vec, const std:
 	{
 		Error("Contraction indice-vectors of different size!\n");
 		return nullptr;
+	}
+
+	if(0 == lfactors.size())
+	{
+		// This is not a contraction but a tensor product!
+		return Multiply(vec);
 	}
 
 	// Check if indices are inside allowed range
@@ -815,6 +838,100 @@ VectorSpace::Vector* VectorSpace::Vector::Permute(const std::vector<uint32_t> &i
 	}
 
 	return retVec;
+}
+
+VectorSpace::Vector* VectorSpace::Vector::MultiplyDerivative(const Vector* vecValuedFct, const Vector* arg)
+{
+	// Is arg the right side, i.e. the scalar?
+	// On which side of the contraction is the non-arg node?
+	const Node * fctNode = vecValuedFct->graph_->GetNode(vecValuedFct->nodeId_);
+	if(nullptr == fctNode)
+	{
+		Error("Could not find node!\n");
+		return nullptr;
+	}
+
+	bool argOnRightSide;
+	Node::Id_t otherNodeId;
+	if(fctNode->parents[0] == arg->nodeId_)
+	{
+		argOnRightSide = false;
+		otherNodeId = fctNode->parents[1];
+	}
+	else
+	{
+		argOnRightSide = true;
+		otherNodeId = fctNode->parents[0];
+	}
+
+	const Node * otherNode = arg->graph_->GetNode(otherNodeId);
+	if(nullptr == otherNode)
+	{
+		Error("Could not find node Id%u!\n", otherNodeId);
+		return nullptr;
+	}
+
+	Vector * otherVec = (Vector *) otherNode->object; // TODO: Casting const void * to Vector *
+
+	// Vector - Scalar multiplication: Do not add V-Space factors
+	// Rationale for creating an exception by not adding factors: We need to be able to define the power of things.
+	bool argScalar = (1 == arg->__space_->GetDim());
+
+	if(argScalar)
+	{
+		return otherVec;
+	}
+
+	KroneckerDeltaParameters_t kronParameters;
+	kronParameters.DeltaPair.resize(2 * arg->__space_->factors_.size());
+
+	for(size_t deltaFactor = 0; deltaFactor < kronParameters.DeltaPair.size() / 2; deltaFactor++)
+	{
+		kronParameters.DeltaPair[deltaFactor] = deltaFactor + kronParameters.DeltaPair.size() / 2;
+		kronParameters.DeltaPair[deltaFactor + kronParameters.DeltaPair.size() / 2] = deltaFactor;
+	}
+
+	VectorSpace * kronVectorSpace = new VectorSpace(*arg->__space_, 2);
+
+	Vector * kronVec = kronVectorSpace->Element(arg->graph_, kronParameters);
+	if(nullptr == kronVec)
+	{
+		Error("Could not create Kronecker\n");
+		return nullptr;
+	}
+
+	Vector * Product = kronVec->Multiply(arg);
+	if(nullptr == kronVec)
+	{
+		Error("Could not multiply\n");
+		return nullptr;
+	}
+
+	if(!argOnRightSide)
+	{
+		// Arg is on left side: No reordering of indices necessary
+		return Product;
+	}
+
+	// Now we just have to reorder the indices..
+
+	// Create Permutation:
+	std::vector<uint32_t> permutation(Product->__space_->factors_.size());
+	std::iota(permutation.begin(), permutation.end(), 0);
+
+	// Move other factors to the left
+	for(uint32_t otherFactor = 0; otherFactor < otherVec->__space_->factors_.size(); otherFactor++)
+	{
+		permutation[arg->__space_->factors_.size() + otherFactor] = arg->__space_->factors_.size() + otherFactor + arg->__space_->factors_.size();
+	}
+
+	// Move Arg factors to the right
+	for(uint32_t argFactor = 0; argFactor < arg->__space_->factors_.size(); argFactor++)
+	{
+		permutation[arg->__space_->factors_.size() + otherVec->__space_->factors_.size() + argFactor] = arg->__space_->factors_.size() + argFactor;
+	}
+
+	return Product->Permute(permutation);
 }
 
 VectorSpace::Vector* VectorSpace::Vector::PermuteDerivative(const Vector* vecValuedFct, const Vector* arg)

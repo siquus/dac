@@ -68,7 +68,7 @@ public:
 		typedef struct {
 			std::vector<uint32_t> indices;
 		} permuteParameters_t;
-		Vector* Permute(const std::vector<uint32_t> &indices); // I.e. for {0, 1, 2, ...} -> {2, 1, 0, ...},  position i will contain j and vice versa
+		Vector* Permute(const std::vector<uint32_t> &indices); // I.e. the new vector is going to contain index indices[j] at position j.
 
 		Vector* Derivative(const Vector* vec);
 
@@ -86,6 +86,7 @@ public:
 		static Vector* AddDerivative(const Vector* vecValuedFct, const Vector* arg);
 		static Vector* ContractDerivative(const Vector* vecValuedFct, const Vector* arg);
 		static Vector* PermuteDerivative(const Vector* vecValuedFct, const Vector* arg);
+		static Vector* MultiplyDerivative(const Vector* vecValuedFct, const Vector* arg);
 	};
 
 	template<typename T>
