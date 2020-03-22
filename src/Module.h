@@ -53,24 +53,24 @@ public:
 
 		// TODO: Make these operators derived classes?
 		// Then we don't have to weirdly hand over the argument order and stuff..
-		Vector* Add(const Vector* vec);
-		Vector* Multiply(const Vector* vec);
-		Vector* IsSmaller(const Vector* vec);
+		const Vector* Add(const Vector* vec) const;
+		const Vector* Multiply(const Vector* vec) const;
+		const Vector* IsSmaller(const Vector* vec) const;
 
 		typedef struct {
 			std::vector<uint32_t> lfactors;
 			std::vector<uint32_t> rfactors;
 		} contractValue_t;
 
-		Vector* Contract(const Vector* vec, uint32_t lfactor = 0, uint32_t rfactor = 0);
-		Vector* Contract(const Vector* vec, const std::vector<uint32_t> &lfactors, const std::vector<uint32_t> &rfactors);
+		const Vector* Contract(const Vector* vec, uint32_t lfactor = 0, uint32_t rfactor = 0) const;
+		const Vector* Contract(const Vector* vec, const std::vector<uint32_t> &lfactors, const std::vector<uint32_t> &rfactors) const;
 
 		typedef struct {
 			std::vector<uint32_t> indices;
 		} permuteParameters_t;
-		Vector* Permute(const std::vector<uint32_t> &indices); // I.e. the new vector is going to contain index indices[j] at position j.
+		const Vector* Permute(const std::vector<uint32_t> &indices) const; // I.e. the new vector is going to contain index indices[j] at position j.
 
-		Vector* Derivative(const Vector* vec);
+		const Vector* Derivative(const Vector* vec) const;
 
 	private:
 		static bool AreCompatible(const Vector* vec1, const Vector* vec2);
@@ -80,13 +80,13 @@ public:
 			std::set<Node::Id_t> children;
 		} depNode_t;
 		void TraverseParents(std::map<Node::Id_t, depNode_t> * depNodes, Node::Id_t currentNode, Node::Id_t depNodeId) const;
-		VectorSpace::Vector* CreateDerivative(std::map<Node::Id_t, depNode_t> * depNodes, const VectorSpace::Vector * currentVec, Node::Id_t depNodeId);
+		const VectorSpace::Vector* CreateDerivative(std::map<Node::Id_t, depNode_t> * depNodes, const VectorSpace::Vector * currentVec, Node::Id_t depNodeId) const;
 
-		static VectorSpace::Vector* CreateDerivative(const Vector* vecValuedFct, const Vector* arg);
-		static Vector* AddDerivative(const Vector* vecValuedFct, const Vector* arg);
-		static Vector* ContractDerivative(const Vector* vecValuedFct, const Vector* arg);
-		static Vector* PermuteDerivative(const Vector* vecValuedFct, const Vector* arg);
-		static Vector* MultiplyDerivative(const Vector* vecValuedFct, const Vector* arg);
+		static const VectorSpace::Vector* CreateDerivative(const Vector* vecValuedFct, const Vector* arg);
+		static const Vector* AddDerivative(const Vector* vecValuedFct, const Vector* arg);
+		static const Vector* ContractDerivative(const Vector* vecValuedFct, const Vector* arg);
+		static const Vector* PermuteDerivative(const Vector* vecValuedFct, const Vector* arg);
+		static const Vector* MultiplyDerivative(const Vector* vecValuedFct, const Vector* arg);
 	};
 
 	template<typename T>

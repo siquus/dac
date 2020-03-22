@@ -139,7 +139,7 @@ VectorSpace::Vector * VectorSpace::Element(Graph* graph, const KroneckerDeltaPar
 
 	if(initializer.DeltaPair.size() != factors_.size())
 	{
-		Error("Initializer dimensions do not match (%lu vs %i)!\n",
+		Error("Initializer dimensions do not match (%lu vs %lu)!\n",
 				initializer.DeltaPair.size(), factors_.size());
 		return nullptr;
 	}
@@ -175,7 +175,7 @@ VectorSpace::Vector * VectorSpace::Element(Graph* graph, const KroneckerDeltaPar
 	return retVec;
 }
 
-VectorSpace::Vector* VectorSpace::Vector::Multiply(const Vector* vec)
+const VectorSpace::Vector* VectorSpace::Vector::Multiply(const Vector* vec) const
 {
 	if(graph_ != vec->graph_)
 	{
@@ -286,7 +286,7 @@ VectorSpace::Vector* VectorSpace::Vector::Multiply(const Vector* vec)
 	return retVec;
 }
 
-VectorSpace::Vector* VectorSpace::Vector::IsSmaller(const Vector* vec)
+const VectorSpace::Vector* VectorSpace::Vector::IsSmaller(const Vector* vec) const
 {
 	if(__space_->GetDim() != vec->__space_->GetDim())
 	{
@@ -354,7 +354,7 @@ bool VectorSpace::Vector::AreCompatible(const Vector* vec1, const Vector* vec2)
 	return true;
 }
 
-VectorSpace::Vector * VectorSpace::Vector::Derivative(const Vector* vec)
+const VectorSpace::Vector * VectorSpace::Vector::Derivative(const Vector* vec) const
 {
 	// TODO: Carry out this code in generation phase.
 	if(graph_ != vec->graph_)
@@ -454,7 +454,7 @@ void VectorSpace::Vector::TraverseParents(std::map<Node::Id_t, depNode_t> * depN
 	}
 }
 
-VectorSpace::Vector* VectorSpace::Vector::CreateDerivative(std::map<Node::Id_t, depNode_t> * depNodes, const VectorSpace::Vector * currentVec, Node::Id_t depNodeId)
+const VectorSpace::Vector* VectorSpace::Vector::CreateDerivative(std::map<Node::Id_t, depNode_t> * depNodes, const VectorSpace::Vector * currentVec, Node::Id_t depNodeId) const
 {
 	if(currentVec->nodeId_ == depNodeId)
 	{
@@ -474,7 +474,7 @@ VectorSpace::Vector* VectorSpace::Vector::CreateDerivative(std::map<Node::Id_t, 
 	// B and D are A's parents. The following for-loop will create the "+" sign above, i.e. sum over all parents
 	// Inside that Loop, this function will be called recursively to create the sums for the chain-rule, e.g. above
 	// for B(C, F) ... i.e. dC and dF are summed.
-	Vector * summandVec = nullptr;
+	const Vector * summandVec = nullptr;
 	for(const Node::Id_t &parentId: (*depNodes)[currentVec->nodeId_].parents)
 	{
 		const Node * parentNode = graph_->GetNode(parentId);
@@ -493,13 +493,13 @@ VectorSpace::Vector* VectorSpace::Vector::CreateDerivative(std::map<Node::Id_t, 
 
 		// TODO: Check for Null returns
 		const Vector * parentVec = (const Vector *) parentNode->object;
-		Vector * derivativeVec = CreateDerivative(currentVec, parentVec);
+		const Vector * derivativeVec = CreateDerivative(currentVec, parentVec);
 
 		if(depNodeId != parentId)
 		{
 			// Call this function recursively if parent is not the variable w.r.t. which
 			// the derivative is calculated
-			Vector * currentVecChainDerivative = CreateDerivative(depNodes, parentVec, depNodeId);
+			const Vector * currentVecChainDerivative = CreateDerivative(depNodes, parentVec, depNodeId);
 
 			// Products are an exception, as these are not contracted.
 			if((Node::Type::VECTOR_SCALAR_PRODUCT != parentNode->type) &&
@@ -543,7 +543,7 @@ VectorSpace::Vector* VectorSpace::Vector::CreateDerivative(std::map<Node::Id_t, 
 
 // For a function V_0 x V_1 .. x V_n -> V, this function creates the derivative,
 // i.e. it returns a vector in the space V_arg \tensor V
-VectorSpace::Vector* VectorSpace::Vector::CreateDerivative(const Vector* vecValuedFct, const Vector* arg)
+const VectorSpace::Vector* VectorSpace::Vector::CreateDerivative(const Vector* vecValuedFct, const Vector* arg)
 {
 	// Check if arg actually is a parent to this function
 	const Node* fctNode = vecValuedFct->graph_->GetNode(vecValuedFct->nodeId_);
@@ -577,7 +577,7 @@ VectorSpace::Vector* VectorSpace::Vector::CreateDerivative(const Vector* vecValu
 	return nullptr;
 }
 
-VectorSpace::Vector* VectorSpace::Vector::Contract(const Vector* vec, const std::vector<uint32_t> &lfactors, const std::vector<uint32_t> &rfactors)
+const VectorSpace::Vector* VectorSpace::Vector::Contract(const Vector* vec, const std::vector<uint32_t> &lfactors, const std::vector<uint32_t> &rfactors) const
 {
 	if(graph_ != vec->graph_)
 	{
@@ -790,7 +790,7 @@ VectorSpace::Vector* VectorSpace::Vector::Contract(const Vector* vec, const std:
 	return retVec;
 }
 
-VectorSpace::Vector* VectorSpace::Vector::Contract(const Vector* vec, uint32_t lfactor, uint32_t rfactor)
+const VectorSpace::Vector* VectorSpace::Vector::Contract(const Vector* vec, uint32_t lfactor, uint32_t rfactor) const
 {
 	std::vector<uint32_t> lfactors{lfactor};
 	std::vector<uint32_t> rfactors{rfactor};
@@ -798,7 +798,7 @@ VectorSpace::Vector* VectorSpace::Vector::Contract(const Vector* vec, uint32_t l
 	return Contract(vec, lfactors, rfactors);
 }
 
-VectorSpace::Vector* VectorSpace::Vector::Permute(const std::vector<uint32_t> &indices)
+const VectorSpace::Vector* VectorSpace::Vector::Permute(const std::vector<uint32_t> &indices) const
 {
 	if(hasDublicates(indices))
 	{
@@ -845,7 +845,7 @@ VectorSpace::Vector* VectorSpace::Vector::Permute(const std::vector<uint32_t> &i
 	return retVec;
 }
 
-VectorSpace::Vector* VectorSpace::Vector::MultiplyDerivative(const Vector* vecValuedFct, const Vector* arg)
+const VectorSpace::Vector* VectorSpace::Vector::MultiplyDerivative(const Vector* vecValuedFct, const Vector* arg)
 {
 	// Is arg the right side, i.e. the scalar?
 	// On which side of the contraction is the non-arg node?
@@ -905,7 +905,7 @@ VectorSpace::Vector* VectorSpace::Vector::MultiplyDerivative(const Vector* vecVa
 		return nullptr;
 	}
 
-	Vector * Product = kronVec->Multiply(otherVec);
+	const Vector * Product = kronVec->Multiply(otherVec);
 	if(nullptr == kronVec)
 	{
 		Error("Could not multiply\n");
@@ -939,7 +939,7 @@ VectorSpace::Vector* VectorSpace::Vector::MultiplyDerivative(const Vector* vecVa
 	return Product->Permute(permutation);
 }
 
-VectorSpace::Vector* VectorSpace::Vector::PermuteDerivative(const Vector* vecValuedFct, const Vector* arg)
+const VectorSpace::Vector* VectorSpace::Vector::PermuteDerivative(const Vector* vecValuedFct, const Vector* arg)
 {
 	const Node * fctNode = vecValuedFct->graph_->GetNode(vecValuedFct->nodeId_);
 	if(nullptr == fctNode)
@@ -965,7 +965,7 @@ VectorSpace::Vector* VectorSpace::Vector::PermuteDerivative(const Vector* vecVal
 	return kronVectorSpace->Element(arg->graph_, kronParameters);
 }
 
-VectorSpace::Vector* VectorSpace::Vector::ContractDerivative(const Vector* vecValuedFct, const Vector* arg)
+const VectorSpace::Vector* VectorSpace::Vector::ContractDerivative(const Vector* vecValuedFct, const Vector* arg)
 {
 	// C_ijkmn = d/dB_ij D_kmn = d/dB_ij (A_klm B_ln) = delta(i,l) delta(j,n) A_klm
 	// So basically, for each of arg's indices, we'll get a delta
@@ -1034,7 +1034,7 @@ VectorSpace::Vector* VectorSpace::Vector::ContractDerivative(const Vector* vecVa
 		lFactors[factor] = argContrFactors->at(factor) + arg->__space_->factors_.size();
 	}
 
-	Vector* returnVec = kronVec->Contract(otherVec, lFactors, *otherContrFactors);
+	const Vector* returnVec = kronVec->Contract(otherVec, lFactors, *otherContrFactors);
 
 	// Now we only have one problem: The indices of arg that were not contracted!
 	// That is, we now have a vector, D, with wrong ordering:
@@ -1062,7 +1062,7 @@ VectorSpace::Vector* VectorSpace::Vector::ContractDerivative(const Vector* vecVa
 	return returnVec;
 }
 
-VectorSpace::Vector* VectorSpace::Vector::AddDerivative(const Vector* vecValuedFct, const Vector* arg)
+const VectorSpace::Vector* VectorSpace::Vector::AddDerivative(const Vector* vecValuedFct, const Vector* arg)
 {
 	Vector* retVec = new Vector;
 	retVec->graph_ = vecValuedFct->graph_;
@@ -1112,7 +1112,7 @@ VectorSpace::Vector* VectorSpace::Vector::AddDerivative(const Vector* vecValuedF
 	return retVec;
 }
 
-VectorSpace::Vector* VectorSpace::Vector::Add(const Vector* vec)
+const VectorSpace::Vector* VectorSpace::Vector::Add(const Vector* vec) const
 {
 	if(!AreCompatible(this, vec))
 	{
