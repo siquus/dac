@@ -36,7 +36,7 @@ static void fatalLine(const char * file, int line, const char * lineString)
 
 int main()
 {
-	struct stat stCodePath = {0};
+	struct stat stCodePath = {};
 	const char path[] = "../Executor/dac";
 	// Test if folder already exsists
 	if (stat(path, &stCodePath) == -1)

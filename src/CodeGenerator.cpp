@@ -2376,7 +2376,7 @@ bool Variable::GetDeclaration(std::string* decl) const
 		case Type::float_:
 		{
 			float* valuePt = (float*) value_;
-			SNPRINTF(tmpBuff, sizeof(tmpBuff), "%f", valuePt[elem]);
+			SNPRINTF(tmpBuff, sizeof(tmpBuff), "%f", (double) valuePt[elem]);
 		}
 		break;
 

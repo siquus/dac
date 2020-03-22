@@ -68,10 +68,10 @@ Ring::type_t VectorSpace::GetRing() const
 void VectorSpace::GetStrides(std::vector<uint32_t> * strides) const
 {
 	strides->resize(factors_.size());
-	for(int fac = 0; fac < factors_.size(); fac++)
+	for(size_t fac = 0; fac < factors_.size(); fac++)
 	{
 		uint32_t stride = 1;
-		for(int prodFac = fac + 1; prodFac < factors_.size(); prodFac++)
+		for(size_t prodFac = fac + 1; prodFac < factors_.size(); prodFac++)
 		{
 			stride *= factors_[prodFac].dim_;
 		}
@@ -336,17 +336,17 @@ bool VectorSpace::Vector::AreCompatible(const Vector* vec1, const Vector* vec2)
 		return false;
 	}
 
-	for(int factor = 0; factor < vec1->__space_->factors_.size(); factor++)
+	for(size_t factor = 0; factor < vec1->__space_->factors_.size(); factor++)
 	{
 		if(vec1->__space_->factors_[factor].dim_ != vec2->__space_->factors_[factor].dim_)
 		{
-			Error("Factor %u is of different dimension!\n", factor);
+			Error("Factor %lu is of different dimension!\n", factor);
 			return false;
 		}
 
 		if(vec1->__space_->factors_[factor].ring_ != vec2->__space_->factors_[factor].ring_)
 		{
-			Error("Factor %u has a different ring!\n", factor);
+			Error("Factor %lu has a different ring!\n", factor);
 			return false;
 		}
 	}

@@ -25,7 +25,7 @@ OBJS_DEP += $(OBJS)
 INC_DIRS := $(shell find $(SRC_DIRS) -type d)
 INC_FLAGS := $(addprefix -I,$(INC_DIRS))
 
-CPPFLAGS ?= $(INC_FLAGS) -MMD -MP -ggdb
+CPPFLAGS ?= $(INC_FLAGS) -Wall -Wextra -Wdouble-promotion -Werror -MMD -MP
 
 LDFLAGS += -L$(BUILD_DIR)$(DAC_DIR)
 LDLIBS := -lstdc++ -pthread

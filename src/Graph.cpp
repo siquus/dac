@@ -104,6 +104,8 @@ bool Graph::DeleteChildReferences(Node::Id_t child)
 			}
 		}
 	}
+
+	return true;
 }
 
 bool Graph::AddParent(Node::Id_t parent, Node::Id_t child)
