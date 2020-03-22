@@ -19,7 +19,7 @@
 using namespace Algebra;
 using namespace Module;
 
-template VectorSpace::Vector * VectorSpace::Element<float>(Graph * graph, const std::vector<float> &initializer) const;
+template const VectorSpace::Vector * VectorSpace::Element<float>(Graph * graph, const std::vector<float> &initializer) const;
 
 template<typename T>
 static bool hasDublicates(const std::vector<T> &vec)
@@ -81,7 +81,7 @@ void VectorSpace::GetStrides(std::vector<uint32_t> * strides) const
 }
 
 template<typename inType>
-VectorSpace::Vector * VectorSpace::Element(Graph * graph, const std::vector<inType>  &initializer) const
+const VectorSpace::Vector * VectorSpace::Element(Graph * graph, const std::vector<inType>  &initializer) const
 {
 	if(nullptr == graph)
 	{
@@ -129,7 +129,7 @@ VectorSpace::Vector * VectorSpace::Element(Graph * graph, const std::vector<inTy
 	return retVec;
 }
 
-VectorSpace::Vector * VectorSpace::Element(Graph* graph, const KroneckerDeltaParameters_t &initializer) const
+const VectorSpace::Vector * VectorSpace::Element(Graph* graph, const KroneckerDeltaParameters_t &initializer) const
 {
 	if(nullptr == graph)
 	{
@@ -184,7 +184,7 @@ const VectorSpace::Vector* VectorSpace::Vector::Divide(const Vector* vec) const
 	}
 
 	// Vector - Scalar multiplication: Do not add V-Space factors
-	// Rationale for creating an exception by not adding factors: We need to be able to define the power of things.
+	// Rationale for creating an exception by not adding factors: Multiplying scalars would quickly become a confusion of indices.
 	bool lArgScalar = (1 == __space_->GetDim());
 	bool rArgScalar = (1 == vec->__space_->GetDim());
 
@@ -295,7 +295,7 @@ const VectorSpace::Vector* VectorSpace::Vector::Multiply(const Vector* vec) cons
 	}
 
 	// Vector - Scalar multiplication: Do not add V-Space factors
-	// Rationale for creating an exception by not adding factors: We need to be able to define the power of things.
+	// Rationale for creating an exception by not adding factors: Multiplying scalars would quickly become a confusion of indices.
 	bool lArgScalar = (1 == __space_->GetDim());
 	bool rArgScalar = (1 == vec->__space_->GetDim());
 
@@ -977,10 +977,10 @@ const VectorSpace::Vector* VectorSpace::Vector::MultiplyDerivative(const Vector*
 		return nullptr;
 	}
 
-	Vector * otherVec = (Vector *) otherNode->object; // TODO: Casting const void * to Vector *
+	const Vector * otherVec = (const Vector *) otherNode->object;
 
 	// Vector - Scalar multiplication: Do not add V-Space factors
-	// Rationale for creating an exception by not adding factors: We need to be able to define the power of things.
+	// Rationale for creating an exception by not adding factors: Multiplying scalars would quickly become a confusion of indices.
 	bool argScalar = (1 == arg->__space_->GetDim());
 
 	if(argScalar)
@@ -999,7 +999,7 @@ const VectorSpace::Vector* VectorSpace::Vector::MultiplyDerivative(const Vector*
 
 	VectorSpace * kronVectorSpace = new VectorSpace(*arg->__space_, 2);
 
-	Vector * kronVec = kronVectorSpace->Element(arg->graph_, kronParameters);
+	const Vector * kronVec = kronVectorSpace->Element(arg->graph_, kronParameters);
 	if(nullptr == kronVec)
 	{
 		Error("Could not create Kronecker\n");
@@ -1125,7 +1125,7 @@ const VectorSpace::Vector* VectorSpace::Vector::ContractDerivative(const Vector*
 	}
 
 	VectorSpace * kronVectorSpace = new VectorSpace(*arg->__space_, 2);
-	Vector * kronVec = kronVectorSpace->Element(arg->graph_, kronParameters);
+	const Vector * kronVec = kronVectorSpace->Element(arg->graph_, kronParameters);
 
 	std::vector<uint32_t> lFactors;
 	lFactors.resize(otherContrFactors->size());
