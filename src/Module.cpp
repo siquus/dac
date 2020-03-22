@@ -175,7 +175,7 @@ VectorSpace::Vector * VectorSpace::Element(Graph* graph, const KroneckerDeltaPar
 	return retVec;
 }
 
-const VectorSpace::Vector* VectorSpace::Vector::Multiply(const Vector* vec) const
+const VectorSpace::Vector* VectorSpace::Vector::Divide(const Vector* vec) const
 {
 	if(graph_ != vec->graph_)
 	{
@@ -188,7 +188,7 @@ const VectorSpace::Vector* VectorSpace::Vector::Multiply(const Vector* vec) cons
 	bool lArgScalar = (1 == __space_->GetDim());
 	bool rArgScalar = (1 == vec->__space_->GetDim());
 
-	if((lArgScalar) || (rArgScalar))
+	if(lArgScalar || rArgScalar)
 	{
 		// Infer space
 
@@ -238,6 +238,107 @@ const VectorSpace::Vector* VectorSpace::Vector::Multiply(const Vector* vec) cons
 			node.parents.push_back(vec->nodeId_);
 			node.parents.push_back(nodeId_);
 		}
+
+		node.type = Node::Type::VECTOR_SCALAR_DIVISION;
+		node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
+		node.object = retVec;
+
+		retVec->nodeId_ = graph_->AddNode(&node);
+
+		if(Node::ID_NONE == retVec->nodeId_)
+		{
+			Error("Could not add Node!\n");
+			return nullptr;
+		}
+
+		return retVec;
+	}
+
+	Vector* retVec = new Vector;
+	retVec->graph_ = graph_;
+
+	VectorSpace * retSpace = nullptr;
+	retSpace = new VectorSpace(std::initializer_list<const VectorSpace*>{__space_, vec->__space_});
+
+	if(nullptr == retSpace)
+	{
+		Error("Could not create VectorSpace");
+		return nullptr;
+	}
+
+	retVec->__space_ = retSpace;
+
+	Node node;
+	node.parents.push_back(nodeId_);
+	node.parents.push_back(vec->nodeId_);
+	node.type = Node::Type::VECTOR_VECTOR_DIVISION;
+	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
+	node.object = retVec;
+
+	retVec->nodeId_ = graph_->AddNode(&node);
+
+	if(Node::ID_NONE == retVec->nodeId_)
+	{
+		Error("Could not add Node!\n");
+		return nullptr;
+	}
+
+	return retVec;
+}
+
+const VectorSpace::Vector* VectorSpace::Vector::Multiply(const Vector* vec) const
+{
+	if(graph_ != vec->graph_)
+	{
+		Error("Not on the same Graph!\n");
+		return nullptr;
+	}
+
+	// Vector - Scalar multiplication: Do not add V-Space factors
+	// Rationale for creating an exception by not adding factors: We need to be able to define the power of things.
+	bool lArgScalar = (1 == __space_->GetDim());
+	bool rArgScalar = (1 == vec->__space_->GetDim());
+
+	if(lArgScalar || rArgScalar)
+	{
+		// Infer space
+
+		Vector* retVec = new Vector;
+		retVec->graph_ = graph_;
+
+		const VectorSpace * retSpace = nullptr;
+
+		if(lArgScalar && rArgScalar)
+		{
+			Ring::type_t inferredRing = Ring::GetSuperiorRing(__space_->GetRing(), vec->__space_->GetRing());
+			if(Ring::None == inferredRing)
+			{
+				Error("Incompatible Rings\n");
+				return nullptr;
+			}
+
+			retSpace = new VectorSpace(inferredRing, 1);
+		}
+		else if(lArgScalar)
+		{
+			retSpace = vec->__space_;
+		}
+		else
+		{
+			retSpace = __space_;
+		}
+
+		if(nullptr == retSpace)
+		{
+			Error("Could not create VectorSpace");
+			return nullptr;
+		}
+
+		retVec->__space_ = retSpace;
+
+		Node node;
+		node.parents.push_back(nodeId_);
+		node.parents.push_back(vec->nodeId_);
 
 		node.type = Node::Type::VECTOR_SCALAR_PRODUCT;
 		node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;

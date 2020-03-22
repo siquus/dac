@@ -52,9 +52,10 @@ public:
 		const void* __value_ = nullptr;
 
 		// TODO: Make these operators derived classes?
-		// Then we don't have to weirdly hand over the argument order and stuff..
+		// Then we don't have to weirdly hand over the argument order and stuff. They could carry a pointer to their derivative.
 		const Vector* Add(const Vector* vec) const;
 		const Vector* Multiply(const Vector* vec) const;
+		const Vector* Divide(const Vector* vec) const;
 		const Vector* IsSmaller(const Vector* vec) const;
 
 		typedef struct {

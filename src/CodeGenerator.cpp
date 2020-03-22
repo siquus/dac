@@ -447,7 +447,9 @@ bool CodeGenerator::GenerateInstructions()
 		case Node::Type::CONTROL_TRANSFER_WHILE: // no break intended
 		case Node::Type::VECTOR_ADDITION: // no break intended
 		case Node::Type::VECTOR_SCALAR_PRODUCT: // no break intended
+		case Node::Type::VECTOR_SCALAR_DIVISION: // no break intended
 		case Node::Type::VECTOR_VECTOR_PRODUCT: // no break intended
+		case Node::Type::VECTOR_VECTOR_DIVISION: // no break intended
 		case Node::Type::VECTOR_CONTRACTION: // no break intended
 		case Node::Type::VECTOR_COMPARISON_IS_SMALLER: // no break intended
 		case Node::Type::VECTOR_PERMUTATION: // no break intended
@@ -670,8 +672,18 @@ bool CodeGenerator::GenerateOperationCode(const Node* node, FileWriter * file)
 				"Could not generate Vector Scalar Product Code!\n");
 		break;
 
+	case Node::Type::VECTOR_SCALAR_DIVISION:
+		retFalseOnFalse(VectorScalarProductCode(node, file, true),
+				"Could not generate Vector Scalar Product Code!\n");
+		break;
+
 	case Node::Type::VECTOR_VECTOR_PRODUCT:
 		retFalseOnFalse(VectorVectorProductCode(node, file),
+				"Could not generate Vector Vector Product Code!\n");
+		break;
+
+	case Node::Type::VECTOR_VECTOR_DIVISION:
+		retFalseOnFalse(VectorVectorProductCode(node, file, true),
 				"Could not generate Vector Vector Product Code!\n");
 		break;
 
@@ -1441,21 +1453,48 @@ bool CodeGenerator::ControlTransferWhileCode(const Node* node, FileWriter * file
 	return true;
 }
 
-bool CodeGenerator::VectorScalarKroneckerDeltaCode(const Node* node, FileWriter * file)
+bool CodeGenerator::VectorScalarProductKroneckerDeltaCode(const Node* node, FileWriter * file, bool divide)
 {
 	file->PrintfLine("// %s\n", __func__);
 
-	getVarRetFalseOnError(varOp, node->id);
-	getVarRetFalseOnError(varScalar, node->parents[1]);
-
-	const auto kronNode = nodeMap_.find(node->parents[0]);
-	if(nodeMap_.end() == kronNode)
+	const auto lVecNode = nodeMap_.find(node->parents[0]);
+	if(nodeMap_.end() == lVecNode)
 	{
 		Error("Could not find Node for id %u\n", node->parents[0]);
 		return false;
 	}
 
-	const Algebra::Module::VectorSpace::KroneckerDeltaParameters_t * kroneckerParam = (const Algebra::Module::VectorSpace::KroneckerDeltaParameters_t *) kronNode->second->typeParameters;
+	const auto rVecNode = nodeMap_.find(node->parents[1]);
+	if(nodeMap_.end() == rVecNode)
+	{
+		Error("Could not find Node for id %u\n", node->parents[1]);
+		return false;
+	}
+
+	Node::Id_t varScalarNodeId;
+	const Node * kronNode = nullptr;
+	if(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lVecNode->second->type)
+	{
+		kronNode = lVecNode->second;
+		varScalarNodeId = node->parents[1];
+	}
+	else
+	{
+		kronNode = rVecNode->second;
+
+		if(divide)
+		{
+			Error("Can't divide by kronecker (division by zero)!\n");
+			return false;
+		}
+
+		varScalarNodeId = node->parents[0];
+	}
+
+	getVarRetFalseOnError(varOp, node->id);
+	getVarRetFalseOnError(varScalar, varScalarNodeId);
+
+	const Algebra::Module::VectorSpace::KroneckerDeltaParameters_t * kroneckerParam = (const Algebra::Module::VectorSpace::KroneckerDeltaParameters_t *) kronNode->typeParameters;
 
 	retFalseOnFalse(GenerateLocalVariableDeclaration(varOp), "Could not generate Var. Decl.\n");
 
@@ -1517,8 +1556,7 @@ bool CodeGenerator::VectorScalarKroneckerDeltaCode(const Node* node, FileWriter 
 	fprintProtect(file->PrintfLine("%s", opIndexTuple.c_str()));
 
 	std::string Result = *(varOp->GetIdentifier());
-	Result += "[opIndex] = ";
-	Result += *varScalar->GetIdentifier() + " * ";
+	Result += "[opIndex] =";
 	for(size_t paramPos = 0; paramPos < kroneckerParam->DeltaPair.size(); paramPos++)
 	{
 		if(kroneckerParam->DeltaPair[paramPos] > paramPos) // Remember, we save the partner for every factor, but only half the information is needed
@@ -1527,7 +1565,18 @@ bool CodeGenerator::VectorScalarKroneckerDeltaCode(const Node* node, FileWriter 
 			Result += " opIndexTuple[deltaPairs[" + std::to_string(paramPos) + "]]) *";
 		}
 	}
-	Result += " " + std::to_string(kroneckerParam->Scaling) + ";";
+	Result += " " + std::to_string(kroneckerParam->Scaling);
+
+	if(divide)
+	{
+		Result += " / ";
+	}
+	else
+	{
+		Result += " * ";
+	}
+
+	 Result += *varScalar->GetIdentifier() + ";";;
 
 	fprintProtect(file->PrintfLine(Result.c_str()));
 
@@ -1537,7 +1586,7 @@ bool CodeGenerator::VectorScalarKroneckerDeltaCode(const Node* node, FileWriter 
 	return true;
 }
 
-bool CodeGenerator::VectorVectorProductKroneckerDeltaCode(const Node* node, FileWriter * file)
+bool CodeGenerator::VectorVectorProductKroneckerDeltaCode(const Node* node, FileWriter * file, bool divide)
 {
 	file->PrintfLine("// %s\n", __func__);
 
@@ -1561,6 +1610,12 @@ bool CodeGenerator::VectorVectorProductKroneckerDeltaCode(const Node* node, File
 	if(lNodeIsKron && rNodeIsKron)
 	{
 		Error("Product of two KroneckerDeltas not supported: Should be handled in graph creation!\n");
+		return false;
+	}
+
+	if(divide && rNodeIsKron)
+	{
+		Error("Can't divide by Kronecker (division by zero)!\n");
 		return false;
 	}
 
@@ -1689,18 +1744,7 @@ bool CodeGenerator::VectorVectorProductKroneckerDeltaCode(const Node* node, File
 	fprintProtect(file->PrintfLine(kronIndexTuple.c_str()));
 
 	std::string product = varOpId;
-	product += "[opIndex] = ";
-	product += *(varVec->GetIdentifier()) + "[";
-	for(uint32_t lIndex = 0; lIndex < vec->__space_->factors_.size(); lIndex++)
-	{
-		product += "vecIndexTuple[" +
-				std::to_string(lIndex) + "] * "
-				+  vecStridesId + "[" +  std::to_string(lIndex) + "] + ";
-	}
-	product.erase(product.end() - 3, product.end()); // remove last " +"
-	product += "]";
-
-	product += " * ";
+	product += "[opIndex] =";
 
 	for(size_t paramPos = 0; paramPos < kroneckerParam->DeltaPair.size(); paramPos++)
 	{
@@ -1710,7 +1754,26 @@ bool CodeGenerator::VectorVectorProductKroneckerDeltaCode(const Node* node, File
 			product += " kronIndexTuple[deltaPairs[" + std::to_string(paramPos) + "]]) *";
 		}
 	}
-	product += " " + std::to_string(kroneckerParam->Scaling) + ";";
+	product += " " + std::to_string(kroneckerParam->Scaling);
+
+	if(divide)
+	{
+		product += " / ";
+	}
+	else
+	{
+		product += " * ";
+	}
+
+	product += *(varVec->GetIdentifier()) + "[";
+	for(uint32_t lIndex = 0; lIndex < vec->__space_->factors_.size(); lIndex++)
+	{
+		product += "vecIndexTuple[" +
+				std::to_string(lIndex) + "] * "
+				+  vecStridesId + "[" +  std::to_string(lIndex) + "] + ";
+	}
+	product.erase(product.end() - 3, product.end()); // remove last " +"
+	product += "];";
 
 	fprintProtect(file->PrintfLine(product.c_str()));
 
@@ -1722,7 +1785,7 @@ bool CodeGenerator::VectorVectorProductKroneckerDeltaCode(const Node* node, File
 	return true;
 }
 
-bool CodeGenerator::VectorVectorProductCode(const Node* node, FileWriter * file)
+bool CodeGenerator::VectorVectorProductCode(const Node* node, FileWriter * file, bool divide)
 {
 	file->PrintfLine("// %s\n", __func__);
 
@@ -1743,7 +1806,7 @@ bool CodeGenerator::VectorVectorProductCode(const Node* node, FileWriter * file)
 	if((Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lnode->second->type) ||
 			(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == rnode->second->type))
 	{
-		return VectorVectorProductKroneckerDeltaCode(node, file);
+		return VectorVectorProductKroneckerDeltaCode(node, file, divide);
 	}
 
 	getVarRetFalseOnError(varOp, node->id);
@@ -1856,7 +1919,14 @@ bool CodeGenerator::VectorVectorProductCode(const Node* node, FileWriter * file)
 	product.erase(product.end() - 3, product.end()); // remove last " +"
 	product += "]";
 
-	product += " * ";
+	if(divide)
+	{
+		product += " / ";
+	}
+	else
+	{
+		product += " * ";
+	}
 
 	product += *(varRVec->GetIdentifier()) + "[";
 	for(uint32_t rIndex = 0; rIndex < rVec->__space_->factors_.size(); rIndex++)
@@ -1878,25 +1948,33 @@ bool CodeGenerator::VectorVectorProductCode(const Node* node, FileWriter * file)
 	return true;
 }
 
-bool CodeGenerator::VectorScalarProductCode(const Node* node, FileWriter * file)
+bool CodeGenerator::VectorScalarProductCode(const Node* node, FileWriter * file, bool divide)
 {
 	file->PrintfLine("// %s\n", __func__);
 
-	const auto varVecNode = nodeMap_.find(node->parents[0]);
-	if(nodeMap_.end() == varVecNode)
+	const auto lVecNode = nodeMap_.find(node->parents[0]);
+	if(nodeMap_.end() == lVecNode)
 	{
 		Error("Could not find Node for id %u\n", node->parents[0]);
 		return false;
 	}
 
-	if(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == varVecNode->second->type)
+	const auto rVecNode = nodeMap_.find(node->parents[1]);
+	if(nodeMap_.end() == rVecNode)
 	{
-		return VectorScalarKroneckerDeltaCode(node, file);
+		Error("Could not find Node for id %u\n", node->parents[1]);
+		return false;
+	}
+
+	if((Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lVecNode->second->type) ||
+			(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == rVecNode->second->type))
+	{
+		return VectorScalarProductKroneckerDeltaCode(node, file, divide);
 	}
 
 	getVarRetFalseOnError(varOp, node->id);
-	getVarRetFalseOnError(varVec, node->parents[0]);
-	getVarRetFalseOnError(varScalar, node->parents[1]);
+	getVarRetFalseOnError(lVar, node->parents[0]);
+	getVarRetFalseOnError(rVar, node->parents[1]);
 
 	retFalseOnFalse(GenerateLocalVariableDeclaration(varOp), "Could not generate Var. Decl.\n");
 
@@ -1907,10 +1985,40 @@ bool CodeGenerator::VectorScalarProductCode(const Node* node, FileWriter * file)
 
 	fprintProtect(file->PrintfLine("{"));
 
-	fprintProtect(file->PrintfLine("\t%s[dim] = %s[dim] * %s;",
-			varOp->GetIdentifier()->c_str(),
-			varVec->GetIdentifier()->c_str(),
-			varScalar->GetIdentifier()->c_str()));
+	bool lVarIsScalar = true;
+	if(1 < lVar->Length())
+	{
+		lVarIsScalar = false;
+	}
+
+	if(divide && lVarIsScalar)
+	{
+		fprintProtect(file->PrintfLine("\t%s[dim] = %s / %s[dim];",
+				varOp->GetIdentifier()->c_str(),
+				lVar->GetIdentifier()->c_str(),
+				rVar->GetIdentifier()->c_str()));
+	}
+	else if(divide)
+	{
+		fprintProtect(file->PrintfLine("\t%s[dim] = %s[dim] / %s;",
+				varOp->GetIdentifier()->c_str(),
+				lVar->GetIdentifier()->c_str(),
+				rVar->GetIdentifier()->c_str()));
+	}
+	else if(lVarIsScalar)
+	{
+		fprintProtect(file->PrintfLine("\t%s[dim] = %s * %s[dim];",
+				varOp->GetIdentifier()->c_str(),
+				lVar->GetIdentifier()->c_str(),
+				rVar->GetIdentifier()->c_str()));
+	}
+	else
+	{
+		fprintProtect(file->PrintfLine("\t%s[dim] = %s[dim] * %s;",
+				varOp->GetIdentifier()->c_str(),
+				lVar->GetIdentifier()->c_str(),
+				rVar->GetIdentifier()->c_str()));
+	}
 
 	fprintProtect(file->PrintfLine("}\n"));
 
