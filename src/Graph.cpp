@@ -149,6 +149,9 @@ const char* Node::getName(Type type)
 	case Type::VECTOR_VECTOR_DIVISION:
 		return "VECTOR_VECTOR_DIVISION";
 
+	case Type::VECTOR_POWER:
+		return "VECTOR_POWER";
+
 	case Type::VECTOR_COMPARISON_IS_SMALLER:
 		return "VECTOR_COMPARISON_IS_SMALLER";
 

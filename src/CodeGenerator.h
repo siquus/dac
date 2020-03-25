@@ -59,6 +59,7 @@ public:
 	size_t Length() const;
 	bool HasProperty(properties_t property) const;
 	bool AddProperty(properties_t property);
+	Type GetType() const;
 	const char* GetTypeString() const;
 	uint32_t GetNewRunningNumber();
 
@@ -105,6 +106,7 @@ class CodeGenerator {
 	bool VectorScalarProductCode(const Node* node, FileWriter * file, bool divide = false);
 	bool VectorScalarProductKroneckerDeltaCode(const Node* node, FileWriter * file, bool divide = false);
 	bool VectorVectorProductCode(const Node* node, FileWriter * file, bool divide = false);
+	bool VectorPowerCode(const Node* node, FileWriter * file);
 	bool VectorVectorProductKroneckerDeltaCode(const Node* node, FileWriter * file, bool divide = false);
 	bool VectorComparisonIsSmallerCode(const Node* node, FileWriter * file);
 	bool VectorContractionCode(const Node* node, FileWriter * file);

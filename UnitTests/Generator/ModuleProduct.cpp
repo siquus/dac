@@ -102,6 +102,11 @@ bool ModuleProduct::Generate(const std::string &path)
 	auto dVecVecProdRightOutput = Interface::Output(&graph, "dVecVecProdRight");
 	dVecVecProdRightOutput.Set(dVecVecProdRightContracted);
 
+	// Power
+	auto scalar2Squared = scalar2->Power(scalar2);
+	auto scalar2SquaredOutput = Interface::Output(&graph, "scalar2Squared");
+	scalar2SquaredOutput.Set(scalar2Squared);
+
 	// Generate Code
 
 	CodeGenerator codeGenerator(&path);

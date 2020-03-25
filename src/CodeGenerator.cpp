@@ -450,6 +450,7 @@ bool CodeGenerator::GenerateInstructions()
 		case Node::Type::VECTOR_SCALAR_DIVISION: // no break intended
 		case Node::Type::VECTOR_VECTOR_PRODUCT: // no break intended
 		case Node::Type::VECTOR_VECTOR_DIVISION: // no break intended
+		case Node::Type::VECTOR_POWER: // no break intended
 		case Node::Type::VECTOR_CONTRACTION: // no break intended
 		case Node::Type::VECTOR_COMPARISON_IS_SMALLER: // no break intended
 		case Node::Type::VECTOR_PERMUTATION: // no break intended
@@ -670,6 +671,11 @@ bool CodeGenerator::GenerateOperationCode(const Node* node, FileWriter * file)
 	case Node::Type::VECTOR_SCALAR_PRODUCT:
 		retFalseOnFalse(VectorScalarProductCode(node, file),
 				"Could not generate Vector Scalar Product Code!\n");
+		break;
+
+	case Node::Type::VECTOR_POWER:
+		retFalseOnFalse(VectorPowerCode(node, file),
+				"Could not generate Vector Power Code!\n");
 		break;
 
 	case Node::Type::VECTOR_SCALAR_DIVISION:
@@ -1948,6 +1954,82 @@ bool CodeGenerator::VectorVectorProductCode(const Node* node, FileWriter * file,
 	return true;
 }
 
+bool CodeGenerator::VectorPowerCode(const Node* node, FileWriter * file)
+{
+	file->PrintfLine("// %s\n", __func__);
+
+	getVarRetFalseOnError(varOp, node->id);
+	getVarRetFalseOnError(lVar, node->parents[0]);
+	getVarRetFalseOnError(rVar, node->parents[1]);
+
+	retFalseOnFalse(GenerateLocalVariableDeclaration(varOp), "Could not generate Var. Decl.\n");
+
+	bool lVarIsScalar = true;
+	if(1 < lVar->Length())
+	{
+		lVarIsScalar = false;
+	}
+
+	bool rVarIsScalar = true;
+	if(1 < rVar->Length())
+	{
+		rVarIsScalar = false;
+	}
+
+	if(!rVarIsScalar)
+	{
+		Error("Can't take to non-scalar powers!\n");
+		return false;
+	}
+
+	// TODO: If the exponent is a constant, it's probably faster to use sqrt in case of 0.5 and so forth
+	const char powFunctions[][6] =
+	{
+			"powf",
+			"pow",
+			"powl"
+	};
+
+	const char* powFctString;
+	switch(lVar->GetType())
+	{
+	case Variable::Type::uint8_: // no break intended
+	case Variable::Type::int8_: // no break intended
+	case Variable::Type::int32_: // no break intended
+		// TODO: Implement https://en.wikipedia.org/wiki/Exponentiation_by_squaring
+	case Variable::Type::float_:
+		powFctString = powFunctions[0];
+		break;
+
+	default: // no break intended
+	case Variable::Type::none: // no break intended
+	case Variable::Type::nrOf:
+		Error("Reached default case!\n");
+		return false;
+	}
+
+	if(lVarIsScalar)
+	{
+		fprintProtect(file->PrintfLine("%s = %s(%s, %s);",
+				varOp->GetIdentifier()->c_str(),
+				powFctString,
+				lVar->GetIdentifier()->c_str(),
+				rVar->GetIdentifier()->c_str()));
+
+		return true;
+	}
+
+	auto vecOp = (const Algebra::Module::VectorSpace::Vector*) node->object;
+
+	if(1 < vecOp->__space_->factors_.size())
+	{
+		Error("Power of non-scalar not yet implemented!\n"); // TODO: Implement
+		return false;
+	}
+
+	return true;
+}
+
 bool CodeGenerator::VectorScalarProductCode(const Node* node, FileWriter * file, bool divide)
 {
 	file->PrintfLine("// %s\n", __func__);
@@ -2367,6 +2449,11 @@ inline bool Variable::HasProperty(properties_t property) const
 	}
 
 	return false;
+}
+
+Variable::Type Variable::GetType() const
+{
+	return type_;
 }
 
 const char* Variable::GetTypeString() const
