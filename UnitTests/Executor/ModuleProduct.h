@@ -16,6 +16,9 @@ public:
 
 	void Execute(size_t threadsNrOf);
 
+	void ScalarScalarDiv(const float * data, size_t size);
+	void DScalarScalarDivLeft(const float * data, size_t size);
+	void DScalarScalarDivRight(const float * data, size_t size);
 	void VecScalarProduct(const float * data, size_t size);
 	void ScalarVecProduct(const float * data, size_t size);
 	void VecVecProduct(const float * data, size_t size);
@@ -30,6 +33,9 @@ private:
 	size_t ThreadsNrOf_ = 0;
 
 	enum {
+		CALLED_ScalarScalarDiv,
+		CALLED_DScalarScalarDivLeft,
+		CALLED_DScalarScalarDivRight,
 		CALLED_ScalarVecProduct,
 		CALLED_VecScalarProduct,
 		CALLED_VecVecProduct,

@@ -17,17 +17,30 @@ bool ModuleProduct::Generate(const std::string &path)
 {
 	Graph graph("ModuleProduct");
 
-	auto myScalarSpace = Algebra::Module::VectorSpace(Algebra::Ring::Float32, 1);
 	auto myVs = Algebra::Module::VectorSpace(Algebra::Ring::Float32, 3);
 	auto myMatrixSpace = Algebra::Module::VectorSpace(myVs, 2);
 
-	auto scalar_init = std::vector<float>{42};
 	auto vector1_init = std::vector<float>{1, 2, 3};
 	auto vector2_init = std::vector<float>{4, 5, 6};
 
-	auto scalar = myScalarSpace.Element(&graph, scalar_init);
+	auto scalar = myVs.Scalar(&graph, 42.f);
 	auto vector1 = myVs.Element(&graph, vector1_init);
 	auto vector2 = myVs.Element(&graph, vector2_init);
+
+	// Scalar - Scalar Division
+	auto scalar2 = myVs.Scalar(&graph, 2.f);
+	auto scalarScalarDiv = scalar->Divide(scalar2);
+	auto scalarScalarDivOutput = Interface::Output(&graph, "scalarScalarDiv");
+	scalarScalarDivOutput.Set(scalarScalarDiv);
+
+	// Derivative
+	auto dScalarScalarDivLeft = scalarScalarDiv->Derivative(scalar);
+	auto dScalarScalarDivLeftOutput = Interface::Output(&graph, "dScalarScalarDivLeft");
+	dScalarScalarDivLeftOutput.Set(dScalarScalarDivLeft);
+
+	auto dScalarScalarDivRight = scalarScalarDiv->Derivative(scalar2);
+	auto dScalarScalarDivRightOutput = Interface::Output(&graph, "dScalarScalarDivRight");
+	dScalarScalarDivRightOutput.Set(dScalarScalarDivRight);
 
 	// Scalar - Vector Multiplication
 	auto scalarVecProd = scalar->Multiply(vector1);

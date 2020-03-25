@@ -1980,47 +1980,81 @@ bool CodeGenerator::VectorScalarProductCode(const Node* node, FileWriter * file,
 
 	auto vecOp = (const Algebra::Module::VectorSpace::Vector*) node->object;
 
-	fprintProtect(file->PrintfLine("for(uint32_t dim = 0; dim < %u; dim++)",
-			vecOp->__space_->GetDim()));
-
-	fprintProtect(file->PrintfLine("{"));
-
 	bool lVarIsScalar = true;
 	if(1 < lVar->Length())
 	{
 		lVarIsScalar = false;
 	}
 
-	if(divide && lVarIsScalar)
+	bool rVarIsScalar = true;
+	if(1 < rVar->Length())
 	{
-		fprintProtect(file->PrintfLine("\t%s[dim] = %s / %s[dim];",
-				varOp->GetIdentifier()->c_str(),
-				lVar->GetIdentifier()->c_str(),
-				rVar->GetIdentifier()->c_str()));
+		rVarIsScalar = false;
 	}
-	else if(divide)
+
+	if(!lVarIsScalar || !rVarIsScalar)
 	{
-		fprintProtect(file->PrintfLine("\t%s[dim] = %s[dim] / %s;",
-				varOp->GetIdentifier()->c_str(),
-				lVar->GetIdentifier()->c_str(),
-				rVar->GetIdentifier()->c_str()));
+		fprintProtect(file->PrintfLine("for(uint32_t dim = 0; dim < %u; dim++)",
+				vecOp->__space_->GetDim()));
+
+		fprintProtect(file->PrintfLine("{"));
+		file->Indent();
 	}
-	else if(lVarIsScalar)
+
+	if(divide)
 	{
-		fprintProtect(file->PrintfLine("\t%s[dim] = %s * %s[dim];",
-				varOp->GetIdentifier()->c_str(),
-				lVar->GetIdentifier()->c_str(),
-				rVar->GetIdentifier()->c_str()));
+		if(lVarIsScalar && rVarIsScalar)
+		{
+			fprintProtect(file->PrintfLine("%s = %s / %s;",
+					varOp->GetIdentifier()->c_str(),
+					lVar->GetIdentifier()->c_str(),
+					rVar->GetIdentifier()->c_str()));
+		}
+		else if(lVarIsScalar)
+		{
+			fprintProtect(file->PrintfLine("%s[dim] = %s / %s[dim];",
+					varOp->GetIdentifier()->c_str(),
+					lVar->GetIdentifier()->c_str(),
+					rVar->GetIdentifier()->c_str()));
+		}
+		else
+		{
+			fprintProtect(file->PrintfLine("%s[dim] = %s[dim] / %s;",
+					varOp->GetIdentifier()->c_str(),
+					lVar->GetIdentifier()->c_str(),
+					rVar->GetIdentifier()->c_str()));
+		}
 	}
 	else
 	{
-		fprintProtect(file->PrintfLine("\t%s[dim] = %s[dim] * %s;",
-				varOp->GetIdentifier()->c_str(),
-				lVar->GetIdentifier()->c_str(),
-				rVar->GetIdentifier()->c_str()));
+		if(lVarIsScalar && rVarIsScalar)
+		{
+			fprintProtect(file->PrintfLine("%s = %s * %s;",
+					varOp->GetIdentifier()->c_str(),
+					lVar->GetIdentifier()->c_str(),
+					rVar->GetIdentifier()->c_str()));
+		}
+		else if(lVarIsScalar)
+		{
+			fprintProtect(file->PrintfLine("%s[dim] = %s * %s[dim];",
+					varOp->GetIdentifier()->c_str(),
+					lVar->GetIdentifier()->c_str(),
+					rVar->GetIdentifier()->c_str()));
+		}
+		else
+		{
+			fprintProtect(file->PrintfLine("%s[dim] = %s[dim] * %s;",
+					varOp->GetIdentifier()->c_str(),
+					lVar->GetIdentifier()->c_str(),
+					rVar->GetIdentifier()->c_str()));
+		}
 	}
 
-	fprintProtect(file->PrintfLine("}\n"));
+	if(!lVarIsScalar || !rVarIsScalar)
+	{
+		file->Outdent();
+		fprintProtect(file->PrintfLine("}\n"));
+	}
 
 	return true;
 }

@@ -54,6 +54,36 @@ bool IsCompatible(type_t type, const std::vector<inType>  &dataVector __attribut
 		return false;
 }
 
+template<typename inType>
+bool IsCompatible(type_t type, const inType &data __attribute__((unused))) // using dataVector only to get its type
+{
+	switch(type)
+	{
+	case Ring::Float32:
+		if(!std::is_same<inType, float>::value)
+		{
+			Error("Type mismatch\n");
+			return false;
+		}
+		return true;
+
+	case Ring::Int32:
+		if(!std::is_same<inType, int32_t>::value)
+		{
+			Error("Type mismatch\n");
+			return false;
+		}
+		return true;
+
+	default:
+		Error("Type mismatch\n");
+		return false;
+	}
+
+		Error("Should not be reached!\n");
+		return false;
+}
+
 }
 }
 #endif /* SRC_RING_H_ */

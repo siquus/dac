@@ -15,6 +15,36 @@
 
 static ModuleProduct * ModuleProductPt = nullptr;
 
+static void scalarScalarDiv(const float * data, size_t size)
+{
+	if(NULL == ModuleProductPt)
+	{
+		fatal("Nullpointer!");
+	}
+
+	ModuleProductPt->ScalarScalarDiv(data, size);
+}
+
+static void dScalarScalarDivLeft(const float * data, size_t size)
+{
+	if(NULL == ModuleProductPt)
+	{
+		fatal("Nullpointer!");
+	}
+
+	ModuleProductPt->DScalarScalarDivLeft(data, size);
+}
+
+static void dScalarScalarDivRight(const float * data, size_t size)
+{
+	if(NULL == ModuleProductPt)
+	{
+		fatal("Nullpointer!");
+	}
+
+	ModuleProductPt->DScalarScalarDivRight(data, size);
+}
+
 static void vecScalarProd(const float * data, size_t size)
 {
 	if(NULL == ModuleProductPt)
@@ -103,6 +133,54 @@ static void kronVecProd(const float * data, size_t size)
 	}
 
 	ModuleProductPt->KronVecProduct(data, size);
+}
+
+void ModuleProduct::ScalarScalarDiv(const float * data, size_t size)
+{
+	const float expected[] = {21};
+
+	if(sizeof(expected) != size)
+	{
+		Error("Size Mismatch! %lu vs %lu\n", sizeof(expected), size);
+	}
+	else if(memcmp(data, expected, sizeof(expected)))
+	{
+		Error("Unexpected result! %f\n", data[0]);
+	}
+
+	called_[CALLED_ScalarScalarDiv] = true;
+}
+
+void ModuleProduct::DScalarScalarDivLeft(const float * data, size_t size)
+{
+	const float expected[] = {1./2.};
+
+	if(sizeof(expected) != size)
+	{
+		Error("Size Mismatch! %lu vs %lu\n", sizeof(expected), size);
+	}
+	else if(memcmp(data, expected, sizeof(expected)))
+	{
+		Error("Unexpected result! %f\n", data[0]);
+	}
+
+	called_[CALLED_DScalarScalarDivLeft] = true;
+}
+
+void ModuleProduct::DScalarScalarDivRight(const float * data, size_t size)
+{
+	const float expected[] = {-42. / 4.};
+
+	if(sizeof(expected) != size)
+	{
+		Error("Size Mismatch! %lu vs %lu\n", sizeof(expected), size);
+	}
+	else if(memcmp(data, expected, sizeof(expected)))
+	{
+		Error("Unexpected result! %f\n", data[0]);
+	}
+
+	called_[CALLED_DScalarScalarDivRight] = true;
 }
 
 void ModuleProduct::ScalarVecProduct(const float * data, size_t size)
@@ -270,6 +348,9 @@ void ModuleProduct::DVecVecProductRight(const float * data, size_t size)
 ModuleProduct::ModuleProduct() {
 	ModuleProductPt = this;
 
+	DacModuleProductOutputCallbackscalarScalarDiv_Register(&scalarScalarDiv);
+	DacModuleProductOutputCallbackdScalarScalarDivLeft_Register(&dScalarScalarDivLeft);
+	DacModuleProductOutputCallbackdScalarScalarDivRight_Register(&dScalarScalarDivRight);
 	DacModuleProductOutputCallbackscalarVecProd_Register(&scalarVecProd);
 	DacModuleProductOutputCallbackvecScalarProd_Register(&vecScalarProd);
 	DacModuleProductOutputCallbackvecVecProd_Register(&vecVecProd);

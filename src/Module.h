@@ -56,6 +56,8 @@ public:
 		const Vector* Add(const Vector* vec) const;
 		const Vector* Multiply(const Vector* vec) const;
 		const Vector* Divide(const Vector* vec) const;
+		const Vector* Power(const Vector* vec) const; // element-wise power, e.g. c_ij^2 = c_ij * c_ij (no sum)
+		const Vector* Power(const Vector* vec, const std::vector<uint32_t> &lfactors, const std::vector<uint32_t> &rfactors) const; // contraction power, e.g. B_ij^n = A_ij = B_ik B_kl B_lo ... n times
 		const Vector* IsSmaller(const Vector* vec) const;
 
 		typedef struct {
@@ -92,9 +94,13 @@ public:
 	};
 
 	template<typename T>
-	const Vector * Element(Graph* graph, const std::vector<T> &initializer) const;
+	const Vector * Element(Graph* graph, const std::vector<T> &initializer) const; // initializer Pointer is taken
 
-	const Vector * Element(Graph* graph, const KroneckerDeltaParameters_t &initializer) const;
+	const Vector * Element(Graph* graph, const KroneckerDeltaParameters_t &initializer) const; // initializer Pointer is taken
+
+	template<typename T>
+	const Vector * Scalar(Graph* graph, const T &initializer) const; // Initializer is copied
+
 };
 }
 }

@@ -22,6 +22,7 @@ public:
 		VECTOR_SCALAR_DIVISION, // e.g. A_ij = B_ij / C_k, |k| = 1
 		VECTOR_VECTOR_PRODUCT, // a.k.a. tensor product, e.g. A_ijk = B_ij * C_k
 		VECTOR_VECTOR_DIVISION, // e.g. A_ijk = B_ij / C_k
+		VECTOR_POWER,
 		VECTOR_COMPARISON_IS_SMALLER,
 		VECTOR_KRONECKER_DELTA_PRODUCT, // i.e. deta^i_j * delta^k_l * ...
 		VECTOR_PERMUTATION,
