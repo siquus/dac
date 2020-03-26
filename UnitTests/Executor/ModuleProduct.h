@@ -29,6 +29,7 @@ public:
 	void DVecVecProductLeft(const float * data, size_t size);
 	void DVecVecProductRight(const float * data, size_t size);
 	void Scalar2Squared(const float * data, size_t size);
+	void DScalar2SquaredBase(const float * data, size_t size);
 
 private:
 	size_t ThreadsNrOf_ = 0;
@@ -47,6 +48,7 @@ private:
 		CALLED_DVecVecProductLeft,
 		CALLED_DVecVecProductRight,
 		CALLED_Scalar2Squared,
+		CALLED_DScalar2SquaredBase,
 		CALLED_NrOf,
 	};
 

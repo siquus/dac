@@ -107,6 +107,10 @@ bool ModuleProduct::Generate(const std::string &path)
 	auto scalar2SquaredOutput = Interface::Output(&graph, "scalar2Squared");
 	scalar2SquaredOutput.Set(scalar2Squared);
 
+	auto dScalar2SquaredBase = scalar2Squared->Derivative(scalar2);
+	auto dScalar2SquaredBaseOutput = Interface::Output(&graph, "dScalar2SquaredBase");
+	dScalar2SquaredBaseOutput.Set(dScalar2SquaredBase);
+
 	// Generate Code
 
 	CodeGenerator codeGenerator(&path);

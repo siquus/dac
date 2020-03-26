@@ -54,6 +54,7 @@ public:
 		// TODO: Make these operators derived classes?
 		// Then we don't have to weirdly hand over the argument order and stuff. They could carry a pointer to their derivative.
 		const Vector* Add(const Vector* vec) const;
+		const Vector* Subtract(const Vector* vec) const;
 		const Vector* Multiply(const Vector* vec) const;
 		const Vector* Divide(const Vector* vec) const;
 		const Vector* Power(const Vector* vec) const; // element-wise power, e.g. c_ij^2 = c_ij * c_ij (no sum)
@@ -91,6 +92,7 @@ public:
 		static const Vector* PermuteDerivative(const Vector* vecValuedFct, const Vector* arg);
 		static const Vector* MultiplyDerivative(const Vector* vecValuedFct, const Vector* arg);
 		static const Vector* DivideDerivative(const Vector* vecValuedFct, const Vector* arg);
+		static const Vector* PowerDerivative(const Vector* vecValuedFct, const Vector* arg);
 	};
 
 	template<typename T>

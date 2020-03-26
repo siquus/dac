@@ -306,6 +306,18 @@ const VectorSpace::Vector* VectorSpace::Vector::Power(const Vector* vec) const
 		return nullptr;
 	}
 
+	if(1 < vec->__space_->GetDim())
+	{
+		Error("Can't take power to non-scalar value!\n");
+		return nullptr;
+	}
+
+	if(1 < __space_->GetDim())
+	{
+		Error("No factors for powering specified. Use alternative overloaded fct!\n");
+		return nullptr;
+	}
+
 	Vector* retVec = new Vector;
 	retVec->graph_ = graph_;
 
@@ -331,6 +343,7 @@ const VectorSpace::Vector* VectorSpace::Vector::Power(const Vector* vec) const
 
 const VectorSpace::Vector* VectorSpace::Vector::Divide(const Vector* vec) const
 {
+	// TODO: Maybe rather than having this be a new operation, simply do result = this * vec^(-1) ?
 	if(graph_ != vec->graph_)
 	{
 		Error("Not on the same Graph!\n");
@@ -818,6 +831,9 @@ const VectorSpace::Vector* VectorSpace::Vector::CreateDerivative(const Vector* v
 	case Node::Type::VECTOR_VECTOR_DIVISION:
 		return DivideDerivative(vecValuedFct, arg);
 
+	case Node::Type::VECTOR_POWER:
+		return PowerDerivative(vecValuedFct, arg);
+
 	default:
 		Error("Node Type %s does not support taking its derivative!\n", Node::getName(fctNode->type));
 		return nullptr;
@@ -1093,6 +1109,73 @@ const VectorSpace::Vector* VectorSpace::Vector::Permute(const std::vector<uint32
 	}
 
 	return retVec;
+}
+
+const VectorSpace::Vector* VectorSpace::Vector::PowerDerivative(const Vector* vecValuedFct, const Vector* arg)
+{
+	// Derivative w.r.t. base?
+	const Node * fctNode = vecValuedFct->graph_->GetNode(vecValuedFct->nodeId_);
+	if(nullptr == fctNode)
+	{
+		Error("Could not find node!\n");
+		return nullptr;
+	}
+
+	const Node * lNode = arg->graph_->GetNode(fctNode->parents[0]);
+	if(nullptr == lNode)
+	{
+		Error("Could not find node Id%u!\n", fctNode->parents[0]);
+		return nullptr;
+	}
+
+	const Node * rNode = arg->graph_->GetNode(fctNode->parents[1]);
+	if(nullptr == rNode)
+	{
+		Error("Could not find node Id%u!\n", fctNode->parents[1]);
+		return nullptr;
+	}
+
+	const Vector* baseVector = (const Vector *) lNode->object;
+	const Vector* expVector = (const Vector *) rNode->object;
+
+	bool derivativeWrtBase = (fctNode->parents[0] == arg->nodeId_);
+
+	if(derivativeWrtBase)
+	{
+		// d/db b^e = e * b^(e-1)
+		const Vector* product = expVector->Multiply(baseVector);
+		if(nullptr == product)
+		{
+			Error("Could not multiply!\n");
+			return nullptr;
+		}
+
+		const Vector* minusOne = expVector->__space_->Scalar(expVector->graph_, -1.f);
+		if(nullptr == minusOne)
+		{
+			Error("Could not create scalar!\n");
+			return nullptr;
+		}
+
+		const Vector * exponent = expVector->Add(minusOne);
+		if(nullptr == exponent)
+		{
+			Error("Could not add!\n");
+			return nullptr;
+		}
+
+		const Vector* derivative = product->Power(exponent);
+		if(nullptr == derivative)
+		{
+			Error("Could not take power!\n");
+			return nullptr;
+		}
+
+		return derivative;
+	}
+
+	Error("Taking derivative w.r.t. exponent is not implemented!\n");
+	return nullptr;
 }
 
 const VectorSpace::Vector* VectorSpace::Vector::DivideDerivative(const Vector* vecValuedFct, const Vector* arg)
@@ -1469,6 +1552,38 @@ const VectorSpace::Vector* VectorSpace::Vector::AddDerivative(const Vector* vecV
 	if(Node::ID_NONE == retVec->nodeId_)
 	{
 		Error("Could not add Node!\n");
+		return nullptr;
+	}
+
+	return retVec;
+}
+
+const VectorSpace::Vector* VectorSpace::Vector::Subtract(const Vector* vec) const
+{
+	if(!AreCompatible(this, vec))
+	{
+		Error("Incompatible Vectors!\n");
+		return nullptr;
+	}
+
+	const Vector * minusOne = vec->__space_->Scalar(vec->graph_, -1.f);
+	if(nullptr == minusOne)
+	{
+		Error("Could not create scalar!\n");
+		return nullptr;
+	}
+
+	const Vector * minusVec = minusOne->Multiply(vec);
+	if(nullptr == minusVec)
+	{
+		Error("Could not multiply!\n");
+		return nullptr;
+	}
+
+	const Vector * retVec = Add(minusVec);
+	if(nullptr == retVec)
+	{
+		Error("Could not add!\n");
 		return nullptr;
 	}
 

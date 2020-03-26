@@ -145,6 +145,16 @@ static void scalar2Squared(const float * data, size_t size)
 	ModuleProductPt->Scalar2Squared(data, size);
 }
 
+static void dScalar2SquaredBase(const float * data, size_t size)
+{
+	if(NULL == ModuleProductPt)
+	{
+		fatal("Nullpointer!");
+	}
+
+	ModuleProductPt->DScalar2SquaredBase(data, size);
+}
+
 void ModuleProduct::Scalar2Squared(const float * data, size_t size)
 {
 	const float expected[] = {4};
@@ -159,6 +169,22 @@ void ModuleProduct::Scalar2Squared(const float * data, size_t size)
 	}
 
 	called_[CALLED_Scalar2Squared] = true;
+}
+
+void ModuleProduct::DScalar2SquaredBase(const float * data, size_t size)
+{
+	const float expected[] = {4};
+
+	if(sizeof(expected) != size)
+	{
+		Error("Size Mismatch! %lu vs %lu\n", sizeof(expected), size);
+	}
+	else if(memcmp(data, expected, sizeof(expected)))
+	{
+		Error("Unexpected result! %f\n", data[0]);
+	}
+
+	called_[CALLED_DScalar2SquaredBase] = true;
 }
 
 void ModuleProduct::ScalarScalarDiv(const float * data, size_t size)
@@ -387,6 +413,7 @@ ModuleProduct::ModuleProduct() {
 	DacModuleProductOutputCallbackdVecVecProdLeft_Register(&dVecVecProdLeft);
 	DacModuleProductOutputCallbackdVecVecProdRight_Register(&dVecVecProdRight);
 	DacModuleProductOutputCallbackscalar2Squared_Register(&scalar2Squared);
+	DacModuleProductOutputCallbackdScalar2SquaredBase_Register(&dScalar2SquaredBase);
 }
 
 void ModuleProduct::Execute(size_t threadsNrOf)

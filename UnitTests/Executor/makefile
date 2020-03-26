@@ -12,7 +12,7 @@ INC_FLAGS := $(addprefix -I,$(INC_DIRS))
 
 CPPFLAGS ?= $(INC_FLAGS) -Wall -Wextra -Wdouble-promotion -MMD -MP
 
-LDLIBS := -lstdc++ -pthread
+LDLIBS := -lstdc++ -lm -pthread
 
 $(BUILD_DIR)/$(TARGET_EXEC): $(OBJS)
 	$(CC) $(OBJS) -o $@ $(LDFLAGS) $(LDLIBS)

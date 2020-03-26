@@ -750,17 +750,29 @@ bool CodeGenerator::VectorAdditionCode(const Node* node, FileWriter * file)
 
 	auto vecOp = (const Algebra::Module::VectorSpace::Vector*) node->object;
 
-	fprintProtect(file->PrintfLine("for(uint32_t dim = 0; dim < %u; dim++)",
-			vecOp->__space_->GetDim()));
+	bool resultIsArray = (1 < vecOp->__space_->GetDim());
 
-	fprintProtect(file->PrintfLine("{"));
+	if(resultIsArray)
+	{
+		fprintProtect(file->PrintfLine("for(uint32_t dim = 0; dim < %u; dim++)",
+				vecOp->__space_->GetDim()));
 
-	fprintProtect(file->PrintfLine("\t%s[dim] = %s[dim] + %s[dim];",
-			varOp->GetIdentifier()->c_str(),
-			varSum1->GetIdentifier()->c_str(),
-			varSum2->GetIdentifier()->c_str()));
+		fprintProtect(file->PrintfLine("{"));
 
-	fprintProtect(file->PrintfLine("}\n"));
+		fprintProtect(file->PrintfLine("\t%s[dim] = %s[dim] + %s[dim];",
+				varOp->GetIdentifier()->c_str(),
+				varSum1->GetIdentifier()->c_str(),
+				varSum2->GetIdentifier()->c_str()));
+
+		fprintProtect(file->PrintfLine("}\n"));
+	}
+	else
+	{
+		fprintProtect(file->PrintfLine("%s = %s + %s;",
+				varOp->GetIdentifier()->c_str(),
+				varSum1->GetIdentifier()->c_str(),
+				varSum2->GetIdentifier()->c_str()));
+	}
 
 	return true;
 }
@@ -854,11 +866,7 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 
 	const char * varOpId = varOp->GetIdentifier()->c_str();
 
-	bool resultIsArray = false;
-	if(1 < varOp->Length())
-	{
-		resultIsArray = true;
-	}
+	bool resultIsArray = (1 < varOp->Length());
 
 	// Copy delta pairs array into file
 	std::string deltaPairs = "const uint32_t deltaPairs[] = {";
@@ -1198,11 +1206,7 @@ bool CodeGenerator::VectorContractionCode(const Node* node, FileWriter * file)
 
 	const char * varOpId = varOp->GetIdentifier()->c_str();
 
-	bool resultIsArray = false;
-	if(1 < varOp->Length())
-	{
-		resultIsArray = true;
-	}
+	bool resultIsArray = (1 < varOp->Length());
 
 	if(resultIsArray)
 	{
@@ -1964,17 +1968,8 @@ bool CodeGenerator::VectorPowerCode(const Node* node, FileWriter * file)
 
 	retFalseOnFalse(GenerateLocalVariableDeclaration(varOp), "Could not generate Var. Decl.\n");
 
-	bool lVarIsScalar = true;
-	if(1 < lVar->Length())
-	{
-		lVarIsScalar = false;
-	}
-
-	bool rVarIsScalar = true;
-	if(1 < rVar->Length())
-	{
-		rVarIsScalar = false;
-	}
+	bool lVarIsScalar = (1 == lVar->Length());
+	bool rVarIsScalar = (1 == rVar->Length());
 
 	if(!rVarIsScalar)
 	{
@@ -2062,17 +2057,8 @@ bool CodeGenerator::VectorScalarProductCode(const Node* node, FileWriter * file,
 
 	auto vecOp = (const Algebra::Module::VectorSpace::Vector*) node->object;
 
-	bool lVarIsScalar = true;
-	if(1 < lVar->Length())
-	{
-		lVarIsScalar = false;
-	}
-
-	bool rVarIsScalar = true;
-	if(1 < rVar->Length())
-	{
-		rVarIsScalar = false;
-	}
+	bool lVarIsScalar = (1 == lVar->Length());
+	bool rVarIsScalar = (1 == rVar->Length());
 
 	if(!lVarIsScalar || !rVarIsScalar)
 	{
