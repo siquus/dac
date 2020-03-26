@@ -140,14 +140,8 @@ const char* Node::getName(Type type)
 	case Type::VECTOR_SCALAR_PRODUCT:
 		return "VECTOR_SCALAR_PRODUCT";
 
-	case Type::VECTOR_SCALAR_DIVISION:
-		return "VECTOR_SCALAR_DIVISION";
-
 	case Type::VECTOR_VECTOR_PRODUCT:
 		return "VECTOR_VECTOR_PRODUCT";
-
-	case Type::VECTOR_VECTOR_DIVISION:
-		return "VECTOR_VECTOR_DIVISION";
 
 	case Type::VECTOR_POWER:
 		return "VECTOR_POWER";

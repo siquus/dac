@@ -245,7 +245,8 @@ bool CodeGenerator::Generate(const Graph* graph)
 	retFalseOnFalse(GenerateIncludes(), "Could not generate Includes\n");
 	fprintProtect(fileDacC_.PrintfLine(""));
 
-	fprintProtect(fileInstructions_.PrintfLine("#include <stdint.h>\n"));
+	fprintProtect(fileInstructions_.PrintfLine("#include <stdint.h>"));
+	fprintProtect(fileInstructions_.PrintfLine("#include <math.h>\n"));
 	fprintProtect(fileInstructions_.PrintfLine("#include \"Dac%s.h\"", graph_->Name().c_str()));
 	fprintProtect(fileInstructions_.PrintfLine("#include \"Instructions%s.h\"\n", graph_->Name().c_str()));
 
@@ -447,9 +448,7 @@ bool CodeGenerator::GenerateInstructions()
 		case Node::Type::CONTROL_TRANSFER_WHILE: // no break intended
 		case Node::Type::VECTOR_ADDITION: // no break intended
 		case Node::Type::VECTOR_SCALAR_PRODUCT: // no break intended
-		case Node::Type::VECTOR_SCALAR_DIVISION: // no break intended
 		case Node::Type::VECTOR_VECTOR_PRODUCT: // no break intended
-		case Node::Type::VECTOR_VECTOR_DIVISION: // no break intended
 		case Node::Type::VECTOR_POWER: // no break intended
 		case Node::Type::VECTOR_CONTRACTION: // no break intended
 		case Node::Type::VECTOR_COMPARISON_IS_SMALLER: // no break intended
@@ -678,18 +677,8 @@ bool CodeGenerator::GenerateOperationCode(const Node* node, FileWriter * file)
 				"Could not generate Vector Power Code!\n");
 		break;
 
-	case Node::Type::VECTOR_SCALAR_DIVISION:
-		retFalseOnFalse(VectorScalarProductCode(node, file, true),
-				"Could not generate Vector Scalar Product Code!\n");
-		break;
-
 	case Node::Type::VECTOR_VECTOR_PRODUCT:
 		retFalseOnFalse(VectorVectorProductCode(node, file),
-				"Could not generate Vector Vector Product Code!\n");
-		break;
-
-	case Node::Type::VECTOR_VECTOR_DIVISION:
-		retFalseOnFalse(VectorVectorProductCode(node, file, true),
 				"Could not generate Vector Vector Product Code!\n");
 		break;
 

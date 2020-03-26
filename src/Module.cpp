@@ -312,12 +312,6 @@ const VectorSpace::Vector* VectorSpace::Vector::Power(const Vector* vec) const
 		return nullptr;
 	}
 
-	if(1 < __space_->GetDim())
-	{
-		Error("No factors for powering specified. Use alternative overloaded fct!\n");
-		return nullptr;
-	}
-
 	Vector* retVec = new Vector;
 	retVec->graph_ = graph_;
 
@@ -343,105 +337,28 @@ const VectorSpace::Vector* VectorSpace::Vector::Power(const Vector* vec) const
 
 const VectorSpace::Vector* VectorSpace::Vector::Divide(const Vector* vec) const
 {
-	// TODO: Maybe rather than having this be a new operation, simply do result = this * vec^(-1) ?
-	if(graph_ != vec->graph_)
+	const Vector * minusOne = vec->__space_->Scalar(vec->graph_, -1.f);
+	if(nullptr == minusOne)
 	{
-		Error("Not on the same Graph!\n");
+		Error("Could not create scalar!\n");
 		return nullptr;
 	}
 
-	// Vector - Scalar multiplication: Do not add V-Space factors
-	// Rationale for creating an exception by not adding factors: Multiplying scalars would quickly become a confusion of indices.
-	bool lArgScalar = (1 == __space_->GetDim());
-	bool rArgScalar = (1 == vec->__space_->GetDim());
-
-	if(lArgScalar || rArgScalar)
+	const Vector * oneOverVec = vec->Power(minusOne);
+	if(nullptr == oneOverVec)
 	{
-		// Infer space
-
-		Vector* retVec = new Vector;
-		retVec->graph_ = graph_;
-
-		const VectorSpace * retSpace = nullptr;
-
-		if(lArgScalar && rArgScalar)
-		{
-			Ring::type_t inferredRing = Ring::GetSuperiorRing(__space_->GetRing(), vec->__space_->GetRing());
-			if(Ring::None == inferredRing)
-			{
-				Error("Incompatible Rings\n");
-				return nullptr;
-			}
-
-			retSpace = new VectorSpace(inferredRing, 1);
-		}
-		else if(lArgScalar)
-		{
-			retSpace = vec->__space_;
-		}
-		else
-		{
-			retSpace = __space_;
-		}
-
-		if(nullptr == retSpace)
-		{
-			Error("Could not create VectorSpace");
-			return nullptr;
-		}
-
-		retVec->__space_ = retSpace;
-
-		Node node;
-
-		node.parents.push_back(nodeId_);
-		node.parents.push_back(vec->nodeId_);
-
-		node.type = Node::Type::VECTOR_SCALAR_DIVISION;
-		node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
-		node.object = retVec;
-
-		retVec->nodeId_ = graph_->AddNode(&node);
-
-		if(Node::ID_NONE == retVec->nodeId_)
-		{
-			Error("Could not add Node!\n");
-			return nullptr;
-		}
-
-		return retVec;
-	}
-
-	Vector* retVec = new Vector;
-	retVec->graph_ = graph_;
-
-	VectorSpace * retSpace = nullptr;
-	retSpace = new VectorSpace(std::initializer_list<const VectorSpace*>{__space_, vec->__space_});
-
-	if(nullptr == retSpace)
-	{
-		Error("Could not create VectorSpace");
+		Error("Could not take power!\n");
 		return nullptr;
 	}
 
-	retVec->__space_ = retSpace;
-
-	Node node;
-	node.parents.push_back(nodeId_);
-	node.parents.push_back(vec->nodeId_);
-	node.type = Node::Type::VECTOR_VECTOR_DIVISION;
-	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
-	node.object = retVec;
-
-	retVec->nodeId_ = graph_->AddNode(&node);
-
-	if(Node::ID_NONE == retVec->nodeId_)
+	const Vector * Result = Multiply(oneOverVec);
+	if(nullptr == Result)
 	{
-		Error("Could not add Node!\n");
+		Error("Could not Multiply!\n");
 		return nullptr;
 	}
 
-	return retVec;
+	return Result;
 }
 
 const VectorSpace::Vector* VectorSpace::Vector::Multiply(const Vector* vec) const
@@ -762,7 +679,8 @@ const VectorSpace::Vector* VectorSpace::Vector::CreateDerivative(std::map<Node::
 
 			// Products are an exception, as these are not contracted.
 			if((Node::Type::VECTOR_SCALAR_PRODUCT != parentNode->type) &&
-					(Node::Type::VECTOR_VECTOR_PRODUCT != parentNode->type))
+					(Node::Type::VECTOR_VECTOR_PRODUCT != parentNode->type) &&
+					(Node::Type::VECTOR_POWER != parentNode->type))
 			{
 				std::vector<uint32_t> lfactors(parentVec->__space_->factors_.size());
 				std::iota(lfactors.begin(), lfactors.end(), 0);
@@ -826,10 +744,6 @@ const VectorSpace::Vector* VectorSpace::Vector::CreateDerivative(const Vector* v
 	case Node::Type::VECTOR_SCALAR_PRODUCT:	// no break intended
 	case Node::Type::VECTOR_VECTOR_PRODUCT:
 		return MultiplyDerivative(vecValuedFct, arg);
-
-	case Node::Type::VECTOR_SCALAR_DIVISION: // no break intended
-	case Node::Type::VECTOR_VECTOR_DIVISION:
-		return DivideDerivative(vecValuedFct, arg);
 
 	case Node::Type::VECTOR_POWER:
 		return PowerDerivative(vecValuedFct, arg);
@@ -1143,13 +1057,6 @@ const VectorSpace::Vector* VectorSpace::Vector::PowerDerivative(const Vector* ve
 	if(derivativeWrtBase)
 	{
 		// d/db b^e = e * b^(e-1)
-		const Vector* product = expVector->Multiply(baseVector);
-		if(nullptr == product)
-		{
-			Error("Could not multiply!\n");
-			return nullptr;
-		}
-
 		const Vector* minusOne = expVector->__space_->Scalar(expVector->graph_, -1.f);
 		if(nullptr == minusOne)
 		{
@@ -1164,10 +1071,17 @@ const VectorSpace::Vector* VectorSpace::Vector::PowerDerivative(const Vector* ve
 			return nullptr;
 		}
 
-		const Vector* derivative = product->Power(exponent);
-		if(nullptr == derivative)
+		const Vector* power = baseVector->Power(exponent);
+		if(nullptr == power)
 		{
 			Error("Could not take power!\n");
+			return nullptr;
+		}
+
+		const Vector* derivative = expVector->Multiply(power);
+		if(nullptr == derivative)
+		{
+			Error("Could not multiply!\n");
 			return nullptr;
 		}
 
@@ -1176,119 +1090,6 @@ const VectorSpace::Vector* VectorSpace::Vector::PowerDerivative(const Vector* ve
 
 	Error("Taking derivative w.r.t. exponent is not implemented!\n");
 	return nullptr;
-}
-
-const VectorSpace::Vector* VectorSpace::Vector::DivideDerivative(const Vector* vecValuedFct, const Vector* arg)
-{
-	// Is arg the right side, i.e. the scalar?
-	// On which side of the contraction is the non-arg node?
-	const Node * fctNode = vecValuedFct->graph_->GetNode(vecValuedFct->nodeId_);
-	if(nullptr == fctNode)
-	{
-		Error("Could not find node!\n");
-		return nullptr;
-	}
-
-	bool argOnRightSide;
-	Node::Id_t otherNodeId;
-	if(fctNode->parents[0] == arg->nodeId_)
-	{
-		argOnRightSide = false;
-		otherNodeId = fctNode->parents[1];
-	}
-	else
-	{
-		argOnRightSide = true;
-		otherNodeId = fctNode->parents[0];
-	}
-
-	const Node * otherNode = arg->graph_->GetNode(otherNodeId);
-	if(nullptr == otherNode)
-	{
-		Error("Could not find node Id%u!\n", otherNodeId);
-		return nullptr;
-	}
-
-	const Vector * otherVec = (const Vector *) otherNode->object;
-
-	// Vector - Scalar multiplication: Do not add V-Space factors
-	// Rationale for creating an exception by not adding factors: Multiplying scalars would quickly become a confusion of indices.
-	bool argScalar = (1 == arg->__space_->GetDim());
-
-	if(argScalar && argOnRightSide)
-	{
-		// Result = -Other / arg^2
-		// i.e. -vecValuedFct / arg
-
-		const Vector * divided = vecValuedFct->Divide(arg);
-		if(nullptr == divided)
-		{
-			Error("Division failed!");
-			return nullptr;
-		}
-
-		const Vector * minusOne = vecValuedFct->__space_->Scalar(vecValuedFct->graph_, -1.f);
-		if(nullptr == minusOne)
-		{
-			Error("Could not create scalar!");
-			return nullptr;
-		}
-
-		return minusOne->Multiply(divided);
-	}
-	else if(argScalar)
-	{
-		// Result = 1 / Other
-		// i.e. vecValuedFct / arg
-		return vecValuedFct->Divide(arg);
-	}
-
-	// Now similar to the scalar case for general tensor products
-	if(argOnRightSide)
-	{
-		// Result_lijk = dfct_ijk / darg_l = -delta_lk Other_ij / arg_k^2 // no sum
-		const Vector * two = arg->__space_->Scalar(arg->graph_, 2.f);
-		const Vector * argSquared = arg->Power(two);
-
-		const Vector * otherDivided = otherVec->Divide(argSquared);
-
-		const Vector * minusOne = arg->__space_->Scalar(arg->graph_, -1);
-		const Vector * derivative __attribute__((unused)) = minusOne->Multiply(otherDivided);
-
-		// TODO: Can't implement the rest, because requisite is not implemented yet
-		// We are missing a way to create the uncontracted ("no sum") Kronecker above
-		Error("Derivative of 1 / n-Tensor, n > 1, Not yet implemented!");
-		return nullptr;
-	}
-
-	// Arg on left side
-	// Result_lmijk = dfct_ijk / darg_lm = delta_li delta_mj / arg_k
-	KroneckerDeltaParameters_t kronParameters;
-	kronParameters.DeltaPair.resize(2 * arg->__space_->factors_.size());
-
-	for(size_t deltaFactor = 0; deltaFactor < kronParameters.DeltaPair.size() / 2; deltaFactor++)
-	{
-		kronParameters.DeltaPair[deltaFactor] = deltaFactor + kronParameters.DeltaPair.size() / 2;
-		kronParameters.DeltaPair[deltaFactor + kronParameters.DeltaPair.size() / 2] = deltaFactor;
-	}
-
-	VectorSpace * kronVectorSpace = new VectorSpace(*arg->__space_, 2);
-
-	const Vector * kronVec = kronVectorSpace->Element(arg->graph_, kronParameters);
-	if(nullptr == kronVec)
-	{
-		Error("Could not create Kronecker\n");
-		return nullptr;
-	}
-
-	const Vector * Product = kronVec->Multiply(otherVec);
-	if(nullptr == kronVec)
-	{
-		Error("Could not multiply\n");
-		return nullptr;
-	}
-
-	return Product;
 }
 
 const VectorSpace::Vector* VectorSpace::Vector::MultiplyDerivative(const Vector* vecValuedFct, const Vector* arg)

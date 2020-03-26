@@ -91,7 +91,6 @@ public:
 		static const Vector* ContractDerivative(const Vector* vecValuedFct, const Vector* arg);
 		static const Vector* PermuteDerivative(const Vector* vecValuedFct, const Vector* arg);
 		static const Vector* MultiplyDerivative(const Vector* vecValuedFct, const Vector* arg);
-		static const Vector* DivideDerivative(const Vector* vecValuedFct, const Vector* arg);
 		static const Vector* PowerDerivative(const Vector* vecValuedFct, const Vector* arg);
 	};
 
