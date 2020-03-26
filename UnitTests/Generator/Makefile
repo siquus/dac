@@ -49,8 +49,11 @@ $(BUILD_DIR)/%.cpp.o: %.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
 # files
-$(BUILD_DIR)/%.file: $(DAC_DIR_REL)/embeddedFiles/%
+$(BUILD_DIR)/%.file: $(BUILD_DIR)/%.copy
 	ld -r -b binary $< -o $@
+	
+$(BUILD_DIR)/%.copy: $(DAC_DIR_REL)/embeddedFiles/%
+	cp -f $< $@	
 
 # ename
 ename.c.inc:
