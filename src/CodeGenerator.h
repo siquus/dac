@@ -113,6 +113,7 @@ class CodeGenerator {
 	bool VectorContractionKroneckerDeltaCode(const Node* node, FileWriter * file);
 	bool ControlTransferWhileCode(const Node* node, FileWriter * file);
 	bool VectorPermutationCode(const Node* node, FileWriter * file);
+	bool VectorProjectionCode(const Node* node, FileWriter * file);
 
 	bool FetchVariables();
 	bool GetFirstNodesToExecute(std::set<Node::Id_t> * nodeSet);

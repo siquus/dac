@@ -71,8 +71,14 @@ public:
 
 		typedef struct {
 			std::vector<uint32_t> indices;
-		} permuteParameters_t;
+		} permuteParameters_t; // TODO: Not used here! Move!
 		const Vector* Permute(const std::vector<uint32_t> &indices) const; // I.e. the new vector is going to contain index indices[j] at position j.
+
+		typedef struct {
+			std::vector<std::pair<uint32_t, uint32_t>> range;
+		} projectParameters_t; // TODO: Not used here! Move!
+		const Vector* Project(const std::vector<std::pair<uint32_t, uint32_t>> &range) const; // I.e. new, smaller vector has only the indices in range.
+		const Vector* Project(const std::pair<uint32_t, uint32_t> &range) const; // I.e. new, smaller vector has only the indices in range.
 
 		const Vector* Derivative(const Vector* vec) const;
 
@@ -102,6 +108,21 @@ public:
 	template<typename T>
 	const Vector * Scalar(Graph* graph, const T &initializer) const; // Initializer is copied
 
+	template<typename T>
+	const Vector * Homomorphism(Graph* graph, const std::vector<T> &initializer) const;  // initializer Pointer is taken
+
+	enum class HomomorphismProperty {
+		Diagonal,
+		Symmetric,
+		Antisymmetric,
+	};
+
+	template<typename T>
+	const Vector * Homomorphism(
+			Graph* graph,
+			const std::vector<T> &initializer,
+			const std::vector<HomomorphismProperty> &properties,
+			const std::vector<const void *> &propertiesParameter) const;  // initializer Pointer is taken
 };
 }
 }

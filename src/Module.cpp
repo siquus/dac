@@ -21,6 +21,12 @@ using namespace Module;
 
 template const VectorSpace::Vector * VectorSpace::Element<float>(Graph * graph, const std::vector<float> &initializer) const;
 template const VectorSpace::Vector * VectorSpace::Scalar<float>(Graph * graph, const float &initializer) const;
+template const VectorSpace::Vector * VectorSpace::Homomorphism<float>(Graph* graph, const std::vector<float> &initializer) const;
+template const VectorSpace::Vector * VectorSpace::Homomorphism<float>(
+		Graph* graph,
+		const std::vector<float> &initializer,
+		const std::vector<HomomorphismProperty> &properties,
+		const std::vector<const void *> &propertiesParameter) const;
 
 template<typename T>
 static bool hasDublicates(const std::vector<T> &vec)
@@ -79,6 +85,99 @@ void VectorSpace::GetStrides(std::vector<uint32_t> * strides) const
 
 		strides->at(fac) = stride;
 	}
+}
+
+template<typename inType>
+const VectorSpace::Vector * VectorSpace::Homomorphism(
+		Graph* graph,
+		const std::vector<inType> &initializer,
+		const std::vector<HomomorphismProperty> &properties,
+		const std::vector<const void *> &propertiesParameter) const
+{
+	if(nullptr == graph)
+	{
+		Error("nullptr\n");
+		return nullptr;
+	}
+
+	if(properties.size() != propertiesParameter.size())
+	{
+		Error("Properties and propertiesParameter need to have same size!\n");
+		return nullptr;
+	}
+
+	// TODO: Implement properties. For now this is just an interface to test usability in application
+	if((properties.size() != 1) ||
+			(HomomorphismProperty::Diagonal != properties[0]) ||
+			(factors_.size() != 1))
+	{
+		Error("Property not implemented yet!\n");
+		return nullptr;
+	}
+
+	// For now, simply create the full matrix
+	const size_t dimensions = GetDim();
+
+	auto newInitiliazer = new std::vector<inType>(dimensions * dimensions, 0.f);
+
+	// Fill diagonal values
+	for(size_t dim = 0; dim < dimensions; dim++)
+	{
+		newInitiliazer->at(dim * dimensions + dim) = initializer[dim];
+	}
+
+	return Homomorphism(graph, *newInitiliazer);
+}
+
+template<typename inType>
+const VectorSpace::Vector * VectorSpace::Homomorphism(Graph* graph, const std::vector<inType> &initializer) const
+{
+	if(nullptr == graph)
+	{
+		Error("nullptr\n");
+		return nullptr;
+	}
+
+	if(initializer.size() != GetDim() * GetDim())
+	{
+		Error("Initializer dimensions do not match (%lu vs %i)!\n",
+				initializer.size(), GetDim() * GetDim());
+		return nullptr;
+	}
+
+	if(!Ring::IsCompatible(GetRing(), initializer))
+	{
+		Error("Initializer for Homomorphism of incompatible Type!\n");
+		return nullptr;
+	}
+
+	Vector * retVec = new Vector;
+	if(nullptr == retVec)
+	{
+		Error("Could not malloc Vec\n");
+		return nullptr;
+	}
+
+	Node node;
+	node.type = Node::Type::VECTOR;
+	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
+	node.object = retVec;
+
+	Node::Id_t nodeId = graph->AddNode(&node);
+	if(Node::ID_NONE == nodeId)
+	{
+		Error("Could not add node!\n");
+		return nullptr;
+	}
+
+	VectorSpace * retSpace = new VectorSpace(*this, 2);
+
+	retVec->__value_ = initializer.data();
+	retVec->__space_ = retSpace;
+	retVec->graph_ = graph;
+	retVec->nodeId_ = nodeId;
+
+	return retVec;
 }
 
 template<typename inType>
@@ -976,6 +1075,78 @@ const VectorSpace::Vector* VectorSpace::Vector::Contract(const Vector* vec, uint
 	std::vector<uint32_t> rfactors{rfactor};
 
 	return Contract(vec, lfactors, rfactors);
+}
+
+const VectorSpace::Vector* VectorSpace::Vector::Project(const std::pair<uint32_t, uint32_t> &range) const
+{
+	if(1 != __space_->factors_.size())
+	{
+		Error("Specify range for each factor!\n");
+		return nullptr;
+	}
+
+	std::vector<std::pair<uint32_t, uint32_t>> IndexRange;
+	IndexRange.push_back(range);
+
+	return Project(IndexRange);
+}
+
+const VectorSpace::Vector* VectorSpace::Vector::Project(const std::vector<std::pair<uint32_t, uint32_t>> &range) const
+{
+	if(range.size() != __space_->factors_.size())
+	{
+		Error("Specify range for each factor!\n");
+		return nullptr;
+	}
+
+	for(size_t factorRange = 0; factorRange < range.size(); factorRange++)
+	{
+		if((__space_->factors_[factorRange].dim_ < range[factorRange].first) ||
+				(__space_->factors_[factorRange].dim_ < range[factorRange].second))
+		{
+			Error("Factor range is larger than factor dimension!\n");
+			return nullptr;
+		}
+
+		if(range[factorRange].first >= range[factorRange].second)
+		{
+			Error("Lower factor range is larger than / equal to upper factor range!\n");
+			return nullptr;
+		}
+	}
+
+	Vector* retVec = new Vector;
+	retVec->graph_ = graph_;
+
+	std::vector<simpleVs_t> newFactors = __space_->factors_;
+	for(size_t factor = 0; factor < newFactors.size(); factor++)
+	{
+		newFactors[factor].dim_ = range[factor].second - range[factor].first;
+	}
+
+	VectorSpace * retSpace = new VectorSpace(newFactors);
+	retVec->__space_ = retSpace;
+
+	Node node;
+	node.parents.push_back(nodeId_);
+	node.type = Node::Type::VECTOR_PROJECTION;
+	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
+	node.object = retVec;
+
+	projectParameters_t * opParameters = new projectParameters_t;
+	opParameters->range = range;
+
+	node.typeParameters = opParameters;
+
+	retVec->nodeId_ = graph_->AddNode(&node);
+
+	if(Node::ID_NONE == retVec->nodeId_)
+	{
+		Error("Could not add Node!\n");
+		return nullptr;
+	}
+
+	return retVec;
 }
 
 const VectorSpace::Vector* VectorSpace::Vector::Permute(const std::vector<uint32_t> &indices) const
