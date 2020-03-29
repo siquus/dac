@@ -32,8 +32,15 @@ E.g. if only a few dozen vector/matrix operations in a few dimensions is require
 - 
 
 ## TODO
+- [ ]	Make vector properties a map<property, const void *>
+- [ ]	Error cnt in code generator accessible to user.
+- [ ]   Put initializer values into separate header? they can become very long.
+- [ ]   __space_ should be private. And offer a function which returns a const pointer/ref to it.
+- [ ]	It's weird that VectorSpace::Vector rather than VectorSpace::Element.
+- [ ]	Rename Vector -> Tensor? It's imagine someone using namespace std
 - [ ]	Rethink that vector space pointer business.
 - [ ]	Introduce "scaling" to vectors, so that e.g. for scalar multiplication not the whole vector needs to be multiplied
 - [ ]   Introduce optimized memory handling: Not every node needs to be statically allocated. Memory may actually be globally optimized on graph
 - [ ]   How to deal with special vectors? E.g. starting with Kronecker? They all require a special implementation.
 - [ ]   To enable DAC on non-unix single-core targets, it should be possible to build without threads.
+- [ ]	Check that all printf of floats uses all floating digits in code generator!

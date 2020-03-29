@@ -23,7 +23,7 @@
 	printf(__VA_ARGS__); \
 	fflush(stdout)
 
-typedef uint16_t dimension_t;
+typedef uint32_t dimension_t;
 
 
 

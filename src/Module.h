@@ -30,6 +30,7 @@ public:
 	} simpleVs_t;
 
 	VectorSpace(Ring::type_t ring, dimension_t dim);
+	VectorSpace(Ring::type_t ring, const std::vector<dimension_t> &dimensions);
 	VectorSpace(const std::vector<simpleVs_t> &factors); // TODO: Don'T expose simpleVs.
 	VectorSpace(std::initializer_list<const VectorSpace*> list);
 	VectorSpace(const VectorSpace &vSpace, size_t nTimes);
@@ -55,8 +56,14 @@ public:
 		// Then we don't have to weirdly hand over the argument order and stuff. They could carry a pointer to their derivative.
 		const Vector* Add(const Vector* vec) const;
 		const Vector* Subtract(const Vector* vec) const;
+
+		template<typename inType>
+		const Vector* Multiply(inType factor) const;
 		const Vector* Multiply(const Vector* vec) const;
 		const Vector* Divide(const Vector* vec) const;
+
+		template<typename inType>
+		const Vector* Power(inType exp) const; // element-wise power, e.g. c_ij^2 = c_ij * c_ij (no sum)
 		const Vector* Power(const Vector* vec) const; // element-wise power, e.g. c_ij^2 = c_ij * c_ij (no sum)
 		const Vector* Power(const Vector* vec, const std::vector<uint32_t> &lfactors, const std::vector<uint32_t> &rfactors) const; // contraction power, e.g. B_ij^n = A_ij = B_ik B_kl B_lo ... n times
 		const Vector* IsSmaller(const Vector* vec) const;
@@ -82,6 +89,31 @@ public:
 
 		const Vector* Derivative(const Vector* vec) const;
 
+		typedef struct {
+			enum initializer_t {DENSE, COO, CSR, CSC};
+			initializer_t Initializer;
+			std::vector<uint32_t> Indices; // declaring which index is sparse. If size == 0 assume all are.
+		} propertyParameterSparse_t;
+
+		typedef struct {
+			enum initializer_t {DENSE, LEFTMOST_INDICES}; // LEFTMOST_INDICES Only the leftmost of all symmetric indices supplied
+			initializer_t Initializer;
+			std::pair<uint32_t, uint32_t> Pairs; // declaring which two indices have this property. If size == 0 then complete symmetry.
+		} propertyParameterSymmetric_t;
+
+		typedef struct {
+			enum initializer_t {DENSE, DIAGONAL}; // LEFTMOST_INDICES Only the leftmost of all symmetric indices supplied
+			initializer_t Initializer;
+			std::pair<uint32_t, uint32_t> Pairs; // declaring which two indices have this property. If size == 0, then all.
+		} propertyParameterDiagonal_t;
+
+		enum class Property {
+			Diagonal, // propertyParameterDiagonal_t
+			Symmetric, // propertyParameterSymmetric_t
+			Antisymmetric, // propertyParameterSymmetric_t
+			Sparse, // propertyParameterSparse_t
+		};
+
 	private:
 		static bool AreCompatible(const Vector* vec1, const Vector* vec2);
 
@@ -103,6 +135,20 @@ public:
 	template<typename T>
 	const Vector * Element(Graph* graph, const std::vector<T> &initializer) const; // initializer Pointer is taken
 
+	template<typename T>
+	const Vector * Element(
+			Graph* graph,
+			const std::vector<T> &initializer,
+			Vector::Property property,
+			const void * parameter = nullptr) const;
+
+	template<typename T>
+	const Vector * Element(
+			Graph* graph,
+			const std::vector<T> &initializer,
+			const std::vector<Vector::Property> &properties,
+			const std::vector<const void *> &propertiesParameter) const;  // initializer Pointer is taken
+
 	const Vector * Element(Graph* graph, const KroneckerDeltaParameters_t &initializer) const; // initializer Pointer is taken
 
 	template<typename T>
@@ -111,17 +157,18 @@ public:
 	template<typename T>
 	const Vector * Homomorphism(Graph* graph, const std::vector<T> &initializer) const;  // initializer Pointer is taken
 
-	enum class HomomorphismProperty {
-		Diagonal,
-		Symmetric,
-		Antisymmetric,
-	};
+	template<typename T>
+	const Vector * Homomorphism(
+			Graph* graph,
+			const std::vector<T> &initializer,
+			Vector::Property property,
+			const void * parameter = nullptr) const;  // initializer Pointer is taken
 
 	template<typename T>
 	const Vector * Homomorphism(
 			Graph* graph,
 			const std::vector<T> &initializer,
-			const std::vector<HomomorphismProperty> &properties,
+			const std::vector<Vector::Property> &properties,
 			const std::vector<const void *> &propertiesParameter) const;  // initializer Pointer is taken
 };
 }

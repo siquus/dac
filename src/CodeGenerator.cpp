@@ -2119,13 +2119,21 @@ bool CodeGenerator::VectorPowerCode(const Node* node, FileWriter * file)
 		return true;
 	}
 
-	auto vecOp = (const Algebra::Module::VectorSpace::Vector*) node->object;
+	fprintProtect(file->PrintfLine("for(int opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
+			varOp->GetIdentifier()->c_str(), varOp->GetIdentifier()->c_str()));
+	fprintProtect(file->PrintfLine("{"));
+	file->Indent();
 
-	if(1 < vecOp->__space_->factors_.size())
-	{
-		Error("Power of non-scalar not yet implemented!\n"); // TODO: Implement
-		return false;
-	}
+	fprintProtect(file->PrintfLine("%s[%s] = %s(%s[%s], %s);",
+			varOp->GetIdentifier()->c_str(),
+			"opIndex",
+			powFctString,
+			lVar->GetIdentifier()->c_str(),
+			"opIndex",
+			rVar->GetIdentifier()->c_str()));
+
+	file->Outdent();
+	fprintProtect(file->PrintfLine("}"));
 
 	return true;
 }

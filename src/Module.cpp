@@ -20,13 +20,36 @@ using namespace Algebra;
 using namespace Module;
 
 template const VectorSpace::Vector * VectorSpace::Element<float>(Graph * graph, const std::vector<float> &initializer) const;
+
+template const VectorSpace::Vector * VectorSpace::Element<float>(
+		Graph* graph,
+		const std::vector<float> &initializer,
+		Vector::Property property,
+		const void * parameter) const;
+
+template const VectorSpace::Vector * VectorSpace::Element<float>(
+			Graph* graph,
+			const std::vector<float> &initializer,
+			const std::vector<Vector::Property> &properties,
+			const std::vector<const void *> &propertiesParameter) const;
+
 template const VectorSpace::Vector * VectorSpace::Scalar<float>(Graph * graph, const float &initializer) const;
 template const VectorSpace::Vector * VectorSpace::Homomorphism<float>(Graph* graph, const std::vector<float> &initializer) const;
+
+template const VectorSpace::Vector * VectorSpace::Homomorphism<float>(
+			Graph* graph,
+			const std::vector<float> &initializer,
+			Vector::Property property,
+			const void * parameter) const;  // initializer Pointer is taken
+
 template const VectorSpace::Vector * VectorSpace::Homomorphism<float>(
 		Graph* graph,
 		const std::vector<float> &initializer,
-		const std::vector<HomomorphismProperty> &properties,
+		const std::vector<Vector::Property> &properties,
 		const std::vector<const void *> &propertiesParameter) const;
+
+template const VectorSpace::Vector* VectorSpace::Vector::Power<float>(float exp) const;
+template const VectorSpace::Vector* VectorSpace::Vector::Multiply<float>(float factor) const;
 
 template<typename T>
 static bool hasDublicates(const std::vector<T> &vec)
@@ -48,6 +71,14 @@ static bool hasDublicates(const std::vector<T> &vec)
 VectorSpace::VectorSpace(Ring::type_t ring, dimension_t dim)
 {
 	factors_.push_back(simpleVs_t{ring, dim});
+}
+
+VectorSpace::VectorSpace(Ring::type_t ring, const std::vector<dimension_t> &dimensions)
+{
+	for(size_t dim = 0; dim < dimensions.size(); dim++)
+	{
+		factors_.push_back(simpleVs_t{ring, dimensions[dim]});
+	}
 }
 
 dimension_t VectorSpace::GetDim() const
@@ -89,9 +120,45 @@ void VectorSpace::GetStrides(std::vector<uint32_t> * strides) const
 
 template<typename inType>
 const VectorSpace::Vector * VectorSpace::Homomorphism(
+			Graph* graph,
+			const std::vector<inType> &initializer,
+			Vector::Property property,
+			const void * parameter) const
+{
+	if(nullptr == graph)
+	{
+		Error("nullptr\n");
+		return nullptr;
+	}
+
+	(void)(parameter);
+
+	// Handle properties, where no indices need to be specified
+	if((Vector::Property::Diagonal == property) && (1 == factors_.size()))
+	{
+		std::vector<Vector::Property> props;
+		props.push_back(property);
+
+		std::pair<uint32_t, uint32_t> param{0, 1};
+		std::vector<const void *> propParam;
+		propParam.push_back(&param);
+
+		return Homomorphism(
+				graph,
+				initializer,
+				props,
+				propParam);
+	}
+
+	Error("Not implemented!\n");
+	return nullptr;
+}
+
+template<typename inType>
+const VectorSpace::Vector * VectorSpace::Homomorphism(
 		Graph* graph,
 		const std::vector<inType> &initializer,
-		const std::vector<HomomorphismProperty> &properties,
+		const std::vector<Vector::Property> &properties,
 		const std::vector<const void *> &propertiesParameter) const
 {
 	if(nullptr == graph)
@@ -99,6 +166,8 @@ const VectorSpace::Vector * VectorSpace::Homomorphism(
 		Error("nullptr\n");
 		return nullptr;
 	}
+
+	// TODO: Call VectorSpace::Element rather than reimplenting stuff here!
 
 	if(properties.size() != propertiesParameter.size())
 	{
@@ -108,7 +177,7 @@ const VectorSpace::Vector * VectorSpace::Homomorphism(
 
 	// TODO: Implement properties. For now this is just an interface to test usability in application
 	if((properties.size() != 1) ||
-			(HomomorphismProperty::Diagonal != properties[0]) ||
+			(Vector::Property::Diagonal != properties[0]) ||
 			(factors_.size() != 1))
 	{
 		Error("Property not implemented yet!\n");
@@ -224,6 +293,60 @@ const VectorSpace::Vector * VectorSpace::Scalar(Graph* graph, const inType &init
 	retVec->nodeId_ = nodeId;
 
 	return retVec;
+}
+
+template<typename inType>
+const VectorSpace::Vector * VectorSpace::Element(
+			Graph* graph,
+			const std::vector<inType> &initializer,
+			Vector::Property property,
+			const void * parameter) const
+{
+	// TODO: Implement properties. For now this is just an interface to test usability in application
+	if(Vector::Property::Sparse != property)
+	{
+		Error("Not implemented!\n");
+		return nullptr;
+	}
+
+	if(nullptr == parameter)
+	{
+		Error("Nullpointer!\n");
+		return nullptr;
+	}
+
+	const Vector::propertyParameterSparse_t * param = (const Vector::propertyParameterSparse_t *) parameter;
+	if(param->DENSE != param->Initializer)
+	{
+		Error("Not implemented!\n");
+		return nullptr;
+	}
+
+	// Ignore sparse..
+
+	return Element(graph, initializer);
+}
+
+template<typename inType>
+const VectorSpace::Vector * VectorSpace::Element(
+			Graph* graph,
+			const std::vector<inType> &initializer,
+			const std::vector<Vector::Property> &properties,
+			const std::vector<const void *> &propertiesParameter) const
+{
+	// TODO: Implement properties. For now this is just an interface to test usability in application
+	(void)(propertiesParameter);
+
+	if((2 == properties.size()) &&
+			(properties[0] == Vector::Property::Sparse) &&
+			(properties[1] == Vector::Property::Antisymmetric))
+	{
+		// Ignore properties
+		return Element(graph, initializer);
+	}
+
+	Error("Not implemented!\n");
+	return nullptr;
 }
 
 template<typename inType>
@@ -397,6 +520,12 @@ const VectorSpace::Vector* VectorSpace::Vector::Power(const Vector* vec, const s
 	return retVec;
 }
 
+template<typename inType>
+const VectorSpace::Vector* VectorSpace::Vector::Power(inType exp) const
+{
+	return Power(__space_->Scalar(graph_, exp));
+}
+
 const VectorSpace::Vector* VectorSpace::Vector::Power(const Vector* vec) const
 {
 	if(graph_ != vec->graph_)
@@ -458,6 +587,14 @@ const VectorSpace::Vector* VectorSpace::Vector::Divide(const Vector* vec) const
 	}
 
 	return Result;
+}
+
+template<typename inType>
+const VectorSpace::Vector* VectorSpace::Vector::Multiply(inType factor) const
+{
+	auto factorVec = __space_->Scalar(graph_, factor);
+
+	return Multiply(factorVec);
 }
 
 const VectorSpace::Vector* VectorSpace::Vector::Multiply(const Vector* vec) const
@@ -846,6 +983,9 @@ const VectorSpace::Vector* VectorSpace::Vector::CreateDerivative(const Vector* v
 
 	case Node::Type::VECTOR_POWER:
 		return PowerDerivative(vecValuedFct, arg);
+
+	case Node::Type::VECTOR_PROJECTION:
+		return ProjectDerivative(vecValuedFct, arg);
 
 	default:
 		Error("Node Type %s does not support taking its derivative!\n", Node::getName(fctNode->type));

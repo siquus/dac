@@ -155,6 +155,9 @@ const char* Node::getName(Type type)
 	case Type::VECTOR_PERMUTATION:
 		return "VECTOR_PERMUTATION";
 
+	case Type::VECTOR_PROJECTION:
+		return "VECTOR_PROJECTION";
+
 	case Type::OUTPUT:
 		return "OUTPUT";
 
