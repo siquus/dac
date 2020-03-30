@@ -68,6 +68,16 @@ static bool hasDublicates(const std::vector<T> &vec)
 	return false;
 }
 
+static void printVector(const std::vector<uint32_t> &vec)
+{
+	printf("(");
+	for(size_t index = 0; index < vec.size(); index++)
+	{
+		printf("%u ", vec[index]);
+	}
+	printf(")");
+}
+
 VectorSpace::VectorSpace(Ring::type_t ring, dimension_t dim)
 {
 	factors_.push_back(simpleVs_t{ring, dim});
@@ -444,6 +454,27 @@ const VectorSpace::Vector * VectorSpace::Element(Graph* graph, const KroneckerDe
 	return retVec;
 }
 
+void VectorSpace::Vector::PrintInfo() const {
+
+	const Node* thisNode = graph_->GetNode(nodeId_);
+	if(nullptr == thisNode)
+	{
+		Error("Could not find node!\n");
+	}
+
+	printf("NodeId: %u, Type: %s, Factor-Dim. (",
+			nodeId_,
+			thisNode->getName()	);
+
+	for(size_t factor = 0; factor < __space_->factors_.size(); factor++)
+	{
+		printf("%u ", __space_->factors_[factor].dim_);
+	}
+	printf(")");
+
+	printf("\n");
+}
+
 const VectorSpace::Vector* VectorSpace::Vector::Power(const Vector* vec, const std::vector<uint32_t> &lfactors, const std::vector<uint32_t> &rfactors) const
 {
 	if(graph_ != vec->graph_)
@@ -484,7 +515,11 @@ const VectorSpace::Vector* VectorSpace::Vector::Power(const Vector* vec, const s
 
 		if(__space_->factors_[lfactors[index]].dim_ != __space_->factors_[rfactors[index]].dim_)
 		{
-			Error("At least one contraction index-pair has different dimension!\n");
+			Error("At least one contraction index-pair has different dimension! Factor %u with %u, |lFactor| = %u, |rFactor| = %u\n",
+					lfactors[index], rfactors[index],
+					__space_->factors_[lfactors[index]].dim_,
+					vec->__space_->factors_[rfactors[index]].dim_);
+
 			return nullptr;
 		}
 	}
@@ -896,6 +931,12 @@ const VectorSpace::Vector* VectorSpace::Vector::CreateDerivative(std::map<Node::
 			return nullptr;
 		}
 
+		const Node* fctNode = currentVec->graph_->GetNode(currentVec->nodeId_);
+		printf("DepNode %u ParNode %u: Calculating derivative of %s (id %u) w.r.t. %s (id %u)\n",
+				depNodeId, parentId,
+				fctNode->getName(), fctNode->id,
+				parentNode->getName(), parentNode->id);
+
 		if(Node::ObjectType::MODULE_VECTORSPACE_VECTOR != parentNode->objectType)
 		{
 			Error("Can't take derivative w.r.t. non-vector node of object type %u!\n",
@@ -905,33 +946,62 @@ const VectorSpace::Vector* VectorSpace::Vector::CreateDerivative(std::map<Node::
 
 		// TODO: Check for Null returns
 		const Vector * parentVec = (const Vector *) parentNode->object;
+
 		const Vector * derivativeVec = CreateDerivative(currentVec, parentVec);
+		if(nullptr == derivativeVec)
+		{
+			Error("Could not get derivative of %s!\n", parentNode->getName());
+		}
 
 		if(depNodeId != parentId)
 		{
+			printf("\nTaking derivative of:\n");
+			parentVec->PrintInfo();
+
 			// Call this function recursively if parent is not the variable w.r.t. which
 			// the derivative is calculated
-			const Vector * currentVecChainDerivative = CreateDerivative(depNodes, parentVec, depNodeId);
+			const Vector * innerDerivative = CreateDerivative(depNodes, parentVec, depNodeId);
+			if(nullptr == innerDerivative)
+			{
+				Error("Failed to CreateDerivative!\n");
+				return nullptr;
+			}
 
-			// Products are an exception, as these are not contracted.
-			if((Node::Type::VECTOR_SCALAR_PRODUCT != parentNode->type) &&
-					(Node::Type::VECTOR_VECTOR_PRODUCT != parentNode->type) &&
-					(Node::Type::VECTOR_POWER != parentNode->type))
+			printf("Got:\n");
+			innerDerivative->PrintInfo();
+			printf("\n");
+
+			if(1 != derivativeVec->__space_->GetDim()) // i.e. if a scalar function is derived w.r.t. vector argument
 			{
 				std::vector<uint32_t> lfactors(parentVec->__space_->factors_.size());
-				std::iota(lfactors.begin(), lfactors.end(), 0);
+				std::iota(lfactors.begin(), lfactors.end(),
+						innerDerivative->__space_->factors_.size() - parentVec->__space_->factors_.size());
 
 				std::vector<uint32_t> rfactors(parentVec->__space_->factors_.size());
-				std::iota(rfactors.begin(), rfactors.end(),
-						currentVecChainDerivative->__space_->factors_.size() - lfactors.size());
+				std::iota(rfactors.begin(), rfactors.end(), 0);
 
-				derivativeVec = derivativeVec->Contract(
-						currentVecChainDerivative,
+				printf("Contracting ");
+				printVector(lfactors);
+				printVector(rfactors);
+				printf(":\n");
+
+				innerDerivative->PrintInfo();
+				derivativeVec->PrintInfo();
+				printf("\n");
+
+				derivativeVec = innerDerivative->Contract(
+						derivativeVec,
 						lfactors, rfactors);
+
+				if(nullptr == derivativeVec)
+				{
+					Error("Contraction failed!\n");
+					return nullptr;
+				}
 			}
 			else
 			{
-				derivativeVec = derivativeVec->Multiply(currentVecChainDerivative);
+				derivativeVec = innerDerivative->Multiply(derivativeVec);
 			}
 		}
 
@@ -946,7 +1016,7 @@ const VectorSpace::Vector* VectorSpace::Vector::CreateDerivative(std::map<Node::
 
 		if(nullptr == summandVec)
 		{
-			Error("Could not create derivative!\n");
+			Error("Could not create derivative! Failed at %s.\n", parentNode->getName());
 			return nullptr;
 		}
 	}
@@ -1027,7 +1097,11 @@ const VectorSpace::Vector* VectorSpace::Vector::Contract(const Vector* vec, cons
 
 		if(__space_->factors_[lfactors[index]].dim_ != vec->__space_->factors_[rfactors[index]].dim_)
 		{
-			Error("At least one contraction index-pair has different dimension!\n");
+			Error("At least one contraction index-pair has different dimension! Factor %u with %u, |lFactor| = %u, |rFactor| = %u\n",
+					lfactors[index], rfactors[index],
+					__space_->factors_[lfactors[index]].dim_,
+					vec->__space_->factors_[rfactors[index]].dim_);
+
 			return nullptr;
 		}
 	}
@@ -1336,6 +1410,82 @@ const VectorSpace::Vector* VectorSpace::Vector::Permute(const std::vector<uint32
 	return retVec;
 }
 
+const VectorSpace::Vector* VectorSpace::Vector::ProjectDerivative(const Vector* vecValuedFct, const Vector* arg)
+{
+	if(Ring::Float32 != arg->__space_->GetRing())
+	{
+		Error("Non implemented!\n");
+		return nullptr;
+	}
+
+	const Node * fctNode = vecValuedFct->graph_->GetNode(vecValuedFct->nodeId_);
+	if(nullptr == fctNode)
+	{
+		Error("Could not find node!\n");
+		return nullptr;
+	}
+
+	const projectParameters_t * projParam = (const projectParameters_t *) fctNode->typeParameters;
+
+	auto retSpace = new VectorSpace(std::vector<const VectorSpace*>{arg->__space_, vecValuedFct->__space_});
+
+	// Create new vector "blackWhiteArg" of arg-type: All proj. values are = 1, others = 0
+	// Construct dProjection/darg = delta_{darg-indices, arg-indices} blackWhiteArg_{arg-indices} (no sum)
+	// TODO: Have to construct this manually. Would be cheaper to have an operation
+	// delta_ij a_jkl (no sum over j).
+	// Or to use a sparse initializer.
+	auto initializer = new std::vector<float>(retSpace->GetDim(), 0);
+
+	std::vector<uint32_t> strides;
+	retSpace->GetStrides(&strides);
+
+	for(size_t index = 0; index < initializer->size(); index++)
+	{
+		std::vector<uint32_t> coord(retSpace->factors_.size());
+		coord[0] = index / strides[0];
+
+		for(size_t factor = 1; factor < arg->__space_->factors_.size(); factor++)
+		{
+			coord[factor] = (index % strides[factor - 1]) / strides[factor];
+		}
+
+		bool inRange = true;
+		for(size_t argFactor = 0; argFactor < projParam->range.size(); argFactor++)
+		{
+			if((projParam->range[argFactor].first > coord[argFactor + coord.size() / 2]) ||
+					(projParam->range[argFactor].second < coord[argFactor + coord.size() / 2]))
+			{
+				inRange = false;
+				break;
+			}
+		}
+
+
+		if(inRange &&
+				(std::equal(coord.begin(), coord.end() - coord.size() / 2, coord.end() - coord.size() / 2)))
+		{
+			initializer->at(index) = 1;
+		}
+	}
+
+	propertyParameterSparse_t paramSparse;
+	paramSparse.Initializer = paramSparse.DENSE;
+
+	const VectorSpace::Vector* retVec = retSpace->Element(
+			arg->graph_,
+			*initializer,
+			Property::Sparse,
+			&paramSparse);
+
+	if(nullptr == retVec)
+	{
+		Error("Could not create vector!\n");
+		return nullptr;
+	}
+
+	return retVec;
+}
+
 const VectorSpace::Vector* VectorSpace::Vector::PowerDerivative(const Vector* vecValuedFct, const Vector* arg)
 {
 	// Derivative w.r.t. base?
@@ -1637,9 +1787,16 @@ const VectorSpace::Vector* VectorSpace::Vector::AddDerivative(const Vector* vecV
 		return nullptr;
 	}
 
+	bool argIsScalar = (1 == arg->__space_->GetDim());
+	if(argIsScalar)
+	{
+		// Do not add indices with Kronecker, but simply return identity.
+		return vecValuedFct->__space_->Scalar(vecValuedFct->graph_, 1.0f); // TODO: Only works for float
+	}
+
 	retVec->__space_ = new VectorSpace(factors);
 
-	// Derivative of Add is easy: Just the product of Kronecker Deltas
+	// General derivative of Add is easy: Just the product of Kronecker Deltas
 	Node node;
 	node.type = Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT;
 	KroneckerDeltaParameters_t * opParameters = new KroneckerDeltaParameters_t;
@@ -1753,9 +1910,9 @@ VectorSpace::VectorSpace(const std::vector<simpleVs_t> &factors)
 	factors_ = factors;
 }
 
-VectorSpace::VectorSpace(std::initializer_list<const VectorSpace*> list)
+VectorSpace::VectorSpace(std::vector<const VectorSpace*> vSpaces)
 {
-	for(const VectorSpace * vSpace: list)
+	for(const VectorSpace * vSpace: vSpaces)
 	{
 		factors_.insert(factors_.end(), vSpace->factors_.begin(), vSpace->factors_.end());
 	}

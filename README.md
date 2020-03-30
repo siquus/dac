@@ -32,6 +32,9 @@ E.g. if only a few dozen vector/matrix operations in a few dimensions is require
 - 
 
 ## TODO
+- [ ]	For debugging, NodeRefs should implement PrintInfo()
+- [ ]	Get rid again of homomorphism?
+- [ ]	Every contraction/product with kronecker makes vector sparse
 - [ ]	Make vector properties a map<property, const void *>
 - [ ]	Error cnt in code generator accessible to user.
 - [ ]   Put initializer values into separate header? they can become very long.

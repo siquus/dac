@@ -12,7 +12,6 @@
 #include <vector>
 #include <map>
 #include <set>
-#include <initializer_list>
 
 #include "GlobalDefines.h"
 #include "Graph.h"
@@ -32,7 +31,7 @@ public:
 	VectorSpace(Ring::type_t ring, dimension_t dim);
 	VectorSpace(Ring::type_t ring, const std::vector<dimension_t> &dimensions);
 	VectorSpace(const std::vector<simpleVs_t> &factors); // TODO: Don'T expose simpleVs.
-	VectorSpace(std::initializer_list<const VectorSpace*> list);
+	VectorSpace(std::vector<const VectorSpace*> vSpaces);
 	VectorSpace(const VectorSpace &vSpace, size_t nTimes);
 
 	// Vector space created by the tensor product of given factors
@@ -51,6 +50,8 @@ public:
 	public:
 		const VectorSpace * __space_;
 		const void* __value_ = nullptr;
+
+		void PrintInfo() const;
 
 		// TODO: Make these operators derived classes?
 		// Then we don't have to weirdly hand over the argument order and stuff. They could carry a pointer to their derivative.
@@ -130,6 +131,7 @@ public:
 		static const Vector* PermuteDerivative(const Vector* vecValuedFct, const Vector* arg);
 		static const Vector* MultiplyDerivative(const Vector* vecValuedFct, const Vector* arg);
 		static const Vector* PowerDerivative(const Vector* vecValuedFct, const Vector* arg);
+		static const Vector* ProjectDerivative(const Vector* vecValuedFct, const Vector* arg);
 	};
 
 	template<typename T>

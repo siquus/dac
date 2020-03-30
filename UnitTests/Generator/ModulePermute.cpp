@@ -20,7 +20,7 @@ bool ModulePermute::Generate(const std::string &path)
 	auto myVs = Algebra::Module::VectorSpace(Algebra::Ring::Float32, 3);
 
 	// Matrix transpose
-	auto myMatrixSpace = Algebra::Module::VectorSpace({&myVs, &myVs});
+	auto myMatrixSpace = Algebra::Module::VectorSpace(myVs, 2);
 
 	auto matrix_init = std::vector<float>{1, 2, 3, 4, 5, 6, 7, 8, 9};
 	auto matrix = myMatrixSpace.Element(&graph, matrix_init);

@@ -124,6 +124,11 @@ bool Graph::AddParent(Node::Id_t parent, Node::Id_t child)
 	return false;
 }
 
+const char * Node::getName() const
+{
+	return getName(type);
+}
+
 const char* Node::getName(Type type)
 {
 	switch(type)

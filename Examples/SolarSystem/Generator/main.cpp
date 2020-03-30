@@ -390,7 +390,7 @@ int main()
 
 	auto dH = hamiltonian->Derivative(state);
 
-	auto X_H = symplecticMatrix->Contract(dH, 1, 0);
+	auto X_H __attribute__((unused)) = symplecticMatrix->Contract(dH, 1, 0);
 
 	// Generate Code
 

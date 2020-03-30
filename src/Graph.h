@@ -29,7 +29,9 @@ public:
 		CONTROL_TRANSFER_WHILE,
 	};
 
+	// TODO: Should be called getTypeStr or so
 	static const char* getName(Type type);
+	const char * getName() const;
 
 	enum class ObjectType {
 		NONE,
