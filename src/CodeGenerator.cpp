@@ -455,6 +455,7 @@ bool CodeGenerator::GenerateInstructions()
 		case Node::Type::VECTOR_COMPARISON_IS_SMALLER: // no break intended
 		case Node::Type::VECTOR_PERMUTATION: // no break intended
 		case Node::Type::VECTOR_PROJECTION: // no break intended
+		case Node::Type::VECTOR_JOIN_INDICES: // no break intended
 		case Node::Type::OUTPUT:
 			break; // create instruction
 		}
@@ -687,6 +688,11 @@ bool CodeGenerator::GenerateOperationCode(const Node* node, FileWriter * file)
 	case Node::Type::VECTOR_VECTOR_PRODUCT:
 		retFalseOnFalse(VectorVectorProductCode(node, file),
 				"Could not generate Vector Vector Product Code!\n");
+		break;
+
+	case Node::Type::VECTOR_JOIN_INDICES:
+		retFalseOnFalse(VectorJoinIndicesCode(node, file),
+						"Could not generate Vector Join Indices Code!\n");
 		break;
 
 	case Node::Type::VECTOR_COMPARISON_IS_SMALLER:
@@ -1947,6 +1953,135 @@ bool CodeGenerator::VectorVectorProductCode(const Node* node, FileWriter * file,
 	fprintProtect(file->PrintfLine(product.c_str()));
 
 	fprintProtect(file->PrintfLine(""));
+
+	file->Outdent();
+	fprintProtect(file->PrintfLine("}"));
+
+	return true;
+}
+
+bool CodeGenerator::VectorJoinIndicesCode(const Node* node, FileWriter * file)
+{
+	file->PrintfLine("// %s\n", __func__);
+
+	const Algebra::Module::VectorSpace::Vector::joinIndicesParameters_t * param = (const Algebra::Module::VectorSpace::Vector::joinIndicesParameters_t *) node->typeParameters;
+
+	getVarRetFalseOnError(varOp, node->id);
+	getVarRetFalseOnError(varArg, node->parents[0]);
+
+	const auto argNode = nodeMap_.find(node->parents[0]);
+	if(nodeMap_.end() == argNode)
+	{
+		Error("Could not find Node for id %u\n", node->parents[0]);
+		return false;
+	}
+
+	const Algebra::Module::VectorSpace::Vector* vecArg = (const Algebra::Module::VectorSpace::Vector*) argNode->second->object;
+	const Algebra::Module::VectorSpace::Vector* vecOp = (const Algebra::Module::VectorSpace::Vector*) node->object;
+
+	std::vector<uint32_t> opStrides;
+	vecOp->__space_->GetStrides(&opStrides);
+	const char opstridesId[] = "opStrides";
+	fprintProtect(file->PrintfLine("const uint32_t %s[] = {", opstridesId));
+	for(const uint32_t &stride: opStrides)
+	{
+		fprintProtect(file->PrintfLine("\t %u,", stride));
+	}
+	fprintProtect(file->PrintfLine("};\n"));
+
+	std::vector<uint32_t> argStrides;
+	vecArg->__space_->GetStrides(&argStrides);
+	const char argstridesId[] = "argStrides";
+	fprintProtect(file->PrintfLine("const uint32_t %s[] = {", argstridesId));
+	for(const uint32_t &stride: argStrides)
+	{
+		fprintProtect(file->PrintfLine("\t %u,", stride));
+	}
+	fprintProtect(file->PrintfLine("};"));
+
+	fprintProtect(file->PrintfLine("for(int opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
+			varOp->GetIdentifier()->c_str(), varOp->GetIdentifier()->c_str()));
+	fprintProtect(file->PrintfLine("{"));
+	file->Indent();
+
+	std::string opIndexTuple = "const uint32_t opIndexTuple[] = {";
+	for(uint32_t stride = 0; stride < opStrides.size(); stride++)
+	{
+		if(0 == stride)
+		{
+			opIndexTuple += "opIndex / ";
+			opIndexTuple += opstridesId;
+			opIndexTuple += "[";
+			opIndexTuple += std::to_string(stride);
+			opIndexTuple += "]";
+			opIndexTuple += ", ";
+		}
+		else
+		{
+			opIndexTuple += "(opIndex % opStrides[";
+			opIndexTuple += std::to_string(stride - 1);
+			opIndexTuple += "]) / opStrides[";
+			opIndexTuple += std::to_string(stride);
+			opIndexTuple += "], ";
+		}
+	}
+	opIndexTuple.erase(opIndexTuple.end() - 2, opIndexTuple.end()); // remove last ", "
+	opIndexTuple += "};";
+
+	fprintProtect(file->PrintfLine("%s", opIndexTuple.c_str()));
+
+	std::vector<uint32_t> opIndexPos(param->Indices.size(), UINT32_MAX);
+	std::string argIndexTuple = "const uint32_t argIndexTuple[] = {";
+	for(uint32_t dim = 0; dim < vecArg->__space_->factors_.size(); dim++)
+	{
+		argIndexTuple += "opIndexTuple[";
+
+		// Is the factor joined?
+		size_t joinedIndices;
+		for(joinedIndices = 0; joinedIndices < param->Indices.size(); joinedIndices++)
+		{
+			auto it = std::find(param->Indices[joinedIndices].begin(), param->Indices[joinedIndices].end(), dim);
+
+			if(param->Indices[joinedIndices].end() != it) // Index is joined
+			{
+				if(param->Indices[joinedIndices].begin() == it) // Set op position of this index
+				{
+					opIndexPos[joinedIndices] = dim;
+				}
+
+				break; // Found index, no need to search further.
+			}
+		}
+
+		if(param->Indices.size() <= joinedIndices) // index not joined
+		{
+			argIndexTuple += std::to_string(dim);
+		}
+		else
+		{
+			argIndexTuple += std::to_string(opIndexPos[joinedIndices]);
+		}
+
+		argIndexTuple += "], ";
+	}
+
+	argIndexTuple.erase(argIndexTuple.end() - 2, argIndexTuple.end()); // remove last ", "
+	argIndexTuple += "};\n";
+	fprintProtect(file->PrintfLine(argIndexTuple.c_str()));
+
+	std::string equationStr = *varOp->GetIdentifier() + "[opIndex] = ";
+	equationStr += *varArg->GetIdentifier() + "[";
+
+	for(uint32_t argIndex = 0; argIndex < vecArg->__space_->factors_.size(); argIndex++)
+	{
+		equationStr += "argIndexTuple[" +
+				std::to_string(argIndex) + "] * "
+				+  argstridesId + "[" +  std::to_string(argIndex) + "] + ";
+	}
+	equationStr.erase(equationStr.end() - 3, equationStr.end()); // remove last " +"
+	equationStr += "];";
+
+	fprintProtect(file->PrintfLine(equationStr.c_str()));
 
 	file->Outdent();
 	fprintProtect(file->PrintfLine("}"));

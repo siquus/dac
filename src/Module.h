@@ -67,12 +67,13 @@ public:
 		const Vector* Power(inType exp) const; // element-wise power, e.g. c_ij^2 = c_ij * c_ij (no sum)
 		const Vector* Power(const Vector* vec) const; // element-wise power, e.g. c_ij^2 = c_ij * c_ij (no sum)
 		const Vector* Power(const Vector* vec, const std::vector<uint32_t> &lfactors, const std::vector<uint32_t> &rfactors) const; // contraction power, e.g. B_ij^n = A_ij = B_ik B_kl B_lo ... n times
+
 		const Vector* IsSmaller(const Vector* vec) const;
 
 		typedef struct {
 			std::vector<uint32_t> lfactors;
 			std::vector<uint32_t> rfactors;
-		} contractValue_t;
+		} contractValue_t; // TODO: Not used here! Move!
 
 		const Vector* Contract(const Vector* vec, uint32_t lfactor = 0, uint32_t rfactor = 0) const;
 		const Vector* Contract(const Vector* vec, const std::vector<uint32_t> &lfactors, const std::vector<uint32_t> &rfactors) const;
@@ -87,6 +88,11 @@ public:
 		} projectParameters_t; // TODO: Not used here! Move!
 		const Vector* Project(const std::vector<std::pair<uint32_t, uint32_t>> &range) const; // I.e. new, smaller vector has only the indices in range.
 		const Vector* Project(const std::pair<uint32_t, uint32_t> &range) const; // I.e. new, smaller vector has only the indices in range.
+
+		typedef struct {
+			std::vector<std::vector<uint32_t>> Indices; // sorted, small to large
+		} joinIndicesParameters_t; // TODO: Not used here! Move!
+		const Vector* JoinIndices(std::vector<std::vector<uint32_t>> &indices) const; // B_ik = JoinIndices(A_ijk, {0, 1})= A_iik (no sum)
 
 		const Vector* Derivative(const Vector* vec) const;
 

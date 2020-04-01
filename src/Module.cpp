@@ -52,7 +52,7 @@ template const VectorSpace::Vector* VectorSpace::Vector::Power<float>(float exp)
 template const VectorSpace::Vector* VectorSpace::Vector::Multiply<float>(float factor) const;
 
 template<typename T>
-static bool hasDublicates(const std::vector<T> &vec)
+static bool hasDuplicates(const std::vector<T> &vec)
 {
 	std::set<T> valueSet;
 
@@ -477,6 +477,7 @@ void VectorSpace::Vector::PrintInfo() const {
 
 const VectorSpace::Vector* VectorSpace::Vector::Power(const Vector* vec, const std::vector<uint32_t> &lfactors, const std::vector<uint32_t> &rfactors) const
 {
+	// TODO: Catch exponent of 0?
 	if(graph_ != vec->graph_)
 	{
 		Error("Not on the same Graph!\n");
@@ -525,7 +526,7 @@ const VectorSpace::Vector* VectorSpace::Vector::Power(const Vector* vec, const s
 	}
 
 	// Check for dublicate indices
-	if(hasDublicates(lfactors) || hasDublicates(rfactors))
+	if(hasDuplicates(lfactors) || hasDuplicates(rfactors))
 	{
 		Error("Dublicate contraction factors!\n");
 		return nullptr;
@@ -558,11 +559,14 @@ const VectorSpace::Vector* VectorSpace::Vector::Power(const Vector* vec, const s
 template<typename inType>
 const VectorSpace::Vector* VectorSpace::Vector::Power(inType exp) const
 {
+	// TODO: Catch exponent of 0?
 	return Power(__space_->Scalar(graph_, exp));
 }
 
 const VectorSpace::Vector* VectorSpace::Vector::Power(const Vector* vec) const
 {
+	// TODO: Catch exponent of 0?
+
 	if(graph_ != vec->graph_)
 	{
 		Error("Not on the same Graph!\n");
@@ -721,6 +725,104 @@ const VectorSpace::Vector* VectorSpace::Vector::Multiply(const Vector* vec) cons
 	node.type = Node::Type::VECTOR_VECTOR_PRODUCT;
 	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
 	node.object = retVec;
+
+	retVec->nodeId_ = graph_->AddNode(&node);
+
+	if(Node::ID_NONE == retVec->nodeId_)
+	{
+		Error("Could not add Node!\n");
+		return nullptr;
+	}
+
+	return retVec;
+}
+
+const VectorSpace::Vector* VectorSpace::Vector::JoinIndices(std::vector<std::vector<uint32_t>> &indices) const
+{
+	std::vector<uint32_t> indicesLinear;
+	for(const auto &joinedIndices: indices)
+	{
+		for(const uint32_t &index: joinedIndices)
+		{
+			if(__space_->factors_.size() <= index)
+			{
+				Error("Supplied index is larger than available factors!\n");
+				return nullptr;
+			}
+
+			indicesLinear.push_back(index);
+		}
+	}
+
+	if(hasDuplicates(indicesLinear))
+	{
+		Error("Duplicate indices specified!\n");
+		return nullptr;
+	}
+
+	// Check that all joined indices have same dimension
+	for(const auto &joinedIndices: indices)
+	{
+		const uint32_t indexDim = __space_->factors_[joinedIndices[0]].dim_;
+		for(const uint32_t &index: joinedIndices)
+		{
+			if(indexDim != __space_->factors_[index].dim_)
+			{
+				Error("Not all specified indices have same dimension!\n");
+				return nullptr;
+			}
+		}
+	}
+
+	// Sort joined indices
+	for(auto &joinedIndices: indices)
+	{
+		std::sort(joinedIndices.begin(), joinedIndices.end());
+	}
+
+	std::vector<simpleVs_t> vsFactors;
+	for(size_t factor = 0; factor < __space_->factors_.size(); factor++)
+	{
+		// Check if the factor is joined
+		bool addFactor = true;
+		for(size_t joinedIndices = 0; joinedIndices < indices.size(); joinedIndices++)
+		{
+			const auto factorIt = std::find(indices[joinedIndices].begin(), indices[joinedIndices].end(), factor);
+
+			if(indices[joinedIndices].end() != factorIt) // This is a joined index
+			{
+				if(indices[joinedIndices].begin() != factorIt) // Factor for joined index is added at the position of the lowest index
+				{
+					addFactor = false;
+				}
+
+				break; // We found the index, don't need to search in other joinedIndices.
+			}
+		}
+
+		if(addFactor)
+		{
+			vsFactors.push_back(__space_->factors_[factor]);
+		}
+	}
+
+	VectorSpace * retSpace = new VectorSpace(vsFactors);
+
+	Vector* retVec = new Vector;
+	retVec->graph_ = graph_;
+	retVec->__space_ = retSpace;
+
+	Node node;
+	node.parents.push_back(nodeId_);
+	node.type = Node::Type::VECTOR_JOIN_INDICES;
+	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
+	node.object = retVec;
+
+	joinIndicesParameters_t * param = new joinIndicesParameters_t;
+	param->Indices = indices;
+	std::sort(param->Indices.begin(), param->Indices.end());
+
+	node.typeParameters = param;
 
 	retVec->nodeId_ = graph_->AddNode(&node);
 
@@ -1107,7 +1209,7 @@ const VectorSpace::Vector* VectorSpace::Vector::Contract(const Vector* vec, cons
 	}
 
 	// Check for dublicate indices
-	if(hasDublicates(lfactors) || hasDublicates(rfactors))
+	if(hasDuplicates(lfactors) || hasDuplicates(rfactors))
 	{
 		Error("Dublicate contraction factors!\n");
 		return nullptr;
@@ -1365,7 +1467,7 @@ const VectorSpace::Vector* VectorSpace::Vector::Project(const std::vector<std::p
 
 const VectorSpace::Vector* VectorSpace::Vector::Permute(const std::vector<uint32_t> &indices) const
 {
-	if(hasDublicates(indices))
+	if(hasDuplicates(indices))
 	{
 		Error("Dublicate permute indices!\n");
 		return nullptr;
@@ -1488,7 +1590,8 @@ const VectorSpace::Vector* VectorSpace::Vector::ProjectDerivative(const Vector* 
 
 const VectorSpace::Vector* VectorSpace::Vector::PowerDerivative(const Vector* vecValuedFct, const Vector* arg)
 {
-	// Derivative w.r.t. base?
+	// TODO: Catch exponent of 1?
+
 	const Node * fctNode = vecValuedFct->graph_->GetNode(vecValuedFct->nodeId_);
 	if(nullptr == fctNode)
 	{
@@ -1515,42 +1618,88 @@ const VectorSpace::Vector* VectorSpace::Vector::PowerDerivative(const Vector* ve
 
 	bool derivativeWrtBase = (fctNode->parents[0] == arg->nodeId_);
 
-	if(derivativeWrtBase)
+	if(!derivativeWrtBase)
 	{
-		// d/db b^e = e * b^(e-1)
-		const Vector* minusOne = expVector->__space_->Scalar(expVector->graph_, -1.f);
-		if(nullptr == minusOne)
-		{
-			Error("Could not create scalar!\n");
-			return nullptr;
-		}
+		Error("Taking derivative w.r.t. exponent is not implemented!\n");
+		return nullptr;
+	}
 
-		const Vector * exponent = expVector->Add(minusOne);
-		if(nullptr == exponent)
-		{
-			Error("Could not add!\n");
-			return nullptr;
-		}
+	// d/db b^e = e * b^(e-1)
+	const Vector* minusOne = expVector->__space_->Scalar(expVector->graph_, -1.f);
+	if(nullptr == minusOne)
+	{
+		Error("Could not create scalar!\n");
+		return nullptr;
+	}
 
-		const Vector* power = baseVector->Power(exponent);
-		if(nullptr == power)
-		{
-			Error("Could not take power!\n");
-			return nullptr;
-		}
+	const Vector * exponent = expVector->Add(minusOne);
+	if(nullptr == exponent)
+	{
+		Error("Could not add!\n");
+		return nullptr;
+	}
 
-		const Vector* derivative = expVector->Multiply(power);
-		if(nullptr == derivative)
-		{
-			Error("Could not multiply!\n");
-			return nullptr;
-		}
+	const Vector* power = baseVector->Power(exponent);
+	if(nullptr == power)
+	{
+		Error("Could not take power!\n");
+		return nullptr;
+	}
 
+	const Vector* derivative = expVector->Multiply(power);
+	if(nullptr == derivative)
+	{
+		Error("Could not multiply!\n");
+		return nullptr;
+	}
+
+	// If this is the scalar case, we are done!
+	if(1 == derivative->__space_->GetDim())
+	{
 		return derivative;
 	}
 
-	Error("Taking derivative w.r.t. exponent is not implemented!\n");
-	return nullptr;
+	// d(a_ijk^2) / d(a_lmn) = 2 * delta_li * delta_mj * delta_nk * a_ijk (no sum)
+	// Multiply with Kronecker
+	KroneckerDeltaParameters_t kronParameters;
+	kronParameters.DeltaPair.resize(2 * arg->__space_->factors_.size());
+
+	for(size_t deltaFactor = 0; deltaFactor < kronParameters.DeltaPair.size() / 2; deltaFactor++)
+	{
+		kronParameters.DeltaPair[deltaFactor] = deltaFactor + kronParameters.DeltaPair.size() / 2;
+		kronParameters.DeltaPair[deltaFactor + kronParameters.DeltaPair.size() / 2] = deltaFactor;
+	}
+
+	VectorSpace * kronVectorSpace = new VectorSpace(*arg->__space_, 2);
+
+	const Vector * kronVec = kronVectorSpace->Element(arg->graph_, kronParameters);
+	if(nullptr == kronVec)
+	{
+		Error("Could not create Kronecker\n");
+		return nullptr;
+	}
+
+	derivative = kronVec->Multiply(derivative);
+	if(nullptr == derivative)
+	{
+		Error("Could not multiply\n");
+		return nullptr;
+	}
+
+	// The second half of the Kronecker indices join the function indices in the back
+	std::vector<std::vector<uint32_t>> indicesToJoin;
+	for(size_t FacToJoin = 0; FacToJoin < arg->__space_->factors_.size(); FacToJoin++)
+	{
+		indicesToJoin.push_back(
+				std::vector<uint32_t>{
+					(uint32_t) (arg->__space_->factors_.size() + FacToJoin),
+					(uint32_t) (2 * arg->__space_->factors_.size() + FacToJoin)});
+	}
+
+
+	derivative = derivative->JoinIndices(indicesToJoin);
+
+	return derivative;
 }
 
 const VectorSpace::Vector* VectorSpace::Vector::MultiplyDerivative(const Vector* vecValuedFct, const Vector* arg)

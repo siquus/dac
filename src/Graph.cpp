@@ -163,6 +163,9 @@ const char* Node::getName(Type type)
 	case Type::VECTOR_PROJECTION:
 		return "VECTOR_PROJECTION";
 
+	case Type::VECTOR_JOIN_INDICES:
+		return "VECTOR_JOIN_INDICES";
+
 	case Type::OUTPUT:
 		return "OUTPUT";
 
