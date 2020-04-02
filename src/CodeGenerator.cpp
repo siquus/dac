@@ -1421,6 +1421,66 @@ bool CodeGenerator::VectorComparisonIsSmallerCode(const Node* node, FileWriter *
 	return true;
 }
 
+bool CodeGenerator::GetRootAncestorInstructionPositions(std::set<uint32_t> * instructionPos, Node::Id_t child)
+{
+	// Get root ancestors. Those won't be instructions
+	std::set<Node::Id_t> rootAncestors;
+	bool success = graph_->GetRootAncestors(&rootAncestors, child);
+	if(!success)
+	{
+		Error("Could not get root ancestors!\n");
+		return false;
+	}
+
+	// Get all of rootAncestor's children
+	std::set<Node::Id_t> rootAncesorChildren;
+	for(const Node::Id_t &rootId: rootAncestors)
+	{
+		const Node * rootNode = graph_->GetNode(rootId);
+
+		for(const Node::Id_t &rootChildId: rootNode->children)
+		{
+			rootAncesorChildren.insert(rootChildId);
+		}
+	}
+
+	// Get all children who do not depend on non-root parents
+	std::set<Node::Id_t> rootChildren;
+	for(const Node::Id_t &childId: rootAncesorChildren)
+	{
+		const Node * rootNode = graph_->GetNode(childId);
+
+		bool allParentsRoot = true;
+		for(const Node::Id_t &parentId: rootNode->parents)
+		{
+			if(rootAncestors.end() == rootAncestors.find(parentId))
+			{
+				allParentsRoot = false;
+				break;
+			}
+		}
+
+		if(allParentsRoot)
+		{
+			rootChildren.insert(childId);
+		}
+	}
+
+	for(const Node::Id_t rootChildId: rootChildren)
+	{
+		const auto &arrayPos = nodeArrayPos_.find(rootChildId);
+		if(nodeArrayPos_.end() == arrayPos)
+		{
+			Error("Couldn't find array position for Node%u\n", rootChildId);
+			return false;
+		}
+
+		instructionPos->insert(arrayPos->second);
+	}
+
+	return true;
+}
+
 bool CodeGenerator::ControlTransferWhileCode(const Node* node, FileWriter * file)
 {
 	file->PrintfLine("// %s\n", __func__);
@@ -1435,31 +1495,75 @@ bool CodeGenerator::ControlTransferWhileCode(const Node* node, FileWriter * file
 
 	const auto * ctWhile = (ControlTransfer::While*) node->object;
 
-	const auto &arrayPosTrue = nodeArrayPos_.find(ctWhile->getTrueNode());
-	if(nodeArrayPos_.end() == arrayPosTrue)
+	std::set<uint32_t> arrayPosTrue;
+	if(Node::ID_NONE != ctWhile->getTrueNode())
 	{
-		Error("Couldn't find array position for Node%u\n",
-				ctWhile->getTrueNode());
+		bool success = GetRootAncestorInstructionPositions(&arrayPosTrue, ctWhile->getTrueNode());
+		if(!success)
+		{
+			Error("Could not get root ancestor instructions!\n");
+			return false;
+		}
+	}
 
+	std::set<uint32_t> arrayPosFalse;
+	if(Node::ID_NONE != ctWhile->getFalseNode())
+	{
+		bool success = GetRootAncestorInstructionPositions(&arrayPosFalse, ctWhile->getFalseNode());
+		if(!success)
+		{
+			Error("Could not get root ancestor instructions!\n");
+			return false;
+		}
+	}
+
+	// Add the condition to the instruction calculated when true
+	std::set<uint32_t> arrayPosCondition;
+	bool success = GetRootAncestorInstructionPositions(&arrayPosCondition, node->parents[0]);
+	if(!success)
+	{
+		Error("Could not get root ancestor instructions!\n");
 		return false;
 	}
 
-	const auto &arrayPosFalse = nodeArrayPos_.find(ctWhile->getFalseNode());
-	if(nodeArrayPos_.end() == arrayPosFalse)
-	{
-		Error("Couldn't find array position for Node%u\n",
-				ctWhile->getTrueNode());
+	arrayPosTrue.insert(arrayPosCondition.begin(), arrayPosCondition.end());
 
-		return false;
-	}
-
+	// Print the instructions
 	fprintProtect(file->PrintfLine("if(%s)", varCond->GetIdentifier()->c_str()));
 	fprintProtect(file->PrintfLine("{"));
-	fprintProtect(file->PrintfLine("\tparam->addPossiblyDeferredNode(param->instance, &nodes%s[%u]);", graph_->Name().c_str(), arrayPosTrue->second));
+
+	if(arrayPosTrue.size())
+	{
+		for(const uint32_t &pos: arrayPosTrue)
+		{
+			fprintProtect(file->PrintfLine("\tparam->addPossiblyDeferredNode(param->instance, &nodes%s[%u]);",
+					graph_->Name().c_str(),
+					pos));
+		}
+	}
+	else
+	{
+		fprintProtect(file->PrintfLine("; // Do nothing"));
+	}
+
 	fprintProtect(file->PrintfLine("}"));
 	fprintProtect(file->PrintfLine("else"));
 	fprintProtect(file->PrintfLine("{"));
-	fprintProtect(file->PrintfLine("\tparam->addPossiblyDeferredNode(param->instance, &nodes%s[%u]);", graph_->Name().c_str(), arrayPosFalse->second));
+
+	if(arrayPosFalse.size())
+	{
+		for(const uint32_t &pos: arrayPosFalse)
+		{
+			fprintProtect(file->PrintfLine("\tparam->addPossiblyDeferredNode(param->instance, &nodes%s[%u]);",
+					graph_->Name().c_str(),
+					pos));
+		}
+	}
+	else
+	{
+		fprintProtect(file->PrintfLine("\t; // Do nothing"));
+	}
+
 	fprintProtect(file->PrintfLine("}"));
 
 	return true;

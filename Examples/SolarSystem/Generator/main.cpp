@@ -390,7 +390,32 @@ int main()
 
 	auto dH = hamiltonian->Derivative(state);
 
-	auto X_H __attribute__((unused)) = symplecticMatrix->Contract(dH, 1, 0);
+	auto X_H = symplecticMatrix->Contract(dH, 1, 0);
+
+	auto timeIncrement = X_H->__space_->Scalar(&graph, 1.f);
+	auto step = X_H->Multiply(timeIncrement);
+
+	auto newState = state->Add(step);
+	newState->StoreIn(state);
+
+	Interface::Output Output(&graph, "NewState");
+	Output.Set(newState);
+
+	auto iterationVs = Algebra::Module::VectorSpace(Algebra::Ring::Float32, 1); // TODO: Ring should be integer, but not implemented.
+
+	auto SimIterations = iterationVs.Scalar(&graph, 10000.f);
+	auto minusOne = iterationVs.Scalar(&graph, -1.f);
+
+	auto IterationCntDown = SimIterations->Add(minusOne);
+
+	std::vector<const NodeRef *> whileParents{&Output};
+
+	ControlTransfer::While While(&graph);
+	While.Set(
+			IterationCntDown,
+			whileParents,
+			&Output,
+			nullptr);
 
 	// Generate Code
 

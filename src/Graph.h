@@ -11,6 +11,7 @@
 #include <vector>
 #include <stdint.h>
 #include <string>
+#include <set>
 
 class Node {
 public:
@@ -86,6 +87,8 @@ public:
 	bool DeleteChildReferences(Node::Id_t child);
 	const std::string &Name() const;
 
+	bool GetRootAncestors(std::set<Node::Id_t> * rootParents, Node::Id_t child) const;
+
 private:
 	std::vector<Node> nodes_;
 	std::string name_;
@@ -99,7 +102,7 @@ public:
 	Node::Id_t nodeId_ = Node::ID_NONE;
 	Graph* graph_ = nullptr;
 
-	bool StoreIn(const NodeRef* nodeRef);
+	bool StoreIn(const NodeRef* nodeRef) const;
 };
 
 #endif /* SRC_GRAPH_H_ */

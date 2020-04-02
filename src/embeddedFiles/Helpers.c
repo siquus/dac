@@ -292,11 +292,17 @@ void * threadFunction(void * arg)
 			threads->threadActive[threadArrayIndex] = 1;
 
 			DPRINTF("Thread %2u: picking up Node %2u. ", threadArrayIndex, nodeJob->id);
-			DPRINTF("%2u Nodes remaining: ", threads->jobPool.jobsNrOf);
 
+			DPRINTF("%2u Nodes remaining: ", threads->jobPool.jobsNrOf);
 			for(uint32_t node = 0; node < threads->jobPool.jobsNrOf; node++)
 			{
 				DPRINTF("%u, ", (threads->jobPool.jobs[node])->id);
+			}
+
+			DPRINTF("%2u deferred Nodes remaining: ", threads->jobPool.deferredJobsNrOf);
+			for(uint32_t node = 0; node < threads->jobPool.deferredJobsNrOf; node++)
+			{
+				DPRINTF("%u, ", (threads->jobPool.deferredJobs[node])->id);
 			}
 
 			DPRINTF("\tThread active: ");

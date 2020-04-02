@@ -119,6 +119,8 @@ class CodeGenerator {
 	bool FetchVariables();
 	bool GetFirstNodesToExecute(std::set<Node::Id_t> * nodeSet);
 
+	bool GetRootAncestorInstructionPositions(std::set<uint32_t> * instructionPos, Node::Id_t child);
+
 	std::map<Node::Id_t, Variable> variables_;
 	Variable* GetVariable(Node::Id_t id);
 

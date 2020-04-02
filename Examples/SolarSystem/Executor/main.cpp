@@ -3,8 +3,17 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-int main() {
+#include "DacSolarSystem.h"
 
+static void StateCallbac(const float* pt, size_t size)
+{
+
+}
+
+int main()
+{
+	DacSolarSystemOutputCallbackNewState_Register(&StateCallbac);
+	DacSolarSystemRun(4);
 
 	return 0;
 }

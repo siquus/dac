@@ -181,7 +181,33 @@ const char* Node::getName(Type type)
 	return nullptr;
 }
 
-bool NodeRef::StoreIn(const NodeRef* nodeRef)
+bool Graph::GetRootAncestors(std::set<Node::Id_t> * rootParents, Node::Id_t child) const
+{
+	const Node * childNode = GetNode(child);
+	if(nullptr == childNode)
+	{
+		Error("Could not find child node!\n");
+		return false;
+	}
+
+	if(0 == childNode->parents.size())
+	{
+		rootParents->insert(childNode->id);
+		return true;
+	}
+
+	for(const auto &parentId: childNode->parents)
+	{
+		if(false == GetRootAncestors(rootParents, parentId))
+		{
+			return false;
+		}
+	}
+
+	return true;
+}
+
+bool NodeRef::StoreIn(const NodeRef* nodeRef) const
 {
 	if(nodeRef->graph_ != graph_)
 	{
