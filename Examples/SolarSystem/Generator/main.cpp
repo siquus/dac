@@ -401,12 +401,13 @@ int main()
 	Interface::Output Output(&graph, "NewState");
 	Output.Set(newState);
 
-	auto iterationVs = Algebra::Module::VectorSpace(Algebra::Ring::Float32, 1); // TODO: Ring should be integer, but not implemented.
+	auto iterationVs = Algebra::Module::VectorSpace(Algebra::Ring::Int32, 1);
 
-	auto SimIterations = iterationVs.Scalar(&graph, 10000.f);
-	auto minusOne = iterationVs.Scalar(&graph, -1.f);
+	auto SimIterations = iterationVs.Scalar(&graph, 1000);
+	auto minusOne = iterationVs.Scalar(&graph, -1);
 
 	auto IterationCntDown = SimIterations->Add(minusOne);
+	IterationCntDown->StoreIn(SimIterations);
 
 	std::vector<const NodeRef *> whileParents{&Output};
 

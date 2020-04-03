@@ -34,6 +34,7 @@ template const VectorSpace::Vector * VectorSpace::Element<float>(
 			const std::vector<const void *> &propertiesParameter) const;
 
 template const VectorSpace::Vector * VectorSpace::Scalar<float>(Graph * graph, const float &initializer) const;
+template const VectorSpace::Vector * VectorSpace::Scalar<int32_t>(Graph * graph, const int32_t &initializer) const;
 template const VectorSpace::Vector * VectorSpace::Homomorphism<float>(Graph* graph, const std::vector<float> &initializer) const;
 
 template const VectorSpace::Vector * VectorSpace::Homomorphism<float>(

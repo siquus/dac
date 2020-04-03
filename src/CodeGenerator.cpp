@@ -1536,7 +1536,7 @@ bool CodeGenerator::ControlTransferWhileCode(const Node* node, FileWriter * file
 	{
 		for(const uint32_t &pos: arrayPosTrue)
 		{
-			fprintProtect(file->PrintfLine("\tparam->addPossiblyDeferredNode(param->instance, &nodes%s[%u]);",
+			fprintProtect(file->PrintfLine("\tparam->PushNode(param->Instance, &nodes%s[%u]);",
 					graph_->Name().c_str(),
 					pos));
 		}
@@ -1554,7 +1554,7 @@ bool CodeGenerator::ControlTransferWhileCode(const Node* node, FileWriter * file
 	{
 		for(const uint32_t &pos: arrayPosFalse)
 		{
-			fprintProtect(file->PrintfLine("\tparam->addPossiblyDeferredNode(param->instance, &nodes%s[%u]);",
+			fprintProtect(file->PrintfLine("\tparam->PushNode(param->Instance, &nodes%s[%u]);",
 					graph_->Name().c_str(),
 					pos));
 		}

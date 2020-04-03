@@ -25,11 +25,11 @@ typedef struct node_s {
 	const uint16_t id;
 } node_t;
 
-typedef void (*addPossiblyDeferredNode_t)(void * instance, struct node_s * node);
+typedef void (*PushNode_t)(void * instance, struct node_s * node);
 
 typedef struct instructionParam_s {
-	void * instance;
-	addPossiblyDeferredNode_t addPossiblyDeferredNode;
+	void * Instance;
+	PushNode_t PushNode;
 } instructionParam_t;
 
 typedef struct jobPoolInit_s {
