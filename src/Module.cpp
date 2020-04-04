@@ -1547,27 +1547,30 @@ const VectorSpace::Vector* VectorSpace::Vector::ProjectDerivative(const Vector* 
 		std::vector<uint32_t> coord(retSpace->factors_.size());
 		coord[0] = index / strides[0];
 
-		for(size_t factor = 1; factor < arg->__space_->factors_.size(); factor++)
+		for(size_t factor = 1; factor < retSpace->factors_.size(); factor++)
 		{
 			coord[factor] = (index % strides[factor - 1]) / strides[factor];
 		}
 
-		bool inRange = true;
-		for(size_t argFactor = 0; argFactor < projParam->range.size(); argFactor++)
+		const size_t coordMiddle = coord.size() / 2;
+		if(std::equal(coord.begin(), coord.end() - coordMiddle, coord.end() - coordMiddle))
 		{
-			if((projParam->range[argFactor].first > coord[argFactor + coord.size() / 2]) ||
-					(projParam->range[argFactor].second < coord[argFactor + coord.size() / 2]))
+			bool inRange = true;
+			for(size_t argFactor = 0; argFactor < projParam->range.size(); argFactor++)
 			{
-				inRange = false;
-				break;
+				const size_t argPos = argFactor + coordMiddle;
+				if((projParam->range[argFactor].first > coord[argPos]) ||
+						(projParam->range[argFactor].second < coord[argPos]))
+				{
+					inRange = false;
+					break;
+				}
 			}
-		}
 
-
-		if(inRange &&
-				(std::equal(coord.begin(), coord.end() - coord.size() / 2, coord.end() - coord.size() / 2)))
-		{
-			initializer->at(index) = 1;
+			if(inRange)
+			{
+				initializer->at(index) = 1;
+			}
 		}
 	}
 

@@ -15,6 +15,26 @@
 
 static ModulePermute * ModulePermutePt = nullptr;
 
+static void projVector(const float * data, size_t size)
+{
+	if(NULL == ModulePermutePt)
+	{
+		fatal("Nullpointer!");
+	}
+
+	ModulePermutePt->ProjVector(data, size);
+}
+
+static void dProjVector(const float * data, size_t size)
+{
+	if(NULL == ModulePermutePt)
+	{
+		fatal("Nullpointer!");
+	}
+
+	ModulePermutePt->DProjVector(data, size);
+}
+
 static void matrixTranspose(const float * data, size_t size)
 {
 	if(NULL == ModulePermutePt)
@@ -75,6 +95,49 @@ void ModulePermute::TensorPermute(const float * data, size_t size)
 	called_[CALLED_TensorPermute] = true;
 }
 
+void ModulePermute::ProjVector(const float * data, size_t size)
+{
+	const float expected[] = {1, 2, 3};
+
+	if(sizeof(expected) != size)
+	{
+		Error("Size Mismatch! %lu vs %lu\n", sizeof(expected), size);
+	}
+	else if(memcmp(data, expected, sizeof(expected)))
+	{
+		Error("Unexpected result! (%f, %f, %f)\n",
+				data[0], data[1], data[2]);
+	}
+
+	called_[CALLED_ProjVector] = true;
+}
+
+void ModulePermute::DProjVector(const float * data, size_t size)
+{
+	const float expected[] = {
+			1, 0, 0,
+			0, 1, 0,
+			0, 0, 1,
+			0, 0, 0,
+			0, 0, 0,
+			0, 0, 0,
+			0, 0, 0,
+			0, 0, 0,
+			0, 0, 0};
+
+	if(sizeof(expected) != size)
+	{
+		Error("Size Mismatch! %lu vs %lu\n", sizeof(expected), size);
+	}
+	else if(memcmp(data, expected, sizeof(expected)))
+	{
+		Error("Unexpected result: (%f, %f, %f, %f, %f, %f, %f, %f, %f)\n",
+				data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8]);
+	}
+
+	called_[CALLED_DProjVector] = true;
+}
+
 void ModulePermute::MatrixTranspose(const float * data, size_t size)
 {
 	const float expected[] = {1, 4, 7, 2, 5, 8, 3, 6, 9};
@@ -115,6 +178,8 @@ ModulePermute::ModulePermute() {
 	DacModulePermuteOutputCallbackmatrixTranspose_Register(&matrixTranspose);
 	DacModulePermuteOutputCallbacktensorPermute_Register(&tensorPermute);
 	DacModulePermuteOutputCallbackdMatrixTransposeContracted_Register(&dMatrixTransposeContracted);
+	DacModulePermuteOutputCallbackprojVector_Register(&projVector);
+	DacModulePermuteOutputCallbackdProjVector_Register(&dProjVector);
 }
 
 void ModulePermute::Execute(size_t threadsNrOf)

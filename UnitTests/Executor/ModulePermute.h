@@ -18,6 +18,8 @@ public:
 	void MatrixTranspose(const float * data, size_t size);
 	void DMatrixTransposeContracted(const float * data, size_t size);
 	void TensorPermute(const float * data, size_t size);
+	void ProjVector(const float * data, size_t size);
+	void DProjVector(const float * data, size_t size);
 
 private:
 	size_t ThreadsNrOf_ = 0;
@@ -26,6 +28,8 @@ private:
 		CALLED_MatrixTranspose,
 		CALLED_DMatrixTransposeContracted,
 		CALLED_TensorPermute,
+		CALLED_ProjVector,
+		CALLED_DProjVector,
 		CALLED_NrOf,
 	};
 

@@ -58,6 +58,22 @@ bool ModulePermute::Generate(const std::string &path)
 	auto dMatrixTransposeContractedOutput = Interface::Output(&graph, "dMatrixTransposeContracted");
 	dMatrixTransposeContractedOutput.Set(dMatrixTransposeContracted);
 
+	// Project // TODO: Projection tests inside permutation is wrong.
+	auto vectorSpace = Algebra::Module::VectorSpace(Algebra::Ring::Float32, 9);
+
+	auto vector_init = std::vector<float>{1, 2, 3, 4, 5, 6, 7, 8, 9};
+	auto vector = vectorSpace.Element(&graph, vector_init);
+
+	auto projVector = vector->Project(std::pair<uint32_t, uint32_t>{0, 3});
+	auto projVectorOutput = Interface::Output(&graph, "projVector");
+	projVectorOutput.Set(projVector);
+
+	auto dProjVector = projVector->Derivative(vector);
+	auto dProjVectorOutput = Interface::Output(&graph, "dProjVector");
+	dProjVectorOutput.Set(dProjVector);
+
+	// Project derivative
+
 	// Generate Code
 
 	CodeGenerator codeGenerator(&path);
