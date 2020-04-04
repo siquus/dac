@@ -129,6 +129,7 @@ class CodeGenerator {
 	std::map<Node::Id_t, uint32_t> nodeArrayPos_;
 
 	size_t ThreadsNrOf_;
+
 public:
 	CodeGenerator(const std::string* path);
 	virtual ~CodeGenerator();

@@ -28,8 +28,10 @@ public:
 	void DVecScalarProdRight(const float * data, size_t size);
 	void DVecVecProductLeft(const float * data, size_t size);
 	void DVecVecProductRight(const float * data, size_t size);
-	void Scalar2Squared(const float * data, size_t size);
-	void DScalar2SquaredBase(const float * data, size_t size);
+	void ScalarSquared(const float * data, size_t size);
+	void DScalarSquaredBase(const float * data, size_t size);
+	void VectorSquared(const float * data, size_t size);
+	void DvectorSquaredBase(const float * data, size_t size);
 
 private:
 	size_t ThreadsNrOf_ = 0;
@@ -47,8 +49,10 @@ private:
 		CALLED_DVecScalarProdLeft,
 		CALLED_DVecVecProductLeft,
 		CALLED_DVecVecProductRight,
-		CALLED_Scalar2Squared,
-		CALLED_DScalar2SquaredBase,
+		CALLED_ScalarSquared,
+		CALLED_DScalarSquaredBase,
+		CALLED_VectorSquared,
+		CALLED_DvectorSquaredBase,
 		CALLED_NrOf,
 	};
 

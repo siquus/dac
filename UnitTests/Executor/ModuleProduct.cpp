@@ -135,29 +135,88 @@ static void kronVecProd(const float * data, size_t size)
 	ModuleProductPt->KronVecProduct(data, size);
 }
 
-static void scalar2Squared(const float * data, size_t size)
+static void scalarSquared(const float * data, size_t size)
 {
 	if(NULL == ModuleProductPt)
 	{
 		fatal("Nullpointer!");
 	}
 
-	ModuleProductPt->Scalar2Squared(data, size);
+	ModuleProductPt->ScalarSquared(data, size);
 }
 
-static void dScalar2SquaredBase(const float * data, size_t size)
+static void dScalarSquaredBase(const float * data, size_t size)
 {
 	if(NULL == ModuleProductPt)
 	{
 		fatal("Nullpointer!");
 	}
 
-	ModuleProductPt->DScalar2SquaredBase(data, size);
+	ModuleProductPt->DScalarSquaredBase(data, size);
 }
 
-void ModuleProduct::Scalar2Squared(const float * data, size_t size)
+static void vectorSquared(const float * data, size_t size)
 {
-	const float expected[] = {4};
+	if(NULL == ModuleProductPt)
+	{
+		fatal("Nullpointer!");
+	}
+
+	ModuleProductPt->VectorSquared(data, size);
+}
+
+static void dvectorSquaredBase(const float * data, size_t size)
+{
+	if(NULL == ModuleProductPt)
+	{
+		fatal("Nullpointer!");
+	}
+
+	ModuleProductPt->DvectorSquaredBase(data, size);
+}
+
+void ModuleProduct::VectorSquared(const float * data, size_t size)
+{
+	const float expected[] = {1, 4, 9};
+
+	if(sizeof(expected) != size)
+	{
+		Error("Size Mismatch! %lu vs %lu\n", sizeof(expected), size);
+	}
+	else if(memcmp(data, expected, sizeof(expected)))
+	{
+		Error("Unexpected result! (%f, %f, %f)\n",
+				data[0], data[1], data[2]);
+	}
+
+	called_[CALLED_VectorSquared] = true;
+}
+
+void ModuleProduct::DvectorSquaredBase(const float * data, size_t size)
+{
+	const float expected[] = {
+			2, 0, 0,
+			0, 4, 0,
+			0, 0, 6};
+
+	if(sizeof(expected) != size)
+	{
+		Error("Size Mismatch! %lu vs %lu\n", sizeof(expected), size);
+	}
+	else if(memcmp(data, expected, sizeof(expected)))
+	{
+		Error("Unexpected result! (%f, %f, %f, %f, %f, %f, %f, %f, %f)\n",
+				data[0], data[1], data[2],
+				data[3], data[4], data[5],
+				data[6], data[7], data[8]);
+	}
+
+	called_[CALLED_DvectorSquaredBase] = true;
+}
+
+void ModuleProduct::ScalarSquared(const float * data, size_t size)
+{
+	const float expected[] = {1764};
 
 	if(sizeof(expected) != size)
 	{
@@ -168,12 +227,12 @@ void ModuleProduct::Scalar2Squared(const float * data, size_t size)
 		Error("Unexpected result! %f\n", data[0]);
 	}
 
-	called_[CALLED_Scalar2Squared] = true;
+	called_[CALLED_ScalarSquared] = true;
 }
 
-void ModuleProduct::DScalar2SquaredBase(const float * data, size_t size)
+void ModuleProduct::DScalarSquaredBase(const float * data, size_t size)
 {
-	const float expected[] = {4};
+	const float expected[] = {84};
 
 	if(sizeof(expected) != size)
 	{
@@ -184,7 +243,7 @@ void ModuleProduct::DScalar2SquaredBase(const float * data, size_t size)
 		Error("Unexpected result! %f\n", data[0]);
 	}
 
-	called_[CALLED_DScalar2SquaredBase] = true;
+	called_[CALLED_DScalarSquaredBase] = true;
 }
 
 void ModuleProduct::ScalarScalarDiv(const float * data, size_t size)
@@ -412,8 +471,10 @@ ModuleProduct::ModuleProduct() {
 	DacModuleProductOutputCallbackdVecScalarProdRight_Register(&dVecScalarProdRight);
 	DacModuleProductOutputCallbackdVecVecProdLeft_Register(&dVecVecProdLeft);
 	DacModuleProductOutputCallbackdVecVecProdRight_Register(&dVecVecProdRight);
-	DacModuleProductOutputCallbackscalar2Squared_Register(&scalar2Squared);
-	DacModuleProductOutputCallbackdScalar2SquaredBase_Register(&dScalar2SquaredBase);
+	DacModuleProductOutputCallbackscalarSquared_Register(&scalarSquared);
+	DacModuleProductOutputCallbackdScalarSquaredBase_Register(&dScalarSquaredBase);
+	DacModuleProductOutputCallbackvectorSquared_Register(&vectorSquared);
+	DacModuleProductOutputCallbackdvectorSquaredBase_Register(&dvectorSquaredBase);
 }
 
 void ModuleProduct::Execute(size_t threadsNrOf)

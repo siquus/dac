@@ -103,13 +103,21 @@ bool ModuleProduct::Generate(const std::string &path)
 	dVecVecProdRightOutput.Set(dVecVecProdRightContracted);
 
 	// Power
-	auto scalar2Squared = scalar2->Power(scalar2);
-	auto scalar2SquaredOutput = Interface::Output(&graph, "scalar2Squared");
-	scalar2SquaredOutput.Set(scalar2Squared);
+	auto scalarSquared = scalar->Power(scalar2);
+	auto scalarSquaredOutput = Interface::Output(&graph, "scalarSquared");
+	scalarSquaredOutput.Set(scalarSquared);
 
-	auto dScalar2SquaredBase = scalar2Squared->Derivative(scalar2);
-	auto dScalar2SquaredBaseOutput = Interface::Output(&graph, "dScalar2SquaredBase");
-	dScalar2SquaredBaseOutput.Set(dScalar2SquaredBase);
+	auto dScalarSquaredBase = scalarSquared->Derivative(scalar);
+	auto dScalarSquaredBaseOutput = Interface::Output(&graph, "dScalarSquaredBase");
+	dScalarSquaredBaseOutput.Set(dScalarSquaredBase);
+
+	auto vectorSquared = vector1->Power(scalar2);
+	auto vectorSquaredOutput = Interface::Output(&graph, "vectorSquared");
+	vectorSquaredOutput.Set(vectorSquared);
+
+	auto dvectorSquaredBase = vectorSquared->Derivative(vector1);
+	auto dvectorSquaredBaseOutput = Interface::Output(&graph, "dvectorSquaredBase");
+	dvectorSquaredBaseOutput.Set(dvectorSquaredBase);
 
 	// Generate Code
 

@@ -110,7 +110,9 @@ bool GenerateEmbeddedFiles(const std::string* path)
 		// Has the file already been generated for another graph?
 		if(0 == access(copyFilePath.c_str(), F_OK))
 		{
+#ifdef PREVENT_UNNECESSARY_COPYING // TODO: This is bothersome during development. Maybe compare timestamps or so? On the other hand this only saves ms
 			break;
+#endif // PREVENT_UNNECESSARY_COPYING
 		}
 
 		FILE* outFile = fopen(copyFilePath.c_str(), "w");
