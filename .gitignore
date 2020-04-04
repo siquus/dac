@@ -27,3 +27,5 @@ src/ename\.c\.inc
 UnitTests/Program/dac/
 
 UnitTests/Executor/dac/
+
+Examples/SolarSystem/Executor/dac/
