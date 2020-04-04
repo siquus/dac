@@ -882,7 +882,7 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 
 	if(resultIsArray)
 	{
-		fprintProtect(file->PrintfLine("for(int opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
+		fprintProtect(file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
 				varOpId, varOpId));
 		fprintProtect(file->PrintfLine("{"));
 		file->Indent();
@@ -1076,7 +1076,7 @@ bool CodeGenerator::VectorPermutationCode(const Node* node, FileWriter * file)
 	}
 	fprintProtect(file->PrintfLine("};\n"));
 
-	fprintProtect(file->PrintfLine("for(int opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
+	fprintProtect(file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
 			varOpId, varOpId));
 	fprintProtect(file->PrintfLine("{"));
 	file->Indent();
@@ -1212,7 +1212,7 @@ bool CodeGenerator::VectorContractionCode(const Node* node, FileWriter * file)
 
 	if(resultIsArray)
 	{
-		fprintProtect(file->PrintfLine("for(int opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
+		fprintProtect(file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
 				varOpId, varOpId));
 		fprintProtect(file->PrintfLine("{"));
 		file->Indent();
@@ -1792,7 +1792,7 @@ bool CodeGenerator::VectorVectorProductKroneckerDeltaCode(const Node* node, File
 
 	const char * varOpId = varOp->GetIdentifier()->c_str();
 
-	fprintProtect(file->PrintfLine("for(int opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
+	fprintProtect(file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
 			varOpId, varOpId));
 	fprintProtect(file->PrintfLine("{"));
 	file->Indent();
@@ -1968,7 +1968,7 @@ bool CodeGenerator::VectorVectorProductCode(const Node* node, FileWriter * file,
 
 	const char * varOpId = varOp->GetIdentifier()->c_str();
 
-	fprintProtect(file->PrintfLine("for(int opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
+	fprintProtect(file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
 			varOpId, varOpId));
 	fprintProtect(file->PrintfLine("{"));
 	file->Indent();
@@ -2103,7 +2103,7 @@ bool CodeGenerator::VectorJoinIndicesCode(const Node* node, FileWriter * file)
 	}
 	fprintProtect(file->PrintfLine("};"));
 
-	fprintProtect(file->PrintfLine("for(int opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
+	fprintProtect(file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
 			varOp->GetIdentifier()->c_str(), varOp->GetIdentifier()->c_str()));
 	fprintProtect(file->PrintfLine("{"));
 	file->Indent();
@@ -2232,7 +2232,7 @@ bool CodeGenerator::VectorProjectionCode(const Node* node, FileWriter * file)
 	}
 	fprintProtect(file->PrintfLine("};"));
 
-	fprintProtect(file->PrintfLine("for(int opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
+	fprintProtect(file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
 			varOp->GetIdentifier()->c_str(), varOp->GetIdentifier()->c_str()));
 	fprintProtect(file->PrintfLine("{"));
 	file->Indent();
@@ -2358,7 +2358,7 @@ bool CodeGenerator::VectorPowerCode(const Node* node, FileWriter * file)
 		return true;
 	}
 
-	fprintProtect(file->PrintfLine("for(int opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
+	fprintProtect(file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
 			varOp->GetIdentifier()->c_str(), varOp->GetIdentifier()->c_str()));
 	fprintProtect(file->PrintfLine("{"));
 	file->Indent();
