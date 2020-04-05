@@ -882,7 +882,8 @@ bool VectorSpace::Vector::AreCompatible(const Vector* vec1, const Vector* vec2)
 
 	if(vec1->__space_->factors_.size() != vec2->__space_->factors_.size())
 	{
-		Error("Product Space has different number of factors!\n");
+		Error("Product Space has different number of factors, %lu vs %lu!\n",
+				vec1->__space_->factors_.size(), vec2->__space_->factors_.size());
 		return false;
 	}
 
@@ -1535,7 +1536,7 @@ const VectorSpace::Vector* VectorSpace::Vector::ProjectDerivative(const Vector* 
 	// Create new vector "blackWhiteArg" of arg-type: All proj. values are = 1, others = 0
 	// Construct dProjection/darg = delta_{darg-indices, arg-indices} blackWhiteArg_{arg-indices} (no sum)
 	// TODO: Have to construct this manually. Would be cheaper to have an operation
-	// delta_ij a_jkl (no sum over j).
+	// delta_ij a_jkl (no sum over j). Note: This operation would use a delta on indices with different dim
 	// Or to use a sparse initializer.
 	auto initializer = new std::vector<float>(retSpace->GetDim(), 0);
 
@@ -1552,15 +1553,20 @@ const VectorSpace::Vector* VectorSpace::Vector::ProjectDerivative(const Vector* 
 			coord[factor] = (index % strides[factor - 1]) / strides[factor];
 		}
 
+		// The arg part of the coordinate starts at 0. Add its offset to get "pre-Projection" coordinate
 		const size_t coordMiddle = coord.size() / 2;
+		for(size_t argFactor = 0; argFactor < projParam->range.size(); argFactor++)
+		{
+			coord[argFactor + coordMiddle] += projParam->range[argFactor].first;
+		}
+
 		if(std::equal(coord.begin(), coord.end() - coordMiddle, coord.end() - coordMiddle))
 		{
 			bool inRange = true;
-			for(size_t argFactor = 0; argFactor < projParam->range.size(); argFactor++)
+			for(size_t factor = 0; factor < projParam->range.size(); factor++)
 			{
-				const size_t argPos = argFactor + coordMiddle;
-				if((projParam->range[argFactor].first > coord[argPos]) ||
-						(projParam->range[argFactor].second < coord[argPos]))
+				if((projParam->range[factor].first > coord[factor]) ||
+						(projParam->range[factor].second < coord[factor]))
 				{
 					inRange = false;
 					break;
