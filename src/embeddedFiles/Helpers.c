@@ -15,9 +15,15 @@
 
 #include "Helpers.h"
 
+#define ENABLE_DEBUG_OUTPUT 0
+
+#if ENABLE_DEBUG_OUTPUT
 #define DPRINTF(...) \
 	printf(__VA_ARGS__); \
 	fflush(stdout);
+#else // !ENABLE_DEBUG_OUTPUT
+#define DPRINTF(...)
+#endif // !ENABLE_DEBUG_OUTPUT
 
 typedef struct {
 	pthread_mutex_t mutex;
