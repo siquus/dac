@@ -2,7 +2,7 @@
 Distributed Algebraic Computations
 
 ## Target use case
-The focus lies in numerical problems requiring many algebraic operations, where the overhead of a function call for a mathematical operation may be neglected.
+The focus lies in numerical problems requiring many algebraic operations, where the overhead of a function call for a mathematical operation may be neglected. Specifically, problems where the same operations are run many times as in a typical optimization / simulation problem (e.g. machine learning, any physical simulation) 
 
 E.g. if only a few dozen vector/matrix operations in a few dimensions is required, one will be better off using Eigen or some BLAS-like library.
 
@@ -20,8 +20,8 @@ E.g. if only a few dozen vector/matrix operations in a few dimensions is require
 
 ## Design Decisions
 ### Why generate code?
-- 
-- Generating custom code is obviously the fastest possible solution
+- Enabes using e.g. feedback directed optimization for compiling (see e.g. Examples/SolarSystem)
+- Generating custom code offers (theoretically) the fastest possible solution
 - Makes the code less complicated
 - Enables customization, e.g. loop-unrolling according to how many floating point units, ...
 

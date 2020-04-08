@@ -10,9 +10,19 @@ DEPS := $(OBJS:.o=.d)
 INC_DIRS := ./dac ../
 INC_FLAGS := $(addprefix -I,$(INC_DIRS))
 
-CPPFLAGS ?= $(INC_FLAGS) -Wall -Wextra -Wdouble-promotion -MMD -MP
-
+CPPFLAGS ?= $(INC_FLAGS) -Wall -Wextra -Wdouble-promotion -MMD -MP -Ofast -march=native
 LDLIBS := -lstdc++ -lm -pthread
+
+BCONFIG ?= NORMAL
+
+ifeq ($(BCONFIG), PROFILE_GENERATE)
+	CPPFLAGS += -fprofile-generate="../profile.gcda"
+	LDLIBS += -lgcov --coverage
+else ifeq ($(BCONFIG), PROFILE_USE)
+	CPPFLAGS += -fprofile-use="../profile.gcda"
+else ifneq ($(BCONFIG), NORMAL)
+$(error Unknown BCONFIG $(BCONFIG))
+endif
 
 $(BUILD_DIR)/$(TARGET_EXEC): $(OBJS)
 	$(CC) $(OBJS) -o $@ $(LDFLAGS) $(LDLIBS)
