@@ -23,6 +23,8 @@ OBJS_DEP += $(OBJS)
 
 
 INC_DIRS := $(shell find $(SRC_DIRS) -type d)
+INC_DIRS += ../
+
 INC_FLAGS := $(addprefix -I,$(INC_DIRS))
 
 CPPFLAGS ?= $(INC_FLAGS) -Wall -Wextra -Wdouble-promotion -Werror -MMD -MP
