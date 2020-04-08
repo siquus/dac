@@ -20,6 +20,7 @@ E.g. if only a few dozen vector/matrix operations in a few dimensions is require
 
 ## Design Decisions
 ### Why generate code?
+- Compiler has an easier time optimizing the code, because many things which would be variables are constants, all variable addresses are known, ..
 - Enabes using e.g. feedback directed optimization for compiling (see e.g. Examples/SolarSystem)
 - Generating custom code offers (theoretically) the fastest possible solution
 - Makes the code less complicated

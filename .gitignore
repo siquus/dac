@@ -29,3 +29,7 @@ UnitTests/Program/dac/
 UnitTests/Executor/dac/
 
 Examples/SolarSystem/Executor/dac/
+
+Examples/SolarSystem/profile.gcda/
+
+Examples/SolarSystem/State.csv
