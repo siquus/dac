@@ -140,8 +140,8 @@ void ModuleContract::MatrixProd1(const float * data, size_t size)
 	}
 	else if(memcmp(data, expected, sizeof(expected)))
 	{
-		Error("Unexpected result! (%f, %f, %f, %f, %f, %f, %f, %f, %f\n",
-				data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8]);
+		Error("Unexpected result!\n");
+		PrintMatrix(stderr, data, size, 3);
 	}
 
 	called_[CALLED_MatrixProd1] = true;
@@ -157,7 +157,8 @@ void ModuleContract::MatrixVecProd(const float * data, size_t size)
 	}
 	else if(memcmp(data, expected, sizeof(expected)))
 	{
-		Error("Unexpected result (%f, %f, %f)\n", data[0], data[1], data[2]);
+		Error("Unexpected result!\n");
+		PrintMatrix(stderr, data, size, 3);
 	}
 
 	called_[CALLED_MatrixVecProd] = true;
@@ -173,7 +174,8 @@ void ModuleContract::VecMatrixProd(const float * data, size_t size)
 	}
 	else if(memcmp(data, expected, sizeof(expected)))
 	{
-		Error("Unexpected result (%f, %f, %f)\n", data[0], data[1], data[2]);
+		Error("Unexpected result!\n");
+		PrintMatrix(stderr, data, size, 3);
 	}
 
 	called_[CALLED_VecMatrixProd] = true;
@@ -192,8 +194,8 @@ void ModuleContract::TensorVecContr2(const float * data, size_t size)
 	}
 	else if(memcmp(data, expected, sizeof(expected)))
 	{
-		Error("Unexpected result! (%f, %f, %f, %f, %f, %f, %f, %f, %f\n",
-				data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8]);
+		Error("Unexpected result!\n");
+		PrintMatrix(stderr, data, size, 3);
 	}
 
 	called_[CALLED_TensorVecContr2] = true;
@@ -212,8 +214,8 @@ void ModuleContract::TensorVecContr1(const float * data, size_t size)
 	}
 	else if(memcmp(data, expected, sizeof(expected)))
 	{
-		Error("Unexpected result! (%f, %f, %f, %f, %f, %f, %f, %f, %f\n",
-				data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8]);
+		Error("Unexpected result!\n");
+		PrintMatrix(stderr, data, size, 3);
 	}
 
 	called_[CALLED_TensorVecContr1] = true;
@@ -232,18 +234,8 @@ void ModuleContract::TensorMatrixContr1(const float * data, size_t size)
 	}
 	else if(memcmp(data, expected, sizeof(expected)))
 	{
-		Error("Unexpected result! (\n");
-
-		for(size_t entry = 0; entry < sizeof(expected) / sizeof(expected[0]); entry++)
-		{
-			fprintf(stderr, "%f, ", data[entry]);
-
-			if((0 == (entry % 9)) && entry)
-			{
-				fprintf(stderr, "\n");
-			}
-		}
-		fprintf(stderr, ")\n");
+		Error("Unexpected result!\n");
+		PrintMatrix(stderr, data, size, 9);
 	}
 
 	called_[CALLED_TensorMatrixContr1] = true;
@@ -259,7 +251,8 @@ void ModuleContract::TensorMatrixContr12(const float * data, size_t size)
 	}
 	else if(memcmp(data, expected, sizeof(expected)))
 	{
-		Error("Unexpected result (%f, %f, %f)\n", data[0], data[1], data[2]);
+		Error("Unexpected result!\n");
+		PrintMatrix(stderr, data, size, 3);
 	}
 
 	called_[CALLED_TensorMatrixContr12] = true;
@@ -275,8 +268,8 @@ void ModuleContract::MatrixIdProd(const float * data, size_t size)
 	}
 	else if(memcmp(data, expected, sizeof(expected)))
 	{
-		Error("Unexpected result! (%f, %f, %f, %f, %f, %f, %f, %f, %f\n",
-				data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8]);
+		Error("Unexpected result!\n");
+		PrintMatrix(stderr, data, size, 3);
 	}
 
 	called_[CALLED_MatrixIdProd] = true;
@@ -292,7 +285,7 @@ void ModuleContract::TwoMatrixTrace(const float * data, size_t size)
 	}
 	else if(*data != expected)
 	{
-		Error("Unexpected result! %f", *data);
+		Error("Unexpected result! %f", (double) data[0]);
 	}
 
 	called_[CALLED_TwoMatrixTrace] = true;
@@ -312,8 +305,8 @@ void ModuleContract::MatrixProdLeft(const float * data, size_t size)
 	}
 	else if(memcmp(data, expected, sizeof(expected)))
 	{
-		Error("Unexpected result! (%f, %f, %f, %f, %f, %f, %f, %f, %f\n",
-				data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8]);
+		Error("Unexpected result!\n");
+		PrintMatrix(stderr, data, size, 3);
 	}
 
 	called_[CALLED_MatrixProdLeft] = true;
@@ -333,8 +326,8 @@ void ModuleContract::MatrixProdRight(const float * data, size_t size)
 	}
 	else if(memcmp(data, expected, sizeof(expected)))
 	{
-		Error("Unexpected result! (%f, %f, %f, %f, %f, %f, %f, %f, %f)\n",
-				data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8]);
+		Error("Unexpected result!\n");
+		PrintMatrix(stderr, data, size, 3);
 	}
 
 	called_[CALLED_MatrixProdRight] = true;

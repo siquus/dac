@@ -13,10 +13,8 @@
 
 #define NODE_T_MAX_EDGE_NUMBER 42u
 
-typedef void (*instruction_t)(struct instructionParam_s * param);
-
 typedef struct node_s {
-	instruction_t instruction;
+	void (*instruction)(void * instance, void (*PushNode)(void * instance, struct node_s * node));
 	const struct node_s * parents[NODE_T_MAX_EDGE_NUMBER];
 	struct node_s * children[NODE_T_MAX_EDGE_NUMBER];
 	uint32_t exeCnt;
@@ -24,13 +22,6 @@ typedef struct node_s {
 	const uint16_t childrenNrOf;
 	const uint16_t id;
 } node_t;
-
-typedef void (*PushNode_t)(void * instance, struct node_s * node);
-
-typedef struct instructionParam_s {
-	void * Instance;
-	PushNode_t PushNode;
-} instructionParam_t;
 
 typedef struct jobPoolInit_s {
 	node_t ** Nodes;

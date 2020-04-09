@@ -78,18 +78,8 @@ void ModulePermute::TensorPermute(const float * data, size_t size)
 	}
 	else if(memcmp(data, expected, sizeof(expected)))
 	{
-		Error("Unexpected result! (\n");
-
-		for(size_t entry = 0; entry < sizeof(expected) / sizeof(expected[0]); entry++)
-		{
-			fprintf(stderr, "%f, ", data[entry]);
-
-			if((0 == (entry % 9)) && entry)
-			{
-				fprintf(stderr, "\n");
-			}
-		}
-		fprintf(stderr, ")\n");
+		Error("Unexpected result!\n");
+		PrintMatrix(stderr, data, size, 9);
 	}
 
 	called_[CALLED_TensorPermute] = true;
@@ -105,8 +95,8 @@ void ModulePermute::ProjVector(const float * data, size_t size)
 	}
 	else if(memcmp(data, expected, sizeof(expected)))
 	{
-		Error("Unexpected result! (%f, %f, %f)\n",
-				data[0], data[1], data[2]);
+		Error("Unexpected result!\n");
+		PrintMatrix(stderr, data, size, 3);
 	}
 
 	called_[CALLED_ProjVector] = true;
@@ -131,8 +121,8 @@ void ModulePermute::DProjVector(const float * data, size_t size)
 	}
 	else if(memcmp(data, expected, sizeof(expected)))
 	{
-		Error("Unexpected result: (%f, %f, %f, %f, %f, %f, %f, %f, %f)\n",
-				data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8]);
+		Error("Unexpected result!\n");
+		PrintMatrix(stderr, data, size, 3);
 	}
 
 	called_[CALLED_DProjVector] = true;
@@ -148,8 +138,8 @@ void ModulePermute::MatrixTranspose(const float * data, size_t size)
 	}
 	else if(memcmp(data, expected, sizeof(expected)))
 	{
-		Error("Unexpected result! (%f, %f, %f, %f, %f, %f, %f, %f, %f\n",
-				data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8]);
+		Error("Unexpected result!\n");
+		PrintMatrix(stderr, data, size, 3);
 	}
 
 	called_[CALLED_MatrixTranspose] = true;
@@ -165,8 +155,8 @@ void ModulePermute::DMatrixTransposeContracted(const float * data, size_t size)
 	}
 	else if(memcmp(data, expected, sizeof(expected)))
 	{
-		Error("Unexpected result! (%f, %f, %f, %f, %f, %f, %f, %f, %f\n",
-				data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8]);
+		Error("Unexpected result!\n");
+		PrintMatrix(stderr, data, size, 3);
 	}
 
 	called_[CALLED_DMatrixTransposeContracted] = true;

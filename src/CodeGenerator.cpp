@@ -464,7 +464,16 @@ bool CodeGenerator::GenerateInstructions()
 		std::string fctId;
 		GenerateInstructionId(&fctId, node.id);
 
-		fileInstructions_.PrintfLine("static void %s(instructionParam_t * param)", fctId.c_str());
+		// Set param to unused if not used
+		if(Node::Type::CONTROL_TRANSFER_WHILE != node.type)
+		{
+			fileInstructions_.PrintfLine("static void %s(void * instance __attribute__((unused)), void (*PushNode)(void * instance, struct node_s * node) __attribute__((unused)))", fctId.c_str());
+		}
+		else
+		{
+			fileInstructions_.PrintfLine("static void %s(void * instance, void (*PushNode)(void * instance, struct node_s * node))", fctId.c_str());
+		}
+
 		fileInstructions_.PrintfLine("{");
 		fileInstructions_.Indent();
 
@@ -844,6 +853,16 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 
 	const Algebra::Module::VectorSpace::KroneckerDeltaParameters_t * kroneckerParam = (const Algebra::Module::VectorSpace::KroneckerDeltaParameters_t *) kronNode->typeParameters;
 
+	// Copy delta pairs array into file
+	std::string deltaPairs = "const uint32_t deltaPairs[] = {";
+	for(size_t paramPos = 0; paramPos < kroneckerParam->DeltaPair.size(); paramPos++)
+	{
+		deltaPairs += std::to_string(kroneckerParam->DeltaPair[paramPos]) + ", ";
+	}
+	deltaPairs.erase(deltaPairs.end() - 2, deltaPairs.end()); // remove last ", "
+	deltaPairs += "};";
+	fprintProtect(file->PrintfLine("%s", deltaPairs.c_str()));
+
 	// Calculate Strides, assume Row-Major Layout
 	// https://en.wikipedia.org/wiki/Row-_and_column-major_order#Address_calculation_in_general
 	std::vector<uint32_t> argStrides;
@@ -856,32 +875,22 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 	}
 	fprintProtect(file->PrintfLine("};"));
 
-	std::vector<uint32_t> opStrides;
-	opVec->__space_->GetStrides(&opStrides);
-	const char opstridesId[] = "opStrides";
-	fprintProtect(file->PrintfLine("const uint32_t %s[] = {", opstridesId));
-	for(const uint32_t &stride: opStrides)
-	{
-		fprintProtect(file->PrintfLine("\t %u,", stride));
-	}
-	fprintProtect(file->PrintfLine("};\n"));
-
 	const char * varOpId = varOp->GetIdentifier()->c_str();
 
 	bool resultIsArray = (1 < varOp->Length());
 
-	// Copy delta pairs array into file
-	std::string deltaPairs = "const uint32_t deltaPairs[] = {";
-	for(size_t paramPos = 0; paramPos < kroneckerParam->DeltaPair.size(); paramPos++)
-	{
-		deltaPairs += std::to_string(kroneckerParam->DeltaPair[paramPos]) + ", ";
-	}
-	deltaPairs.erase(deltaPairs.end() - 2, deltaPairs.end()); // remove last ", "
-	deltaPairs += "};";
-	fprintProtect(file->PrintfLine("%s", deltaPairs.c_str()));
-
 	if(resultIsArray)
 	{
+		std::vector<uint32_t> opStrides;
+		opVec->__space_->GetStrides(&opStrides);
+		const char opstridesId[] = "opStrides";
+		fprintProtect(file->PrintfLine("const uint32_t %s[] = {", opstridesId));
+		for(const uint32_t &stride: opStrides)
+		{
+			fprintProtect(file->PrintfLine("\t %u,", stride));
+		}
+		fprintProtect(file->PrintfLine("};\n"));
+
 		fprintProtect(file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
 				varOpId, varOpId));
 		fprintProtect(file->PrintfLine("{"));
@@ -1017,7 +1026,7 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 			sum += " kronIndexTuple[deltaPairs[" + std::to_string(paramPos) + "]]) *";
 		}
 	}
-	sum += " " + std::to_string(kroneckerParam->Scaling) + ";";
+	sum += " " + std::to_string(kroneckerParam->Scaling) + "f;";
 
 	fprintProtect(file->PrintfLine(sum.c_str()));
 
@@ -1196,22 +1205,22 @@ bool CodeGenerator::VectorContractionCode(const Node* node, FileWriter * file)
 	}
 	fprintProtect(file->PrintfLine("};"));
 
-	std::vector<uint32_t> opStrides;
-	opVec->__space_->GetStrides(&opStrides);
-	const char opstridesId[] = "opStrides";
-	fprintProtect(file->PrintfLine("const uint32_t %s[] = {", opstridesId));
-	for(const uint32_t &stride: opStrides)
-	{
-		fprintProtect(file->PrintfLine("\t %u,", stride));
-	}
-	fprintProtect(file->PrintfLine("};\n"));
-
 	const char * varOpId = varOp->GetIdentifier()->c_str();
 
 	bool resultIsArray = (1 < varOp->Length());
 
 	if(resultIsArray)
 	{
+		std::vector<uint32_t> opStrides;
+		opVec->__space_->GetStrides(&opStrides);
+		const char opstridesId[] = "opStrides";
+		fprintProtect(file->PrintfLine("const uint32_t %s[] = {", opstridesId));
+		for(const uint32_t &stride: opStrides)
+		{
+			fprintProtect(file->PrintfLine("\t %u,", stride));
+		}
+		fprintProtect(file->PrintfLine("};\n"));
+
 		fprintProtect(file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
 				varOpId, varOpId));
 		fprintProtect(file->PrintfLine("{"));
@@ -1536,7 +1545,7 @@ bool CodeGenerator::ControlTransferWhileCode(const Node* node, FileWriter * file
 	{
 		for(const uint32_t &pos: arrayPosTrue)
 		{
-			fprintProtect(file->PrintfLine("\tparam->PushNode(param->Instance, &nodes%s[%u]);",
+			fprintProtect(file->PrintfLine("\tPushNode(instance, &nodes%s[%u]);",
 					graph_->Name().c_str(),
 					pos));
 		}
@@ -1554,7 +1563,7 @@ bool CodeGenerator::ControlTransferWhileCode(const Node* node, FileWriter * file
 	{
 		for(const uint32_t &pos: arrayPosFalse)
 		{
-			fprintProtect(file->PrintfLine("\tparam->PushNode(param->Instance, &nodes%s[%u]);",
+			fprintProtect(file->PrintfLine("\tPushNode(instance, &nodes%s[%u]);",
 					graph_->Name().c_str(),
 					pos));
 		}
@@ -1681,7 +1690,7 @@ bool CodeGenerator::VectorScalarProductKroneckerDeltaCode(const Node* node, File
 			Result += " opIndexTuple[deltaPairs[" + std::to_string(paramPos) + "]]) *";
 		}
 	}
-	Result += " " + std::to_string(kroneckerParam->Scaling);
+	Result += " " + std::to_string(kroneckerParam->Scaling) + "f";
 
 	if(divide)
 	{
@@ -1870,7 +1879,7 @@ bool CodeGenerator::VectorVectorProductKroneckerDeltaCode(const Node* node, File
 			product += " kronIndexTuple[deltaPairs[" + std::to_string(paramPos) + "]]) *";
 		}
 	}
-	product += " " + std::to_string(kroneckerParam->Scaling);
+	product += " " + std::to_string(kroneckerParam->Scaling) + "f";
 
 	if(divide)
 	{

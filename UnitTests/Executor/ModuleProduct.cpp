@@ -185,8 +185,8 @@ void ModuleProduct::VectorSquared(const float * data, size_t size)
 	}
 	else if(memcmp(data, expected, sizeof(expected)))
 	{
-		Error("Unexpected result! (%f, %f, %f)\n",
-				data[0], data[1], data[2]);
+		Error("Unexpected result!\n");
+		PrintMatrix(stderr, data, size, 3);
 	}
 
 	called_[CALLED_VectorSquared] = true;
@@ -205,10 +205,8 @@ void ModuleProduct::DvectorSquaredBase(const float * data, size_t size)
 	}
 	else if(memcmp(data, expected, sizeof(expected)))
 	{
-		Error("Unexpected result! (%f, %f, %f, %f, %f, %f, %f, %f, %f)\n",
-				data[0], data[1], data[2],
-				data[3], data[4], data[5],
-				data[6], data[7], data[8]);
+		Error("Unexpected result!\n");
+		PrintMatrix(stderr, data, size, 3);
 	}
 
 	called_[CALLED_DvectorSquaredBase] = true;
@@ -224,7 +222,7 @@ void ModuleProduct::ScalarSquared(const float * data, size_t size)
 	}
 	else if(memcmp(data, expected, sizeof(expected)))
 	{
-		Error("Unexpected result! %f\n", data[0]);
+		Error("Unexpected result! %f\n", (double) data[0]);
 	}
 
 	called_[CALLED_ScalarSquared] = true;
@@ -240,7 +238,7 @@ void ModuleProduct::DScalarSquaredBase(const float * data, size_t size)
 	}
 	else if(memcmp(data, expected, sizeof(expected)))
 	{
-		Error("Unexpected result! %f\n", data[0]);
+		Error("Unexpected result! %f\n", (double) data[0]);
 	}
 
 	called_[CALLED_DScalarSquaredBase] = true;
@@ -256,7 +254,7 @@ void ModuleProduct::ScalarScalarDiv(const float * data, size_t size)
 	}
 	else if(memcmp(data, expected, sizeof(expected)))
 	{
-		Error("Unexpected result! %f\n", data[0]);
+		Error("Unexpected result! %f\n", (double) data[0]);
 	}
 
 	called_[CALLED_ScalarScalarDiv] = true;
@@ -272,7 +270,7 @@ void ModuleProduct::DScalarScalarDivLeft(const float * data, size_t size)
 	}
 	else if(memcmp(data, expected, sizeof(expected)))
 	{
-		Error("Unexpected result! %f\n", data[0]);
+		Error("Unexpected result! %f\n", (double) data[0]);
 	}
 
 	called_[CALLED_DScalarScalarDivLeft] = true;
@@ -288,7 +286,7 @@ void ModuleProduct::DScalarScalarDivRight(const float * data, size_t size)
 	}
 	else if(memcmp(data, expected, sizeof(expected)))
 	{
-		Error("Unexpected result! %f\n", data[0]);
+		Error("Unexpected result! %f\n", (double) data[0]);
 	}
 
 	called_[CALLED_DScalarScalarDivRight] = true;
@@ -304,8 +302,8 @@ void ModuleProduct::ScalarVecProduct(const float * data, size_t size)
 	}
 	else if(memcmp(data, expected, sizeof(expected)))
 	{
-		Error("Unexpected result! (%f, %f, %f)\n",
-				data[0], data[1], data[2]);
+		Error("Unexpected result!\n");
+		PrintMatrix(stderr, data, size, 3);
 	}
 
 	called_[CALLED_ScalarVecProduct] = true;
@@ -321,8 +319,8 @@ void ModuleProduct::VecScalarProduct(const float * data, size_t size)
 	}
 	else if(memcmp(data, expected, sizeof(expected)))
 	{
-		Error("Unexpected result! (%f, %f, %f)\n",
-				data[0], data[1], data[2]);
+		Error("Unexpected result!\n");
+		PrintMatrix(stderr, data, size, 3);
 	}
 
 	called_[CALLED_VecScalarProduct] = true;
@@ -342,8 +340,8 @@ void ModuleProduct::VecVecProduct(const float * data, size_t size)
 	}
 	else if(memcmp(data, expected, sizeof(expected)))
 	{
-		Error("Unexpected result! (%f, %f, %f, %f, %f, %f, %f, %f, %f)\n",
-				data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8]);
+		Error("Unexpected result!\n");
+		PrintMatrix(stderr, data, size, 3);
 	}
 
 	called_[CALLED_VecVecProduct] = true;
@@ -359,8 +357,8 @@ void ModuleProduct::KronVecProduct(const float * data, size_t size)
 	}
 	else if(memcmp(data, expected, sizeof(expected)))
 	{
-		Error("Unexpected result! (%f, %f, %f)\n",
-				data[0], data[1], data[2]);
+		Error("Unexpected result!\n");
+		PrintMatrix(stderr, data, size, 3);
 	}
 
 	called_[CALLED_KronVecProduct] = true;
@@ -376,8 +374,8 @@ void ModuleProduct::VecKronProduct(const float * data, size_t size)
 	}
 	else if(memcmp(data, expected, sizeof(expected)))
 	{
-		Error("Unexpected result! (%f, %f, %f)\n",
-				data[0], data[1], data[2]);
+		Error("Unexpected result!\n");
+		PrintMatrix(stderr, data, size, 3);
 	}
 
 	called_[CALLED_VecKronProduct] = true;
@@ -396,10 +394,8 @@ void ModuleProduct::DVecScalarProdLeft(const float * data, size_t size)
 	}
 	else if(memcmp(data, expected, sizeof(expected)))
 	{
-		Error("Unexpected result! (%f, %f, %f, %f, %f, %f, %f, %f, %f)\n",
-				data[0], data[1], data[2],
-				data[3], data[4], data[5],
-				data[6], data[7], data[8]);
+		Error("Unexpected result!\n");
+		PrintMatrix(stderr, data, size, 3);
 	}
 
 	called_[CALLED_DVecScalarProdLeft] = true;
@@ -415,8 +411,8 @@ void ModuleProduct::DVecScalarProdRight(const float * data, size_t size)
 	}
 	else if(memcmp(data, expected, sizeof(expected)))
 	{
-		Error("Unexpected result! (%f, %f, %f)\n",
-				data[0], data[1], data[2]);
+		Error("Unexpected result!\n");
+		PrintMatrix(stderr, data, size, 3);
 	}
 
 	called_[CALLED_DVecScalarProdRight] = true;
@@ -432,8 +428,8 @@ void ModuleProduct::DVecVecProductLeft(const float * data, size_t size)
 	}
 	else if(memcmp(data, expected, sizeof(expected)))
 	{
-		Error("Unexpected result! (%f, %f, %f)\n",
-				data[0], data[1], data[2]);
+		Error("Unexpected result!\n");
+		PrintMatrix(stderr, data, size, 3);
 	}
 
 	called_[CALLED_DVecVecProductLeft] = true;
@@ -449,8 +445,8 @@ void ModuleProduct::DVecVecProductRight(const float * data, size_t size)
 	}
 	else if(memcmp(data, expected, sizeof(expected)))
 	{
-		Error("Unexpected result! (%f, %f, %f)\n",
-				data[0], data[1], data[2]);
+		Error("Unexpected result!\n");
+		PrintMatrix(stderr, data, size, 3);
 	}
 
 	called_[CALLED_DVecVecProductRight] = true;

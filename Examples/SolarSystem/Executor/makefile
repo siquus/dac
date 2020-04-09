@@ -10,7 +10,7 @@ DEPS := $(OBJS:.o=.d)
 INC_DIRS := ./dac ../
 INC_FLAGS := $(addprefix -I,$(INC_DIRS))
 
-CPPFLAGS ?= $(INC_FLAGS) -Wall -Wextra -Wdouble-promotion -MMD -MP -Ofast -march=native -flto
+CPPFLAGS ?= $(INC_FLAGS) -Wall -Wextra -Wdouble-promotion -Werror -MMD -MP -Ofast -march=native -flto
 LDLIBS := -lstdc++ -lm -pthread
 LDFLAGS += -flto
 

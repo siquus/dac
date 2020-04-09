@@ -80,7 +80,7 @@ static void removeDeferredJobWithinMutex(threads_t * threads, const node_t* node
 	}
 }
 
-static void addDeferredJobWithinMutex(threads_t * threads, const node_t* node)
+static void addDeferredJobWithinMutex(threads_t * threads, node_t* node)
 {
 	// Job already in pool?
 	for(size_t job = 0; job < threads->jobPool.deferredJobsNrOf; job++)
@@ -102,7 +102,7 @@ static void addDeferredJobWithinMutex(threads_t * threads, const node_t* node)
 	}
 }
 
-static void pushJobWithinMutex(threads_t * threads, const node_t* node)
+static void pushJobWithinMutex(threads_t * threads, node_t* node)
 {
 	// Go through all parents and check if they already executed
 	for(uint32_t parent = 0; parent < node->parentsNrOf; parent++)
@@ -155,7 +155,7 @@ static void pushJobWithinMutex(threads_t * threads, const node_t* node)
 	}
 }
 
-static void pushJob(threads_t * threads, const node_t* node)
+static void pushJob(threads_t * threads, node_t* node)
 {
 	int mutexLockRet;
 	mutexLockRet = pthread_mutex_lock(&threads->jobPool.mutex);
@@ -172,6 +172,11 @@ static void pushJob(threads_t * threads, const node_t* node)
 	{
 		errExitEN(mutexUnlockRet, "pthread_mutex_unlock");
 	}
+}
+
+static void pushJobExported(void * instance, struct node_s * node)
+{
+	pushJob((threads_t *) instance, node);
 }
 
 void checkDeferredJobs(threads_t * threads)
@@ -195,10 +200,6 @@ void * threadFunction(void * arg)
 	threads_t * threads = init->threads;
 
 	node_t * nodeJob = NULL;
-
-	instructionParam_t instructionParam = {
-			.Instance = threads,
-			.PushNode = pushJob};
 
 	while(1)
 	{
@@ -339,7 +340,7 @@ void * threadFunction(void * arg)
 		}
 
 		// Run instruction
-		nodeJob->instruction(&instructionParam);
+		nodeJob->instruction(threads, &pushJobExported);
 	}
 
 	SIGNAL_DONE_AND_TERMINATE:
