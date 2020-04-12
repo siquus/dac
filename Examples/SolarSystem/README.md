@@ -39,3 +39,12 @@ dac/Examples/SolarSystem/Executor$ /build/main.out
 dac/Examples/SolarSystem/Executor$ make clean
 dac/Examples/SolarSystem/Executor$ make BCONFIG=PROFILE_USE # This will create the faster binary, so change iteration number before this step
 ```
+
+## Linux scheduler
+If the binary is executed privilidged or the binary itself is granted sufficient rights
+
+```console
+dac/Examples/SolarSystem/Executor$ sudo setcap 'cap_sys_nice=eip' build/main.out
+```
+
+all threads will be run at highest priority using SCHED_FIFO.

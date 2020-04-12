@@ -10,6 +10,8 @@
 #include <stdlib.h>
 #include <stdatomic.h>
 #include <pthread.h>
+#include <sched.h>
+#include <errno.h>
 
 #include "error_functions.h"
 
@@ -24,6 +26,10 @@
 #else // !ENABLE_DEBUG_OUTPUT
 #define DPRINTF(...)
 #endif // !ENABLE_DEBUG_OUTPUT
+
+#define INFO(...) \
+	printf(__VA_ARGS__); \
+	fflush(stdout);
 
 typedef struct {
 	pthread_mutex_t mutex;
@@ -424,16 +430,71 @@ void StartThreads(void ** instance, size_t threadsNrOf, jobPoolInit_t * jobPoolI
 		fatal("Could not malloc threadInit_t!\n");
 	}
 
+	// Set thread attributes: Priority & scheduler
+	// Checking whether this process is allowed to change schedulers requires an external library,
+	// check the man-pages for libcap.
+	// To avoid installing it for this, we just try and see if we fail with "EPERM Operation not permitted"
+	// and use the normal SCHED_OTHER in that case
+	pthread_attr_t threadAttribute;
+	int attrInitRet = pthread_attr_init(&threadAttribute);
+	if(attrInitRet)
+	{
+		errExitEN(attrInitRet, "pthread_attr_init");
+	}
+
+	int setinheritschedRet = pthread_attr_setinheritsched(&threadAttribute, PTHREAD_EXPLICIT_SCHED);
+	if(setinheritschedRet)
+	{
+		errExitEN(setinheritschedRet, "thread_attr_setinheritsched");
+	}
+
+	int setschedpolicyRet = pthread_attr_setschedpolicy(&threadAttribute, SCHED_FIFO);
+	if(setschedpolicyRet)
+	{
+		errExitEN(setschedpolicyRet, "pthread_attr_setschedpolicy");
+	}
+
+	struct sched_param schedParams;
+	int getPriorityRet = schedParams.sched_priority = sched_get_priority_max(SCHED_FIFO);
+	if(0 > getPriorityRet)
+	{
+		err_exit("sched_get_priority_max() failed!");
+	}
+
+	int setschedparamRet = pthread_attr_setschedparam(&threadAttribute, &schedParams);
+	if(setschedparamRet)
+	{
+		errExitEN(setschedparamRet, "pthread_attr_setschedparam");
+	}
+
+	uint8_t have_cap_sys_nice = 1;
 	for(uint16_t arrayPos = 0; arrayPos < threads->threadsNrOf; arrayPos++)
 	{
 		threadInits[arrayPos].threads = threads;
 		threadInits[arrayPos].arrayPos = arrayPos;
 
 		int threadCreateRet;
-		threadCreateRet = pthread_create(&threads->pthreads[arrayPos], NULL, threadFunction, &threadInits[arrayPos]);
-		if(0 != threadCreateRet)
+		if(have_cap_sys_nice)
 		{
-			errExitEN(threadCreateRet, "pthread_create");
+			threadCreateRet = pthread_create(&threads->pthreads[arrayPos], &threadAttribute, threadFunction, &threadInits[arrayPos]);
+		}
+		else
+		{
+			threadCreateRet = pthread_create(&threads->pthreads[arrayPos], NULL, threadFunction, &threadInits[arrayPos]);
+		}
+
+		if(threadCreateRet)
+		{
+			if((EPERM == threadCreateRet) && have_cap_sys_nice && (0 == arrayPos)) // We are not allowed to set the thread attribues: Create threads with standard values.
+			{
+				INFO("No CAP_SYS_NICE capability. Defaulting to standard thread attributes.\n")
+				threadCreateRet = pthread_create(&threads->pthreads[arrayPos], NULL, threadFunction, &threadInits[arrayPos]);
+				have_cap_sys_nice = 0;
+			}
+			else
+			{
+				errExitEN(threadCreateRet, "pthread_create");
+			}
 		}
 	}
 
