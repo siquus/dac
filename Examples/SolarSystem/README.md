@@ -13,13 +13,13 @@ $ ./makeRun.sh
 Run the simulation with 
 
 ```console
-$ Executor/build/main.out -p ./State.csv -i 1000
+dac/Examples/SolarSystem$ Executor/build/main.out -p ./State.csv -i 1000
 ```
 
 After running the simulation, open Gnuplot and
 
 ```console
-$ gnuplot 
+dac/Examples/SolarSystem$ gnuplot 
 gnuplot> load "gnuplot.p"
 ```
 

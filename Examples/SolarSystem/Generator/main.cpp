@@ -352,7 +352,7 @@ int main()
 
 	auto iterationVs = Algebra::Module::VectorSpace(Algebra::Ring::Int32, 1);
 
-	auto SimIterations = iterationVs.Scalar(&graph, 100000);
+	auto SimIterations = iterationVs.Scalar(&graph, 10000);
 	auto minusOne = iterationVs.Scalar(&graph, -1);
 
 	auto IterationCntDown = SimIterations->Add(minusOne);

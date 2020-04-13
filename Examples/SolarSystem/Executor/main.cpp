@@ -6,6 +6,7 @@
 #include <float.h>
 #include <cerrno>
 #include <time.h>
+#include <math.h>
 
 #include "common.h"
 
@@ -16,6 +17,22 @@
 	fprintf(stderr, __VA_ARGS__); \
 	fflush(stderr); \
 	exit(1)
+
+// At 10000 iterations
+static const float expectedTerminationState[2 * OBJECT_NROF * DIMENSIONS] = {
+		5.436864122748374938965e-02, -2.608752995729446411133e-02, -1.282220706343650817871e-02,
+		3.694848060607910156250e+00, -3.479873657226562500000e+00, -1.581821084022521972656e+00,
+		6.928699016571044921875e+00, -6.636600017547607421875e+00, -3.039297819137573242188e+00,
+		1.440823078155517578125e+01, 1.244436931610107421875e+01, 5.245813846588134765625e+00,
+		2.969760894775390625000e+01, -3.484727621078491210938e+00, -2.166513442993164062500e+00,
+		1.523834514617919921875e+01, -2.794991302490234375000e+01, -1.330021476745605468750e+01,
+		1.808732434938065125607e-07, -8.569744750275276601315e-06, -3.668478257168317213655e-06,
+		5.035052708990406244993e-06, 4.854637154494412243366e-06, 1.958277380254003219306e-06,
+		1.065750780071539338678e-06, 1.020184527078527025878e-06, 3.754914246201224159449e-07,
+		-1.189661276157494285144e-07, 1.065470485173136694357e-07, 4.834423705801782489289e-08,
+		2.113485741972453979542e-08, 1.500443431723397225142e-07, 6.088395565484461258166e-08,
+		2.230819522164306789591e-11, 7.749273445156745765416e-12, -4.292256220589374393626e-12
+};
 
 typedef struct {
 	uint32_t WriteInterval = 1;
@@ -30,18 +47,21 @@ typedef struct {
 
 static Output_t Output;
 
+static float LastState[2 * OBJECT_NROF * DIMENSIONS];
+
 static void StateCallback(const float* pt, size_t size)
 {
+	memcpy(LastState, pt, sizeof(LastState));
+
 	if(nullptr == Output.File)
 	{
 		return;
 	}
 
-	const size_t expectedSize = 2 * OBJECT_NROF * DIMENSIONS * sizeof(float);
-	if(expectedSize != size)
+	if(sizeof(LastState) != size)
 	{
 		fatal("Unexpected callback size: %lu vs %lu!\n",
-				expectedSize, size);
+				sizeof(LastState), size);
 	}
 
 	Output.Cnt++;
@@ -151,6 +171,20 @@ int main(int argc, char* argv[])
 	clock_t dacStartClock = clock();
 	DacSolarSystemRun(4);
 	clock_t dacEndClock = clock();
+
+	// Check result
+	for(size_t dim = 0; dim < sizeof(expectedTerminationState) / sizeof(expectedTerminationState[0]); dim++)
+	{
+		// We can't compare with constant tolerance, as we are comparing values in the range e-12 .. e+01
+		// We can perform a relative comparison as we are not expecting a 0.f result.
+		float relTolerance = FLT_EPSILON * fabsf(expectedTerminationState[dim]);
+
+		if(fabsf(expectedTerminationState[dim] - LastState[dim]) > relTolerance)
+		{
+			fprintf(stderr, "Last state does not match expected!\n");
+			exit(1);
+		}
+	}
 
 	printf("DAC Runtime: %f Seconds\n",
 			(dacEndClock - dacStartClock) / ((double) CLOCKS_PER_SEC));
