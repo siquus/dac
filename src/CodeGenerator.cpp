@@ -22,14 +22,6 @@
 
 #include "ControlTransfer.h"
 
-#define fprintProtect(ret) \
-	{if(0 > ret) \
-	{ \
-		Error("fprintf failed: %s\n", strerror(errno)); \
-		return false; \
-	} \
-	}
-
 #define SNPRINTF(pt, size, ...) \
 	{ \
 		int ret = snprintf(pt, size, __VA_ARGS__); \
@@ -118,7 +110,11 @@ bool FileWriter::Init(const std::string * path)
 	}
 
 	// Print standard header
-	fprintProtect(fprintf(outfile_, "%s\n", fileHeader));
+	int printRet = fprintf(outfile_, "%s\n", fileHeader);
+	if(0 > printRet)
+	{
+		Fatal("fprintf to %s failed: %s\n", path_.c_str(), strerror(errno));
+	}
 
 	return true;
 }
@@ -141,7 +137,7 @@ void FileWriter::Outdent(uint8_t tabNumber)
 	indentationLevel_ -= tabNumber;
 }
 
-int FileWriter::PrintfLine(const char * format, ...)
+void FileWriter::PrintfLine(const char * format, ...)
 {
 	va_list argList;
 	va_start(argList, format);
@@ -155,7 +151,11 @@ int FileWriter::PrintfLine(const char * format, ...)
 	formatStr += format;
 	formatStr += "\n";
 
-	return vfprintf(outfile_, formatStr.c_str(), argList);
+	int printRet = vfprintf(outfile_, formatStr.c_str(), argList);
+	if(0 > printRet)
+	{
+		Fatal("vfprintf to %s failed: %s\n", path_.c_str(), strerror(errno));
+	}
 }
 
 const std::string * FileWriter::Path() const
@@ -244,48 +244,48 @@ bool CodeGenerator::Generate(const Graph* graph)
 
 	// Generate Includes
 	retFalseOnFalse(GenerateIncludes(), "Could not generate Includes\n");
-	fprintProtect(fileDacC_.PrintfLine(""));
+	fileDacC_.PrintfLine("");
 
-	fprintProtect(fileInstructions_.PrintfLine("#include <stdint.h>"));
-	fprintProtect(fileInstructions_.PrintfLine("#include <math.h>\n"));
-	fprintProtect(fileInstructions_.PrintfLine("#include \"Dac%s.h\"", graph_->Name().c_str()));
-	fprintProtect(fileInstructions_.PrintfLine("#include \"Instructions%s.h\"\n", graph_->Name().c_str()));
+	fileInstructions_.PrintfLine("#include <stdint.h>");
+	fileInstructions_.PrintfLine("#include <math.h>\n");
+	fileInstructions_.PrintfLine("#include \"Dac%s.h\"", graph_->Name().c_str());
+	fileInstructions_.PrintfLine("#include \"Instructions%s.h\"\n", graph_->Name().c_str());
 
 	// Generate Functions
-	fprintProtect(fileDacH_.PrintfLine("#ifdef __cplusplus"));
-	fprintProtect(fileDacH_.PrintfLine("extern \"C\" {"));
-	fprintProtect(fileDacH_.PrintfLine("#endif // __cplusplus\n"));
-	fprintProtect(fileDacH_.PrintfLine("#include <stddef.h>\n"));
+	fileDacH_.PrintfLine("#ifdef __cplusplus");
+	fileDacH_.PrintfLine("extern \"C\" {");
+	fileDacH_.PrintfLine("#endif // __cplusplus\n");
+	fileDacH_.PrintfLine("#include <stddef.h>\n");
 	retFalseOnFalse(GenerateOutputFunctions(), "Could not generate Output Functions\n!");
-	fprintProtect(fileInstructions_.PrintfLine(""));
+	fileInstructions_.PrintfLine("");
 
 	// Generate Variables
 	retFalseOnFalse(GenerateConstantDeclarations(), "Could not generate Constants\n");
-	fprintProtect(fileInstructions_.PrintfLine(""));
+	fileInstructions_.PrintfLine("");
 	retFalseOnFalse(GenerateStaticVariableDeclarations(), "Could not generate Statics\n!");
-	fprintProtect(fileInstructions_.PrintfLine(""));
+	fileInstructions_.PrintfLine("");
 
 	auto runHeading = std::string("The main run routine");
 	retFalseOnFalse(GenerateHeading(&runHeading), "Run Heading failed!\n");
 
 	retFalseOnFalse(GenerateRunFunction(), "Could not generate Run Function!\n");
 
-	fprintProtect(fileInstructions_.PrintfLine("static node_t nodes%s[]; // Initialized below\n", graph_->Name().c_str())) // TODO: This seems dirty.
+	fileInstructions_.PrintfLine("static node_t nodes%s[]; // Initialized below\n", graph_->Name().c_str()); // TODO: This seems dirty.
 
 	retFalseOnFalse(GenerateInstructions(), "Could not generate Instructions!\n");
 
 	retFalseOnFalse(GenerateNodesArray(), "Could not generate Nodes Array");
 
-	fprintProtect(fileDacH_.PrintfLine("#ifdef __cplusplus"));
-	fprintProtect(fileDacH_.PrintfLine("}"));
-	fprintProtect(fileDacH_.PrintfLine("#endif // __cplusplus\n"));
+	fileDacH_.PrintfLine("#ifdef __cplusplus");
+	fileDacH_.PrintfLine("}");
+	fileDacH_.PrintfLine("#endif // __cplusplus\n");
 
 	return true;
 }
 
 bool CodeGenerator::GenerateNodesArray()
 {
-	fprintProtect(fileInstructions_.PrintfLine("static node_t nodes%s[] = {", graph_->Name().c_str()));
+	fileInstructions_.PrintfLine("static node_t nodes%s[] = {", graph_->Name().c_str());
 	fileInstructions_.Indent();
 
 	// Write array
@@ -336,7 +336,7 @@ bool CodeGenerator::GenerateNodesArray()
 	}
 
 	fileInstructions_.Outdent();
-	fprintProtect(fileInstructions_.PrintfLine("};\n"));
+	fileInstructions_.PrintfLine("};\n");
 
 	// Create node-list to initialize job pool
 	std::set<Node::Id_t> firstNodes;
@@ -362,19 +362,19 @@ bool CodeGenerator::GenerateNodesArray()
 	jobPoolInitNodes.erase(jobPoolInitNodes.size() - 2); // Remove last ", "
 	jobPoolInitNodes += "};\n";
 
-	fprintProtect(fileInstructions_.PrintfLine("%s", jobPoolInitNodes.c_str()));
+	fileInstructions_.PrintfLine("%s", jobPoolInitNodes.c_str());
 
 	std::string jobPoolInitId = "jobPoolInit_t jobPoolInit" + graph_->Name();
-	fprintProtect(fileInstructions_.PrintfLine("%s = {", jobPoolInitId.c_str()));
+	fileInstructions_.PrintfLine("%s = {", jobPoolInitId.c_str());
 	fileInstructions_.Indent();
-	fprintProtect(fileInstructions_.PrintfLine(".Nodes = %s,", jobPoolInitNodesId.c_str()));
-	fprintProtect(fileInstructions_.PrintfLine(".NodesNrOf = %lu,", firstNodes.size()));
+	fileInstructions_.PrintfLine(".Nodes = %s,", jobPoolInitNodesId.c_str());
+	fileInstructions_.PrintfLine(".NodesNrOf = %lu,", firstNodes.size());
 	fileInstructions_.Outdent();
-	fprintProtect(fileInstructions_.PrintfLine("};"));
+	fileInstructions_.PrintfLine("};");
 
-	fprintProtect(fileInstructionsH_.PrintfLine("#include \"Helpers.h\"\n"));
-	fprintProtect(fileInstructionsH_.PrintfLine("\n"));
-	fprintProtect(fileInstructionsH_.PrintfLine("extern %s;", jobPoolInitId.c_str()));
+	fileInstructionsH_.PrintfLine("#include \"Helpers.h\"\n");
+	fileInstructionsH_.PrintfLine("\n");
+	fileInstructionsH_.PrintfLine("extern %s;", jobPoolInitId.c_str());
 
 	return true;
 }
@@ -509,14 +509,14 @@ bool CodeGenerator::GenerateCallbackPtCheck(FileWriter* file) const
 
 		auto output = (const Interface::Output*) node.object;
 
-		fprintProtect(file->PrintfLine("if(NULL == Dac%sOutputCallback%s)",
+		file->PrintfLine("if(NULL == Dac%sOutputCallback%s)",
 				graph_->Name().c_str(),
-				output->GetOutputName()->c_str()));
-		fprintProtect(file->PrintfLine("{"));
-		fprintProtect(file->PrintfLine("\tfatal(\"Dac%sOutputCallback%s == NULL\");",
+				output->GetOutputName()->c_str());
+		file->PrintfLine("{");
+		file->PrintfLine("\tfatal(\"Dac%sOutputCallback%s == NULL\");",
 				graph_->Name().c_str(),
-				output->GetOutputName()->c_str()));
-		fprintProtect(file->PrintfLine("}\n"));
+				output->GetOutputName()->c_str());
+		file->PrintfLine("}\n");
 	}
 
 	return true;
@@ -598,7 +598,7 @@ bool CodeGenerator::GenerateNodesElem(
 	buffer += ", ";
 	buffer += std::to_string(nodeId);
 
-	fprintProtect(fileInstructions_.PrintfLine("{%s},", buffer.c_str()));
+	fileInstructions_.PrintfLine("{%s},", buffer.c_str());
 
 	return true;
 }
@@ -606,24 +606,24 @@ bool CodeGenerator::GenerateNodesElem(
 bool CodeGenerator::GenerateRunFunction()
 {
 	// Add prototype to header
-	fprintProtect(fileDacH_.PrintfLine("extern int Dac%sRun(size_t threadsNrOf);", graph_->Name().c_str()));
+	fileDacH_.PrintfLine("extern int Dac%sRun(size_t threadsNrOf);", graph_->Name().c_str());
 
 	// Define function
-	fprintProtect(fileDacC_.PrintfLine("int Dac%sRun(size_t threadsNrOf)\n{", graph_->Name().c_str()));
+	fileDacC_.PrintfLine("int Dac%sRun(size_t threadsNrOf)\n{", graph_->Name().c_str());
 	fileDacC_.Indent();
 
 	// Check that callbacks have been set
 	GenerateCallbackPtCheck(&fileDacC_);
 
 	// Fire up threads
-	fprintProtect(fileDacC_.PrintfLine("void * instance = NULL;"));
-	fprintProtect(fileDacC_.PrintfLine("StartThreads(&instance, threadsNrOf, &jobPoolInit%s);", graph_->Name().c_str()));
+	fileDacC_.PrintfLine("void * instance = NULL;");
+	fileDacC_.PrintfLine("StartThreads(&instance, threadsNrOf, &jobPoolInit%s);", graph_->Name().c_str());
 
 	// Join threads, create return values and closing brackets
-	fprintProtect(fileDacC_.PrintfLine("JoinThreads(instance);\n"));
+	fileDacC_.PrintfLine("JoinThreads(instance);\n");
 
 	// Return 0 to show success.
-	fprintProtect(fileDacC_.PrintfLine("return 0;\n}\n"));
+	fileDacC_.PrintfLine("return 0;\n}\n");
 
 	return true;
 }
@@ -654,14 +654,14 @@ bool CodeGenerator::OutputCode(const Node* node, FileWriter * file)
 		}
 		NodeStr += *varIdentifier;
 
-		fprintProtect(file->PrintfLine("Dac%sOutputCallback%s(%s, sizeof(%s));\n",
+		file->PrintfLine("Dac%sOutputCallback%s(%s, sizeof(%s));\n",
 				graph_->Name().c_str(),
 				output->GetOutputName()->c_str(),
 				NodeStr.c_str(),
-				varIdentifier->c_str()));
+				varIdentifier->c_str());
 	}
 
-	fprintProtect(file->PrintfLine(""));
+	file->PrintfLine("");
 
 	return true;
 }
@@ -743,7 +743,7 @@ bool CodeGenerator::GenerateLocalVariableDeclaration(const Variable * var)
 		std::string varDecl;
 		var->GetDeclaration(&varDecl);
 		varDecl += "\n";
-		fprintProtect(fileDacC_.PrintfLine("\t%s", varDecl.c_str()));
+		fileDacC_.PrintfLine("\t%s", varDecl.c_str());
 	}
 
 	return true;
@@ -765,24 +765,24 @@ bool CodeGenerator::VectorAdditionCode(const Node* node, FileWriter * file)
 
 	if(resultIsArray)
 	{
-		fprintProtect(file->PrintfLine("for(uint32_t dim = 0; dim < %u; dim++)",
-				vecOp->__space_->GetDim()));
+		file->PrintfLine("for(uint32_t dim = 0; dim < %u; dim++)",
+				vecOp->__space_->GetDim());
 
-		fprintProtect(file->PrintfLine("{"));
+		file->PrintfLine("{");
 
-		fprintProtect(file->PrintfLine("\t%s[dim] = %s[dim] + %s[dim];",
+		file->PrintfLine("\t%s[dim] = %s[dim] + %s[dim];",
 				varOp->GetIdentifier()->c_str(),
 				varSum1->GetIdentifier()->c_str(),
-				varSum2->GetIdentifier()->c_str()));
+				varSum2->GetIdentifier()->c_str());
 
-		fprintProtect(file->PrintfLine("}\n"));
+		file->PrintfLine("}\n");
 	}
 	else
 	{
-		fprintProtect(file->PrintfLine("%s = %s + %s;",
+		file->PrintfLine("%s = %s + %s;",
 				varOp->GetIdentifier()->c_str(),
 				varSum1->GetIdentifier()->c_str(),
-				varSum2->GetIdentifier()->c_str()));
+				varSum2->GetIdentifier()->c_str());
 	}
 
 	return true;
@@ -861,19 +861,19 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 	}
 	deltaPairs.erase(deltaPairs.end() - 2, deltaPairs.end()); // remove last ", "
 	deltaPairs += "};";
-	fprintProtect(file->PrintfLine("%s", deltaPairs.c_str()));
+	file->PrintfLine("%s", deltaPairs.c_str());
 
 	// Calculate Strides, assume Row-Major Layout
 	// https://en.wikipedia.org/wiki/Row-_and_column-major_order#Address_calculation_in_general
 	std::vector<uint32_t> argStrides;
 	argVec->__space_->GetStrides(&argStrides);
 	const char argStridesId[] = "argStrides";
-	fprintProtect(file->PrintfLine("const uint32_t %s[] = {", argStridesId));
+	file->PrintfLine("const uint32_t %s[] = {", argStridesId);
 	for(const uint32_t &stride: argStrides)
 	{
-		fprintProtect(file->PrintfLine("\t %u,", stride));
+		file->PrintfLine("\t %u,", stride);
 	}
-	fprintProtect(file->PrintfLine("};"));
+	file->PrintfLine("};");
 
 	const char * varOpId = varOp->GetIdentifier()->c_str();
 
@@ -884,16 +884,16 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 		std::vector<uint32_t> opStrides;
 		opVec->__space_->GetStrides(&opStrides);
 		const char opstridesId[] = "opStrides";
-		fprintProtect(file->PrintfLine("const uint32_t %s[] = {", opstridesId));
+		file->PrintfLine("const uint32_t %s[] = {", opstridesId);
 		for(const uint32_t &stride: opStrides)
 		{
-			fprintProtect(file->PrintfLine("\t %u,", stride));
+			file->PrintfLine("\t %u,", stride);
 		}
-		fprintProtect(file->PrintfLine("};\n"));
+		file->PrintfLine("};\n");
 
-		fprintProtect(file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
-				varOpId, varOpId));
-		fprintProtect(file->PrintfLine("{"));
+		file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
+				varOpId, varOpId);
+		file->PrintfLine("{");
 		file->Indent();
 
 		std::string opIndexTuple = "const uint32_t opIndexTuple[] = {";
@@ -920,17 +920,17 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 		opIndexTuple.erase(opIndexTuple.end() - 2, opIndexTuple.end()); // remove last ", "
 		opIndexTuple += "};";
 
-		fprintProtect(file->PrintfLine("%s", opIndexTuple.c_str()));
+		file->PrintfLine("%s", opIndexTuple.c_str());
 	}
 
-	fprintProtect(file->PrintfLine("%s sum = 0;", varOp->GetTypeString()));
+	file->PrintfLine("%s sum = 0;", varOp->GetTypeString());
 	for(uint32_t factorIndex = 0; factorIndex < contractValue->lfactors.size(); factorIndex++)
 	{
-		fprintProtect(file->PrintfLine("for(int dim%u = 0; dim%u < %u; dim%u++)",
+		file->PrintfLine("for(int dim%u = 0; dim%u < %u; dim%u++)",
 				factorIndex, factorIndex,
 				argVec->__space_->factors_[argContractFactors->at(factorIndex)].dim_,
-				factorIndex));
-		fprintProtect(file->PrintfLine("{"));
+				factorIndex);
+		file->PrintfLine("{");
 		file->Indent();
 	}
 
@@ -964,7 +964,7 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 
 	argIndexTuple.erase(argIndexTuple.end() - 2, argIndexTuple.end()); // remove last ", "
 	argIndexTuple += "};";
-	fprintProtect(file->PrintfLine(argIndexTuple.c_str()));
+	file->PrintfLine(argIndexTuple.c_str());
 
 	if(!argVecIsLeftArg)
 	{
@@ -995,7 +995,7 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 
 	kronIndexTuple.erase(kronIndexTuple.end() - 2, kronIndexTuple.end()); // remove last ", "
 	kronIndexTuple += "};";
-	fprintProtect(file->PrintfLine(kronIndexTuple.c_str()));
+	file->PrintfLine(kronIndexTuple.c_str());
 
 	// A_ijk	= B_ijm d_mk
 	//			= B_ijk
@@ -1028,27 +1028,27 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 	}
 	sum += " " + std::to_string(kroneckerParam->Scaling) + "f;";
 
-	fprintProtect(file->PrintfLine(sum.c_str()));
+	file->PrintfLine(sum.c_str());
 
 	for(uint32_t factorIndex = 0; factorIndex < contractValue->lfactors.size(); factorIndex++)
 	{
 		file->Outdent();
-		fprintProtect(file->PrintfLine("}"));
+		file->PrintfLine("}");
 	}
 
-	fprintProtect(file->PrintfLine(""));
+	file->PrintfLine("");
 
 	if(resultIsArray)
 	{
-		fprintProtect(file->PrintfLine("%s[opIndex] = sum;",
-				varOpId));
+		file->PrintfLine("%s[opIndex] = sum;",
+				varOpId);
 
 		file->Outdent();
-		fprintProtect(file->PrintfLine("}"));
+		file->PrintfLine("}");
 	}
 	else
 	{
-		fprintProtect(file->PrintfLine("%s = sum;", varOpId));
+		file->PrintfLine("%s = sum;", varOpId);
 	}
 
 	return true;
@@ -1078,16 +1078,16 @@ bool CodeGenerator::VectorPermutationCode(const Node* node, FileWriter * file)
 	std::vector<uint32_t> strides;
 	vec->__space_->GetStrides(&strides);
 	const char stridesId[] = "strides";
-	fprintProtect(file->PrintfLine("const uint32_t %s[] = {", stridesId));
+	file->PrintfLine("const uint32_t %s[] = {", stridesId);
 	for(const uint32_t &stride: strides)
 	{
-		fprintProtect(file->PrintfLine("\t %u,", stride));
+		file->PrintfLine("\t %u,", stride);
 	}
-	fprintProtect(file->PrintfLine("};\n"));
+	file->PrintfLine("};\n");
 
-	fprintProtect(file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
-			varOpId, varOpId));
-	fprintProtect(file->PrintfLine("{"));
+	file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
+			varOpId, varOpId);
+	file->PrintfLine("{");
 	file->Indent();
 
 	std::string opIndexTuple = "const uint32_t opIndexTuple[] = {";
@@ -1114,7 +1114,7 @@ bool CodeGenerator::VectorPermutationCode(const Node* node, FileWriter * file)
 	opIndexTuple.erase(opIndexTuple.end() - 2, opIndexTuple.end()); // remove last ", "
 	opIndexTuple += "};";
 
-	fprintProtect(file->PrintfLine("%s", opIndexTuple.c_str()));
+	file->PrintfLine("%s", opIndexTuple.c_str());
 
 	std::string argIndexTuple = "const uint32_t argIndexTuple[] = {";
 
@@ -1126,7 +1126,7 @@ bool CodeGenerator::VectorPermutationCode(const Node* node, FileWriter * file)
 	argIndexTuple.erase(argIndexTuple.end() - 2, argIndexTuple.end()); // remove last ", "
 	argIndexTuple += "};\n";
 
-	fprintProtect(file->PrintfLine("%s", argIndexTuple.c_str()));
+	file->PrintfLine("%s", argIndexTuple.c_str());
 
 	std::string opValue = varOpId;
 	opValue += "[opIndex]";
@@ -1141,10 +1141,10 @@ bool CodeGenerator::VectorPermutationCode(const Node* node, FileWriter * file)
 	opValue.erase(opValue.end() - 3, opValue.end()); // remove last " + "
 	opValue += "];";
 
-	fprintProtect(file->PrintfLine("%s", opValue.c_str()));
+	file->PrintfLine("%s", opValue.c_str());
 
 	file->Outdent();
-	fprintProtect(file->PrintfLine("}"));
+	file->PrintfLine("}");
 
 	return true;
 }
@@ -1188,22 +1188,22 @@ bool CodeGenerator::VectorContractionCode(const Node* node, FileWriter * file)
 	std::vector<uint32_t> lStrides;
 	lVec->__space_->GetStrides(&lStrides);
 	const char lstridesId[] = "lStrides";
-	fprintProtect(file->PrintfLine("const uint32_t %s[] = {", lstridesId));
+	file->PrintfLine("const uint32_t %s[] = {", lstridesId);
 	for(const uint32_t &stride: lStrides)
 	{
-		fprintProtect(file->PrintfLine("\t %u,", stride));
+		file->PrintfLine("\t %u,", stride);
 	}
-	fprintProtect(file->PrintfLine("};"));
+	file->PrintfLine("};");
 
 	std::vector<uint32_t> rStrides;
 	rVec->__space_->GetStrides(&rStrides);
 	const char rstridesId[] = "rStrides";
-	fprintProtect(file->PrintfLine("const uint32_t %s[] = {", rstridesId));
+	file->PrintfLine("const uint32_t %s[] = {", rstridesId);
 	for(const uint32_t &stride: rStrides)
 	{
-		fprintProtect(file->PrintfLine("\t %u,", stride));
+		file->PrintfLine("\t %u,", stride);
 	}
-	fprintProtect(file->PrintfLine("};"));
+	file->PrintfLine("};");
 
 	const char * varOpId = varOp->GetIdentifier()->c_str();
 
@@ -1214,16 +1214,16 @@ bool CodeGenerator::VectorContractionCode(const Node* node, FileWriter * file)
 		std::vector<uint32_t> opStrides;
 		opVec->__space_->GetStrides(&opStrides);
 		const char opstridesId[] = "opStrides";
-		fprintProtect(file->PrintfLine("const uint32_t %s[] = {", opstridesId));
+		file->PrintfLine("const uint32_t %s[] = {", opstridesId);
 		for(const uint32_t &stride: opStrides)
 		{
-			fprintProtect(file->PrintfLine("\t %u,", stride));
+			file->PrintfLine("\t %u,", stride);
 		}
-		fprintProtect(file->PrintfLine("};\n"));
+		file->PrintfLine("};\n");
 
-		fprintProtect(file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
-				varOpId, varOpId));
-		fprintProtect(file->PrintfLine("{"));
+		file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
+				varOpId, varOpId);
+		file->PrintfLine("{");
 		file->Indent();
 
 		std::string opIndexTuple = "const uint32_t opIndexTuple[] = {";
@@ -1250,17 +1250,17 @@ bool CodeGenerator::VectorContractionCode(const Node* node, FileWriter * file)
 		opIndexTuple.erase(opIndexTuple.end() - 2, opIndexTuple.end()); // remove last ", "
 		opIndexTuple += "};";
 
-		fprintProtect(file->PrintfLine("%s", opIndexTuple.c_str()));
+		file->PrintfLine("%s", opIndexTuple.c_str());
 	}
 
-	fprintProtect(file->PrintfLine("%s sum = 0;", varOp->GetTypeString()));
+	file->PrintfLine("%s sum = 0;", varOp->GetTypeString());
 	for(uint32_t factorIndex = 0; factorIndex < contractValue->lfactors.size(); factorIndex++)
 	{
-		fprintProtect(file->PrintfLine("for(int dim%u = 0; dim%u < %u; dim%u++)",
+		file->PrintfLine("for(int dim%u = 0; dim%u < %u; dim%u++)",
 				factorIndex, factorIndex,
 				lVec->__space_->factors_[contractValue->lfactors[factorIndex]].dim_,
-				factorIndex));
-		fprintProtect(file->PrintfLine("{"));
+				factorIndex);
+		file->PrintfLine("{");
 		file->Indent();
 	}
 
@@ -1289,7 +1289,7 @@ bool CodeGenerator::VectorContractionCode(const Node* node, FileWriter * file)
 
 	lIndexTuple.erase(lIndexTuple.end() - 2, lIndexTuple.end()); // remove last ", "
 	lIndexTuple += "};";
-	fprintProtect(file->PrintfLine(lIndexTuple.c_str()));
+	file->PrintfLine(lIndexTuple.c_str());
 
 	std::string rIndexTuple = "const uint32_t rIndexTuple[] = {";
 	for(uint32_t rDim = 0; rDim < rVec->__space_->factors_.size(); rDim++)
@@ -1315,7 +1315,7 @@ bool CodeGenerator::VectorContractionCode(const Node* node, FileWriter * file)
 
 	rIndexTuple.erase(rIndexTuple.end() - 2, rIndexTuple.end()); // remove last ", "
 	rIndexTuple += "};";
-	fprintProtect(file->PrintfLine(rIndexTuple.c_str()));
+	file->PrintfLine(rIndexTuple.c_str());
 
 	std::string sum = "sum += ";
 	sum += *(varLVec->GetIdentifier()) + "[";
@@ -1340,27 +1340,27 @@ bool CodeGenerator::VectorContractionCode(const Node* node, FileWriter * file)
 	sum.erase(sum.end() - 3, sum.end()); // remove last " +"
 	sum += "];";
 
-	fprintProtect(file->PrintfLine(sum.c_str()));
+	file->PrintfLine(sum.c_str());
 
 	for(uint32_t factorIndex = 0; factorIndex < contractValue->lfactors.size(); factorIndex++)
 	{
 		file->Outdent();
-		fprintProtect(file->PrintfLine("}"));
+		file->PrintfLine("}");
 	}
 
-	fprintProtect(file->PrintfLine(""));
+	file->PrintfLine("");
 
 	if(resultIsArray)
 	{
-		fprintProtect(file->PrintfLine("%s[opIndex] = sum;",
-				varOpId));
+		file->PrintfLine("%s[opIndex] = sum;",
+				varOpId);
 
 		file->Outdent();
-		fprintProtect(file->PrintfLine("}"));
+		file->PrintfLine("}");
 	}
 	else
 	{
-		fprintProtect(file->PrintfLine("%s = sum;", varOpId));
+		file->PrintfLine("%s = sum;", varOpId);
 	}
 
 	return true;
@@ -1379,53 +1379,53 @@ bool CodeGenerator::VectorComparisonIsSmallerCode(const Node* node, FileWriter *
 	lNormId += *(varLVec->GetIdentifier());
 	lNormId += "Norm";
 	lNormId += std::to_string(varLVec->GetNewRunningNumber());
-	fprintProtect(file->PrintfLine("%s %s = 0;",
+	file->PrintfLine("%s %s = 0;",
 			varLVec->GetTypeString(),
-			lNormId.c_str()));
+			lNormId.c_str());
 
 	std::string rNormId;
 	rNormId += *(varRVec->GetIdentifier());
 	rNormId += "Norm";
 	rNormId += std::to_string(varRVec->GetNewRunningNumber());
-	fprintProtect(file->PrintfLine("%s %s = 0;",
+	file->PrintfLine("%s %s = 0;",
 			varRVec->GetTypeString(),
-			rNormId.c_str()));
+			rNormId.c_str());
 
 	std::string lArrayElem;
 	varLVec->GetElement(&lArrayElem, "dim");
 
-	fprintProtect(file->PrintfLine("for(uint32_t dim = 0; dim < %u; dim++)",
-			varLVec->Length()));
-	fprintProtect(file->PrintfLine("{"));
-	fprintProtect(file->PrintfLine("\t %s += %s * %s;",
+	file->PrintfLine("for(uint32_t dim = 0; dim < %u; dim++)",
+			varLVec->Length());
+	file->PrintfLine("{");
+	file->PrintfLine("\t %s += %s * %s;",
 			lNormId.c_str(),
-			lArrayElem.c_str(), lArrayElem.c_str()));
-	fprintProtect(file->PrintfLine("}\n"));
+			lArrayElem.c_str(), lArrayElem.c_str());
+	file->PrintfLine("}\n");
 
 	std::string rArrayElem;
 	varRVec->GetElement(&rArrayElem, "dim");
 
-	fprintProtect(file->PrintfLine("for(uint32_t dim = 0; dim < %u; dim++)",
-			varRVec->Length()));
-	fprintProtect(file->PrintfLine("{"));
-	fprintProtect(file->PrintfLine("\t %s += %s * %s;",
+	file->PrintfLine("for(uint32_t dim = 0; dim < %u; dim++)",
+			varRVec->Length());
+	file->PrintfLine("{");
+	file->PrintfLine("\t %s += %s * %s;",
 			rNormId.c_str(),
-			rArrayElem.c_str(), rArrayElem.c_str()));
-	fprintProtect(file->PrintfLine("}\n"));
+			rArrayElem.c_str(), rArrayElem.c_str());
+	file->PrintfLine("}\n");
 
 	retFalseOnFalse(GenerateLocalVariableDeclaration(varOp), "Could not generate Var. Decl.\n");
 
-	fprintProtect(file->PrintfLine("if(%s < %s)",
-			lNormId.c_str(), rNormId.c_str()));
-	fprintProtect(file->PrintfLine("{"));
-	fprintProtect(file->PrintfLine("\t %s = 1;",
-			varOp->GetIdentifier()->c_str()));
-	fprintProtect(file->PrintfLine("}"));
-	fprintProtect(file->PrintfLine("else"));
-	fprintProtect(file->PrintfLine("{"));
-	fprintProtect(file->PrintfLine("\t %s = 0;",
-			varOp->GetIdentifier()->c_str()));
-	fprintProtect(file->PrintfLine("}\n"));
+	file->PrintfLine("if(%s < %s)",
+			lNormId.c_str(), rNormId.c_str());
+	file->PrintfLine("{");
+	file->PrintfLine("\t %s = 1;",
+			varOp->GetIdentifier()->c_str());
+	file->PrintfLine("}");
+	file->PrintfLine("else");
+	file->PrintfLine("{");
+	file->PrintfLine("\t %s = 0;",
+			varOp->GetIdentifier()->c_str());
+	file->PrintfLine("}\n");
 
 	return true;
 }
@@ -1538,42 +1538,42 @@ bool CodeGenerator::ControlTransferWhileCode(const Node* node, FileWriter * file
 	arrayPosTrue.insert(arrayPosCondition.begin(), arrayPosCondition.end());
 
 	// Print the instructions
-	fprintProtect(file->PrintfLine("if(%s)", varCond->GetIdentifier()->c_str()));
-	fprintProtect(file->PrintfLine("{"));
+	file->PrintfLine("if(%s)", varCond->GetIdentifier()->c_str());
+	file->PrintfLine("{");
 
 	if(arrayPosTrue.size())
 	{
 		for(const uint32_t &pos: arrayPosTrue)
 		{
-			fprintProtect(file->PrintfLine("\tPushNode(instance, &nodes%s[%u]);",
+			file->PrintfLine("\tPushNode(instance, &nodes%s[%u]);",
 					graph_->Name().c_str(),
-					pos));
+					pos);
 		}
 	}
 	else
 	{
-		fprintProtect(file->PrintfLine("; // Do nothing"));
+		file->PrintfLine("; // Do nothing");
 	}
 
-	fprintProtect(file->PrintfLine("}"));
-	fprintProtect(file->PrintfLine("else"));
-	fprintProtect(file->PrintfLine("{"));
+	file->PrintfLine("}");
+	file->PrintfLine("else");
+	file->PrintfLine("{");
 
 	if(arrayPosFalse.size())
 	{
 		for(const uint32_t &pos: arrayPosFalse)
 		{
-			fprintProtect(file->PrintfLine("\tPushNode(instance, &nodes%s[%u]);",
+			file->PrintfLine("\tPushNode(instance, &nodes%s[%u]);",
 					graph_->Name().c_str(),
-					pos));
+					pos);
 		}
 	}
 	else
 	{
-		fprintProtect(file->PrintfLine("\t; // Do nothing"));
+		file->PrintfLine("\t; // Do nothing");
 	}
 
-	fprintProtect(file->PrintfLine("}"));
+	file->PrintfLine("}");
 
 	return true;
 }
@@ -1631,12 +1631,12 @@ bool CodeGenerator::VectorScalarProductKroneckerDeltaCode(const Node* node, File
 	std::vector<uint32_t> opStrides;
 	opVec->__space_->GetStrides(&opStrides);
 	const char opstridesId[] = "opStrides";
-	fprintProtect(file->PrintfLine("const uint32_t %s[] = {", opstridesId));
+	file->PrintfLine("const uint32_t %s[] = {", opstridesId);
 	for(const uint32_t &stride: opStrides)
 	{
-		fprintProtect(file->PrintfLine("\t %u,", stride));
+		file->PrintfLine("\t %u,", stride);
 	}
-	fprintProtect(file->PrintfLine("};\n"));
+	file->PrintfLine("};\n");
 
 	std::string deltaPairs = "const uint32_t deltaPairs[] = {";
 	for(size_t paramPos = 0; paramPos < kroneckerParam->DeltaPair.size(); paramPos++)
@@ -1645,12 +1645,12 @@ bool CodeGenerator::VectorScalarProductKroneckerDeltaCode(const Node* node, File
 	}
 	deltaPairs.erase(deltaPairs.end() - 2, deltaPairs.end()); // remove last ", "
 	deltaPairs += "};";
-	fprintProtect(file->PrintfLine("%s", deltaPairs.c_str()));
+	file->PrintfLine("%s", deltaPairs.c_str());
 
-	fprintProtect(file->PrintfLine("for(uint32_t opIndex = 0; opIndex < %u; opIndex++)",
-			opVec->__space_->GetDim()));
+	file->PrintfLine("for(uint32_t opIndex = 0; opIndex < %u; opIndex++)",
+			opVec->__space_->GetDim());
 
-	fprintProtect(file->PrintfLine("{"));
+	file->PrintfLine("{");
 	file->Indent();
 
 	std::string opIndexTuple = "const uint32_t opIndexTuple[] = {";
@@ -1678,7 +1678,7 @@ bool CodeGenerator::VectorScalarProductKroneckerDeltaCode(const Node* node, File
 
 	opIndexTuple += "};";
 
-	fprintProtect(file->PrintfLine("%s", opIndexTuple.c_str()));
+	file->PrintfLine("%s", opIndexTuple.c_str());
 
 	std::string Result = *(varOp->GetIdentifier());
 	Result += "[opIndex] =";
@@ -1703,10 +1703,10 @@ bool CodeGenerator::VectorScalarProductKroneckerDeltaCode(const Node* node, File
 
 	 Result += *varScalar->GetIdentifier() + ";";;
 
-	fprintProtect(file->PrintfLine(Result.c_str()));
+	file->PrintfLine(Result.c_str());
 
 	file->Outdent();
-	fprintProtect(file->PrintfLine("}\n"));
+	file->PrintfLine("}\n");
 
 	return true;
 }
@@ -1773,22 +1773,22 @@ bool CodeGenerator::VectorVectorProductKroneckerDeltaCode(const Node* node, File
 	std::vector<uint32_t> vecStrides;
 	vec->__space_->GetStrides(&vecStrides);
 	const char vecStridesId[] = "vecStrides";
-	fprintProtect(file->PrintfLine("const uint32_t %s[] = {", vecStridesId));
+	file->PrintfLine("const uint32_t %s[] = {", vecStridesId);
 	for(const uint32_t &stride: vecStrides)
 	{
-		fprintProtect(file->PrintfLine("\t %u,", stride));
+		file->PrintfLine("\t %u,", stride);
 	}
-	fprintProtect(file->PrintfLine("};"));
+	file->PrintfLine("};");
 
 	std::vector<uint32_t> opStrides;
 	opVec->__space_->GetStrides(&opStrides);
 	const char opstridesId[] = "opStrides";
-	fprintProtect(file->PrintfLine("const uint32_t %s[] = {", opstridesId));
+	file->PrintfLine("const uint32_t %s[] = {", opstridesId);
 	for(const uint32_t &stride: opStrides)
 	{
-		fprintProtect(file->PrintfLine("\t %u,", stride));
+		file->PrintfLine("\t %u,", stride);
 	}
-	fprintProtect(file->PrintfLine("};\n"));
+	file->PrintfLine("};\n");
 
 	std::string deltaPairs = "const uint32_t deltaPairs[] = {";
 	for(size_t paramPos = 0; paramPos < kroneckerParam->DeltaPair.size(); paramPos++)
@@ -1797,13 +1797,13 @@ bool CodeGenerator::VectorVectorProductKroneckerDeltaCode(const Node* node, File
 	}
 	deltaPairs.erase(deltaPairs.end() - 2, deltaPairs.end()); // remove last ", "
 	deltaPairs += "};";
-	fprintProtect(file->PrintfLine("%s", deltaPairs.c_str()));
+	file->PrintfLine("%s", deltaPairs.c_str());
 
 	const char * varOpId = varOp->GetIdentifier()->c_str();
 
-	fprintProtect(file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
-			varOpId, varOpId));
-	fprintProtect(file->PrintfLine("{"));
+	file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
+			varOpId, varOpId);
+	file->PrintfLine("{");
 	file->Indent();
 
 	std::string opIndexTuple = "const uint32_t opIndexTuple[] = {";
@@ -1830,7 +1830,7 @@ bool CodeGenerator::VectorVectorProductKroneckerDeltaCode(const Node* node, File
 	opIndexTuple.erase(opIndexTuple.end() - 2, opIndexTuple.end()); // remove last ", "
 	opIndexTuple += "};";
 
-	fprintProtect(file->PrintfLine("%s", opIndexTuple.c_str()));
+	file->PrintfLine("%s", opIndexTuple.c_str());
 
 	uint32_t vecIndexOffset = 0;
 	if(lNodeIsKron)
@@ -1848,7 +1848,7 @@ bool CodeGenerator::VectorVectorProductKroneckerDeltaCode(const Node* node, File
 
 	vecIndexTuple.erase(vecIndexTuple.end() - 2, vecIndexTuple.end()); // remove last ", "
 	vecIndexTuple += "};";
-	fprintProtect(file->PrintfLine(vecIndexTuple.c_str()));
+	file->PrintfLine(vecIndexTuple.c_str());
 
 	uint32_t kronIndexOffset = vec->__space_->factors_.size();
 	if(lNodeIsKron)
@@ -1866,7 +1866,7 @@ bool CodeGenerator::VectorVectorProductKroneckerDeltaCode(const Node* node, File
 
 	kronIndexTuple.erase(kronIndexTuple.end() - 2, kronIndexTuple.end()); // remove last ", "
 	kronIndexTuple += "};";
-	fprintProtect(file->PrintfLine(kronIndexTuple.c_str()));
+	file->PrintfLine(kronIndexTuple.c_str());
 
 	std::string product = varOpId;
 	product += "[opIndex] =";
@@ -1900,12 +1900,12 @@ bool CodeGenerator::VectorVectorProductKroneckerDeltaCode(const Node* node, File
 	product.erase(product.end() - 3, product.end()); // remove last " +"
 	product += "];";
 
-	fprintProtect(file->PrintfLine(product.c_str()));
+	file->PrintfLine(product.c_str());
 
-	fprintProtect(file->PrintfLine(""));
+	file->PrintfLine("");
 
 	file->Outdent();
-	fprintProtect(file->PrintfLine("}"));
+	file->PrintfLine("}");
 
 	return true;
 }
@@ -1948,38 +1948,38 @@ bool CodeGenerator::VectorVectorProductCode(const Node* node, FileWriter * file,
 	std::vector<uint32_t> lStrides;
 	lVec->__space_->GetStrides(&lStrides);
 	const char lstridesId[] = "lStrides";
-	fprintProtect(file->PrintfLine("const uint32_t %s[] = {", lstridesId));
+	file->PrintfLine("const uint32_t %s[] = {", lstridesId);
 	for(const uint32_t &stride: lStrides)
 	{
-		fprintProtect(file->PrintfLine("\t %u,", stride));
+		file->PrintfLine("\t %u,", stride);
 	}
-	fprintProtect(file->PrintfLine("};"));
+	file->PrintfLine("};");
 
 	std::vector<uint32_t> rStrides;
 	rVec->__space_->GetStrides(&rStrides);
 	const char rstridesId[] = "rStrides";
-	fprintProtect(file->PrintfLine("const uint32_t %s[] = {", rstridesId));
+	file->PrintfLine("const uint32_t %s[] = {", rstridesId);
 	for(const uint32_t &stride: rStrides)
 	{
-		fprintProtect(file->PrintfLine("\t %u,", stride));
+		file->PrintfLine("\t %u,", stride);
 	}
-	fprintProtect(file->PrintfLine("};"));
+	file->PrintfLine("};");
 
 	std::vector<uint32_t> opStrides;
 	opVec->__space_->GetStrides(&opStrides);
 	const char opstridesId[] = "opStrides";
-	fprintProtect(file->PrintfLine("const uint32_t %s[] = {", opstridesId));
+	file->PrintfLine("const uint32_t %s[] = {", opstridesId);
 	for(const uint32_t &stride: opStrides)
 	{
-		fprintProtect(file->PrintfLine("\t %u,", stride));
+		file->PrintfLine("\t %u,", stride);
 	}
-	fprintProtect(file->PrintfLine("};\n"));
+	file->PrintfLine("};\n");
 
 	const char * varOpId = varOp->GetIdentifier()->c_str();
 
-	fprintProtect(file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
-			varOpId, varOpId));
-	fprintProtect(file->PrintfLine("{"));
+	file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
+			varOpId, varOpId);
+	file->PrintfLine("{");
 	file->Indent();
 
 	std::string opIndexTuple = "const uint32_t opIndexTuple[] = {";
@@ -2006,7 +2006,7 @@ bool CodeGenerator::VectorVectorProductCode(const Node* node, FileWriter * file,
 	opIndexTuple.erase(opIndexTuple.end() - 2, opIndexTuple.end()); // remove last ", "
 	opIndexTuple += "};";
 
-	fprintProtect(file->PrintfLine("%s", opIndexTuple.c_str()));
+	file->PrintfLine("%s", opIndexTuple.c_str());
 
 	std::string lIndexTuple = "const uint32_t lIndexTuple[] = {";
 	for(uint32_t lDim = 0; lDim < lVec->__space_->factors_.size(); lDim++)
@@ -2018,7 +2018,7 @@ bool CodeGenerator::VectorVectorProductCode(const Node* node, FileWriter * file,
 
 	lIndexTuple.erase(lIndexTuple.end() - 2, lIndexTuple.end()); // remove last ", "
 	lIndexTuple += "};";
-	fprintProtect(file->PrintfLine(lIndexTuple.c_str()));
+	file->PrintfLine(lIndexTuple.c_str());
 
 	std::string rIndexTuple = "const uint32_t rIndexTuple[] = {";
 	for(uint32_t rDim = 0; rDim < rVec->__space_->factors_.size(); rDim++)
@@ -2030,7 +2030,7 @@ bool CodeGenerator::VectorVectorProductCode(const Node* node, FileWriter * file,
 
 	rIndexTuple.erase(rIndexTuple.end() - 2, rIndexTuple.end()); // remove last ", "
 	rIndexTuple += "};";
-	fprintProtect(file->PrintfLine(rIndexTuple.c_str()));
+	file->PrintfLine(rIndexTuple.c_str());
 
 	std::string product = varOpId;
 	product += "[opIndex] = ";
@@ -2063,12 +2063,12 @@ bool CodeGenerator::VectorVectorProductCode(const Node* node, FileWriter * file,
 	product.erase(product.end() - 3, product.end()); // remove last " +"
 	product += "];";
 
-	fprintProtect(file->PrintfLine(product.c_str()));
+	file->PrintfLine(product.c_str());
 
-	fprintProtect(file->PrintfLine(""));
+	file->PrintfLine("");
 
 	file->Outdent();
-	fprintProtect(file->PrintfLine("}"));
+	file->PrintfLine("}");
 
 	return true;
 }
@@ -2095,26 +2095,26 @@ bool CodeGenerator::VectorJoinIndicesCode(const Node* node, FileWriter * file)
 	std::vector<uint32_t> opStrides;
 	vecOp->__space_->GetStrides(&opStrides);
 	const char opstridesId[] = "opStrides";
-	fprintProtect(file->PrintfLine("const uint32_t %s[] = {", opstridesId));
+	file->PrintfLine("const uint32_t %s[] = {", opstridesId);
 	for(const uint32_t &stride: opStrides)
 	{
-		fprintProtect(file->PrintfLine("\t %u,", stride));
+		file->PrintfLine("\t %u,", stride);
 	}
-	fprintProtect(file->PrintfLine("};\n"));
+	file->PrintfLine("};\n");
 
 	std::vector<uint32_t> argStrides;
 	vecArg->__space_->GetStrides(&argStrides);
 	const char argstridesId[] = "argStrides";
-	fprintProtect(file->PrintfLine("const uint32_t %s[] = {", argstridesId));
+	file->PrintfLine("const uint32_t %s[] = {", argstridesId);
 	for(const uint32_t &stride: argStrides)
 	{
-		fprintProtect(file->PrintfLine("\t %u,", stride));
+		file->PrintfLine("\t %u,", stride);
 	}
-	fprintProtect(file->PrintfLine("};"));
+	file->PrintfLine("};");
 
-	fprintProtect(file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
-			varOp->GetIdentifier()->c_str(), varOp->GetIdentifier()->c_str()));
-	fprintProtect(file->PrintfLine("{"));
+	file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
+			varOp->GetIdentifier()->c_str(), varOp->GetIdentifier()->c_str());
+	file->PrintfLine("{");
 	file->Indent();
 
 	std::string opIndexTuple = "const uint32_t opIndexTuple[] = {";
@@ -2141,7 +2141,7 @@ bool CodeGenerator::VectorJoinIndicesCode(const Node* node, FileWriter * file)
 	opIndexTuple.erase(opIndexTuple.end() - 2, opIndexTuple.end()); // remove last ", "
 	opIndexTuple += "};";
 
-	fprintProtect(file->PrintfLine("%s", opIndexTuple.c_str()));
+	file->PrintfLine("%s", opIndexTuple.c_str());
 
 	std::vector<uint32_t> opIndexPos(param->Indices.size(), UINT32_MAX);
 	std::string argIndexTuple = "const uint32_t argIndexTuple[] = {";
@@ -2180,7 +2180,7 @@ bool CodeGenerator::VectorJoinIndicesCode(const Node* node, FileWriter * file)
 
 	argIndexTuple.erase(argIndexTuple.end() - 2, argIndexTuple.end()); // remove last ", "
 	argIndexTuple += "};\n";
-	fprintProtect(file->PrintfLine(argIndexTuple.c_str()));
+	file->PrintfLine(argIndexTuple.c_str());
 
 	std::string equationStr = *varOp->GetIdentifier() + "[opIndex] = ";
 	equationStr += *varArg->GetIdentifier() + "[";
@@ -2194,10 +2194,10 @@ bool CodeGenerator::VectorJoinIndicesCode(const Node* node, FileWriter * file)
 	equationStr.erase(equationStr.end() - 3, equationStr.end()); // remove last " +"
 	equationStr += "];";
 
-	fprintProtect(file->PrintfLine(equationStr.c_str()));
+	file->PrintfLine(equationStr.c_str());
 
 	file->Outdent();
-	fprintProtect(file->PrintfLine("}"));
+	file->PrintfLine("}");
 
 	return true;
 }
@@ -2224,26 +2224,26 @@ bool CodeGenerator::VectorProjectionCode(const Node* node, FileWriter * file)
 	std::vector<uint32_t> opStrides;
 	vecOp->__space_->GetStrides(&opStrides);
 	const char opstridesId[] = "opStrides";
-	fprintProtect(file->PrintfLine("const uint32_t %s[] = {", opstridesId));
+	file->PrintfLine("const uint32_t %s[] = {", opstridesId);
 	for(const uint32_t &stride: opStrides)
 	{
-		fprintProtect(file->PrintfLine("\t %u,", stride));
+		file->PrintfLine("\t %u,", stride);
 	}
-	fprintProtect(file->PrintfLine("};\n"));
+	file->PrintfLine("};\n");
 
 	std::vector<uint32_t> argStrides;
 	vecArg->__space_->GetStrides(&argStrides);
 	const char argstridesId[] = "argStrides";
-	fprintProtect(file->PrintfLine("const uint32_t %s[] = {", argstridesId));
+	file->PrintfLine("const uint32_t %s[] = {", argstridesId);
 	for(const uint32_t &stride: argStrides)
 	{
-		fprintProtect(file->PrintfLine("\t %u,", stride));
+		file->PrintfLine("\t %u,", stride);
 	}
-	fprintProtect(file->PrintfLine("};"));
+	file->PrintfLine("};");
 
-	fprintProtect(file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
-			varOp->GetIdentifier()->c_str(), varOp->GetIdentifier()->c_str()));
-	fprintProtect(file->PrintfLine("{"));
+	file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
+			varOp->GetIdentifier()->c_str(), varOp->GetIdentifier()->c_str());
+	file->PrintfLine("{");
 	file->Indent();
 
 	std::string opIndexTuple = "const uint32_t opIndexTuple[] = {";
@@ -2270,7 +2270,7 @@ bool CodeGenerator::VectorProjectionCode(const Node* node, FileWriter * file)
 	opIndexTuple.erase(opIndexTuple.end() - 2, opIndexTuple.end()); // remove last ", "
 	opIndexTuple += "};";
 
-	fprintProtect(file->PrintfLine("%s", opIndexTuple.c_str()));
+	file->PrintfLine("%s", opIndexTuple.c_str());
 
 	std::string argIndexTuple = "const uint32_t argIndexTuple[] = {";
 	for(uint32_t dim = 0; dim < vecArg->__space_->factors_.size(); dim++)
@@ -2289,7 +2289,7 @@ bool CodeGenerator::VectorProjectionCode(const Node* node, FileWriter * file)
 
 	argIndexTuple.erase(argIndexTuple.end() - 2, argIndexTuple.end()); // remove last ", "
 	argIndexTuple += "};\n";
-	fprintProtect(file->PrintfLine(argIndexTuple.c_str()));
+	file->PrintfLine(argIndexTuple.c_str());
 
 	std::string equationStr = *varOp->GetIdentifier() + "[opIndex] = ";
 	equationStr += *varArg->GetIdentifier() + "[";
@@ -2303,10 +2303,10 @@ bool CodeGenerator::VectorProjectionCode(const Node* node, FileWriter * file)
 	equationStr.erase(equationStr.end() - 3, equationStr.end()); // remove last " +"
 	equationStr += "];";
 
-	fprintProtect(file->PrintfLine(equationStr.c_str()));
+	file->PrintfLine(equationStr.c_str());
 
 	file->Outdent();
-	fprintProtect(file->PrintfLine("}"));
+	file->PrintfLine("}");
 
 	return true;
 }
@@ -2358,30 +2358,30 @@ bool CodeGenerator::VectorPowerCode(const Node* node, FileWriter * file)
 
 	if(lVarIsScalar)
 	{
-		fprintProtect(file->PrintfLine("%s = %s(%s, %s);",
+		file->PrintfLine("%s = %s(%s, %s);",
 				varOp->GetIdentifier()->c_str(),
 				powFctString,
 				lVar->GetIdentifier()->c_str(),
-				rVar->GetIdentifier()->c_str()));
+				rVar->GetIdentifier()->c_str());
 
 		return true;
 	}
 
-	fprintProtect(file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
-			varOp->GetIdentifier()->c_str(), varOp->GetIdentifier()->c_str()));
-	fprintProtect(file->PrintfLine("{"));
+	file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
+			varOp->GetIdentifier()->c_str(), varOp->GetIdentifier()->c_str());
+	file->PrintfLine("{");
 	file->Indent();
 
-	fprintProtect(file->PrintfLine("%s[%s] = %s(%s[%s], %s);",
+	file->PrintfLine("%s[%s] = %s(%s[%s], %s);",
 			varOp->GetIdentifier()->c_str(),
 			"opIndex",
 			powFctString,
 			lVar->GetIdentifier()->c_str(),
 			"opIndex",
-			rVar->GetIdentifier()->c_str()));
+			rVar->GetIdentifier()->c_str());
 
 	file->Outdent();
-	fprintProtect(file->PrintfLine("}"));
+	file->PrintfLine("}");
 
 	return true;
 }
@@ -2423,10 +2423,10 @@ bool CodeGenerator::VectorScalarProductCode(const Node* node, FileWriter * file,
 
 	if(!lVarIsScalar || !rVarIsScalar)
 	{
-		fprintProtect(file->PrintfLine("for(uint32_t dim = 0; dim < %u; dim++)",
-				vecOp->__space_->GetDim()));
+		file->PrintfLine("for(uint32_t dim = 0; dim < %u; dim++)",
+				vecOp->__space_->GetDim());
 
-		fprintProtect(file->PrintfLine("{"));
+		file->PrintfLine("{");
 		file->Indent();
 	}
 
@@ -2434,55 +2434,55 @@ bool CodeGenerator::VectorScalarProductCode(const Node* node, FileWriter * file,
 	{
 		if(lVarIsScalar && rVarIsScalar)
 		{
-			fprintProtect(file->PrintfLine("%s = %s / %s;",
+			file->PrintfLine("%s = %s / %s;",
 					varOp->GetIdentifier()->c_str(),
 					lVar->GetIdentifier()->c_str(),
-					rVar->GetIdentifier()->c_str()));
+					rVar->GetIdentifier()->c_str());
 		}
 		else if(lVarIsScalar)
 		{
-			fprintProtect(file->PrintfLine("%s[dim] = %s / %s[dim];",
+			file->PrintfLine("%s[dim] = %s / %s[dim];",
 					varOp->GetIdentifier()->c_str(),
 					lVar->GetIdentifier()->c_str(),
-					rVar->GetIdentifier()->c_str()));
+					rVar->GetIdentifier()->c_str());
 		}
 		else
 		{
-			fprintProtect(file->PrintfLine("%s[dim] = %s[dim] / %s;",
+			file->PrintfLine("%s[dim] = %s[dim] / %s;",
 					varOp->GetIdentifier()->c_str(),
 					lVar->GetIdentifier()->c_str(),
-					rVar->GetIdentifier()->c_str()));
+					rVar->GetIdentifier()->c_str());
 		}
 	}
 	else
 	{
 		if(lVarIsScalar && rVarIsScalar)
 		{
-			fprintProtect(file->PrintfLine("%s = %s * %s;",
+			file->PrintfLine("%s = %s * %s;",
 					varOp->GetIdentifier()->c_str(),
 					lVar->GetIdentifier()->c_str(),
-					rVar->GetIdentifier()->c_str()));
+					rVar->GetIdentifier()->c_str());
 		}
 		else if(lVarIsScalar)
 		{
-			fprintProtect(file->PrintfLine("%s[dim] = %s * %s[dim];",
+			file->PrintfLine("%s[dim] = %s * %s[dim];",
 					varOp->GetIdentifier()->c_str(),
 					lVar->GetIdentifier()->c_str(),
-					rVar->GetIdentifier()->c_str()));
+					rVar->GetIdentifier()->c_str());
 		}
 		else
 		{
-			fprintProtect(file->PrintfLine("%s[dim] = %s[dim] * %s;",
+			file->PrintfLine("%s[dim] = %s[dim] * %s;",
 					varOp->GetIdentifier()->c_str(),
 					lVar->GetIdentifier()->c_str(),
-					rVar->GetIdentifier()->c_str()));
+					rVar->GetIdentifier()->c_str());
 		}
 	}
 
 	if(!lVarIsScalar || !rVarIsScalar)
 	{
 		file->Outdent();
-		fprintProtect(file->PrintfLine("}\n"));
+		file->PrintfLine("}\n");
 	}
 
 	return true;
@@ -2498,7 +2498,7 @@ bool CodeGenerator::GenerateConstantDeclarations()
 			std::string decl;
 			retFalseOnFalse(var->GetDeclaration(&decl), "Could not get declaration!\n");
 
-			fprintProtect(fileInstructions_.PrintfLine("%s", decl.c_str()));
+			fileInstructions_.PrintfLine("%s", decl.c_str());
 		}
 	}
 
@@ -2521,7 +2521,7 @@ bool CodeGenerator::GenerateStaticVariableDeclarations()
 			std::string decl;
 			retFalseOnFalse(var->GetDeclaration(&decl), "Could not get declaration!\n");
 
-			fprintProtect(fileInstructions_.PrintfLine("%s", decl.c_str()));
+			fileInstructions_.PrintfLine("%s", decl.c_str());
 		}
 	}
 
@@ -2714,19 +2714,19 @@ bool CodeGenerator::GenerateOutputFunctions()
 		callbackTypedef += "* pt, size_t size);";
 
 		// Export function prototype
-		fprintProtect(fileDacH_.PrintfLine("%s", callbackTypedef.c_str()));
-		fprintProtect(fileDacH_.PrintfLine("extern void %s_Register(%s_t callback);",
+		fileDacH_.PrintfLine("%s", callbackTypedef.c_str());
+		fileDacH_.PrintfLine("extern void %s_Register(%s_t callback);",
 				fctPtTypeId.c_str(),
-				fctPtTypeId.c_str()));
+				fctPtTypeId.c_str());
 
 		// Declare Static Variables keeping the callback pointers
-		fprintProtect(fileDacC_.PrintfLine("%s_t %s = NULL;",
+		fileDacC_.PrintfLine("%s_t %s = NULL;",
 				fctPtTypeId.c_str(),
-				fctPtTypeId.c_str()));
+				fctPtTypeId.c_str());
 
-		fprintProtect(fileInstructions_.PrintfLine("extern %s_t %s;",
+		fileInstructions_.PrintfLine("extern %s_t %s;",
 				fctPtTypeId.c_str(),
-				fctPtTypeId.c_str()));
+				fctPtTypeId.c_str());
 
 		// Define Function
 		char tmpBuff[200];
@@ -2741,12 +2741,12 @@ bool CodeGenerator::GenerateOutputFunctions()
 		fctDefinitions += "}\n\n";
 	}
 
-	fprintProtect(fileDacC_.PrintfLine(""));
+	fileDacC_.PrintfLine("");
 
 	auto exportedHeading = std::string("Exported Functions");
 	retFalseOnFalse(GenerateHeading(&exportedHeading), "Exported Heading failed!\n");
 
-	fprintProtect(fileDacC_.PrintfLine("%s", fctDefinitions.c_str()));
+	fileDacC_.PrintfLine("%s", fctDefinitions.c_str());
 
 	return true;
 }
@@ -2767,7 +2767,7 @@ bool CodeGenerator::GenerateHeading(const std::string * heading)
 		starSpangledHeading += "*";
 	}
 
-	fprintProtect(fileDacC_.PrintfLine("%s*/", starSpangledHeading.c_str()));
+	fileDacC_.PrintfLine("%s*/", starSpangledHeading.c_str());
 
 	return true;
 }
@@ -2776,14 +2776,14 @@ bool CodeGenerator::GenerateIncludes()
 {
 	for(uint16_t incl = 0; incl < sizeof(includeFilesBrackets) / sizeof(includeFilesBrackets[0]); incl++)
 	{
-		fprintProtect(fileDacC_.PrintfLine("#include <%s>", includeFilesBrackets[incl]));
+		fileDacC_.PrintfLine("#include <%s>", includeFilesBrackets[incl]);
 	}
 
-	fprintProtect(fileDacC_.PrintfLine("\n"));
+	fileDacC_.PrintfLine("\n");
 
-	fprintProtect(fileDacC_.PrintfLine("#include \"error_functions.h\"\n"));
-	fprintProtect(fileDacC_.PrintfLine("#include \"Instructions%s.h\"\n", graph_->Name().c_str()));
-	fprintProtect(fileDacC_.PrintfLine("#include \"Dac%s.h\"\n", graph_->Name().c_str()));
+	fileDacC_.PrintfLine("#include \"error_functions.h\"\n");
+	fileDacC_.PrintfLine("#include \"Instructions%s.h\"\n", graph_->Name().c_str());
+	fileDacC_.PrintfLine("#include \"Dac%s.h\"\n", graph_->Name().c_str());
 
 	return true;
 }

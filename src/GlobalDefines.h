@@ -11,6 +11,12 @@
 #include <stdio.h>
 #include <stdint.h>
 
+#define Fatal(...) \
+	fprintf(stderr, "File %s, Line %i: ", __FILE__, __LINE__); \
+	fprintf(stderr, __VA_ARGS__); \
+	fflush(stderr); \
+	exit(1)
+
 #define Error(...) \
 	fprintf(stderr, "File %s, Line %i: ", __FILE__, __LINE__); \
 	fprintf(stderr, __VA_ARGS__); \

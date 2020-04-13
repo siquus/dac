@@ -26,7 +26,7 @@ class FileWriter {
 public:
 	bool Init(const std::string* path);
 	~FileWriter();
-	int PrintfLine(const char * format, ...);
+	void PrintfLine(const char * format, ...);
 	void Indent(uint8_t tabNubmer = 1);
 	void Outdent(uint8_t tabNumber = 1);
 	const std::string* Path() const;
