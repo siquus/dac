@@ -124,7 +124,6 @@ class CodeGenerator {
 	std::map<Node::Id_t, Variable> variables_;
 	Variable* GetVariable(Node::Id_t id);
 
-	std::map<Node::Id_t, const Node*> nodeMap_;
 	std::map<Node::Id_t, const Node*> nodesInstructionMap_;
 	std::map<Node::Id_t, uint32_t> nodeArrayPos_;
 

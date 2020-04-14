@@ -9,9 +9,10 @@
 #define SRC_GRAPH_H_
 
 #include <vector>
+#include <map>
+#include <set>
 #include <stdint.h>
 #include <string>
-#include <set>
 
 class Node {
 public:
@@ -63,7 +64,7 @@ public:
 	const void* typeParameters = nullptr;
 	ObjectType objectType;
 	const void* object = nullptr;
-	Id_t id;
+	Id_t id = ID_NONE;
 	Hardware_t hardware;
 	Id_t storedIn_ = ID_NONE;
 	bool noStorage_ = false;
@@ -81,16 +82,16 @@ public:
 
 	Node::Id_t AddNode(Node * node);
 	bool AddParent(Node::Id_t parent, Node::Id_t child);
-	const std::vector<Node> * GetNodes() const;
+	const std::map<Node::Id_t, Node> * GetNodes() const;
 	const Node * GetNode(Node::Id_t id) const;
-	std::vector<Node> * GetNodesModifyable();
+	std::map<Node::Id_t, Node> * GetNodesModifyable();
 	bool DeleteChildReferences(Node::Id_t child);
 	const std::string &Name() const;
 
 	bool GetRootAncestors(std::set<Node::Id_t> * rootParents, Node::Id_t child) const;
 
 private:
-	std::vector<Node> nodes_;
+	std::map<Node::Id_t, Node> nodes_;
 	std::string name_;
 
 	void Init(const std::string &name);

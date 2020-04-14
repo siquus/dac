@@ -483,8 +483,7 @@ void ModuleProduct::Execute(size_t threadsNrOf)
 	{
 		if(false == called_[call])
 		{
-			Error("Not all callbacks executed!\n");
-			break;
+			Error("Not all callbacks executed: Missing %lu!\n", call);
 		}
 	}
 }

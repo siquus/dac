@@ -34,7 +34,7 @@ Node::Id_t Graph::AddNode(Node * node)
 {
 	// Add the node
 	node->id = nextNodeId_;
-	nodes_.push_back(*node);
+	nodes_.insert(std::pair<Node::Id_t, Node>{node->id, *node});
 
 	nextNodeId_++;
 
@@ -55,51 +55,49 @@ Node::Id_t Graph::AddNode(Node * node)
 bool Graph::AddChild(Node::Id_t parent, Node::Id_t child)
 {
 	// Search for parent and add child
-	for(Node &node: nodes_)
+	auto parentNode = nodes_.find(parent);
+	if(nodes_.end() == parentNode)
 	{
-		if(node.id == parent)
-		{
-			node.children.push_back(child);
-			return true;
-		}
+		Error("Could not find parent!\n");
+		return false;
 	}
 
-	Error("Could not AddChild!\n");
-	return false;
+	parentNode->second.children.push_back(child);
+
+	return true;
 }
 
-const std::vector<Node> * Graph::GetNodes() const
+const std::map<Node::Id_t, Node> * Graph::GetNodes() const
 {
 	return &nodes_;
 }
 
 const Node * Graph::GetNode(Node::Id_t id) const
 {
-	for(const Node &node: nodes_)
+	auto node = nodes_.find(id);
+	if(nodes_.end() == node)
 	{
-		if(node.id == id)
-		{
-			return &node;
-		}
+		Error("Could not find node!\n");
+		return nullptr;
 	}
 
-	return nullptr;
+	return &node->second;
 }
 
-std::vector<Node> * Graph::GetNodesModifyable()
+std::map<Node::Id_t, Node> * Graph::GetNodesModifyable()
 {
 	return &nodes_;
 }
 
 bool Graph::DeleteChildReferences(Node::Id_t child)
 {
-	for(Node &parent: nodes_)
+	for(auto &parentPair: nodes_)
 	{
-		for(auto childIt = parent.children.begin(); childIt != parent.children.end(); childIt++)
+		for(auto childIt = parentPair.second.children.begin(); childIt != parentPair.second.children.end(); childIt++)
 		{
 			if(child == *childIt)
 			{
-				parent.children.erase(childIt);
+				parentPair.second.children.erase(childIt);
 				break;
 			}
 		}
@@ -111,17 +109,16 @@ bool Graph::DeleteChildReferences(Node::Id_t child)
 bool Graph::AddParent(Node::Id_t parent, Node::Id_t child)
 {
 	// search for Child and add parent
-	for(Node &node: nodes_)
+	auto childPair = nodes_.find(child);
+	if(nodes_.end() == childPair)
 	{
-		if(node.id == child)
-		{
-			node.parents.push_back(parent);
-			return AddChild(parent, child);
-		}
+		Error("Could not find node!\n");
+		return false;
 	}
 
-	Error("Could not AddParent!\n");
-	return false;
+	childPair->second.parents.push_back(parent);
+
+	return AddChild(parent, child);
 }
 
 const char * Node::getName() const
@@ -218,25 +215,23 @@ bool NodeRef::StoreIn(const NodeRef* nodeRef) const
 	auto nodes = graph_->GetNodesModifyable();
 
 	// TODO: Test that nodes are compatible!
-	uint8_t foundCnt = 0;
-	for(auto &node: *nodes)
+	auto thisNode = nodes->find(nodeId_);
+	if(nodes->end() == thisNode)
 	{
-		if(node.id == nodeId_)
-		{
-			node.storedIn_ = nodeRef->nodeId_;
-			foundCnt++;
-		}
-		else if(node.id == nodeRef->nodeId_)
-		{
-			node.usedAsStorageBy_.push_back(nodeId_);
-			foundCnt++;
-		}
-
-		if(2 == foundCnt)
-		{
-			return true;
-		}
+		Error("Could not find node!\n");
+		return false;
 	}
 
-	return false;
+	thisNode->second.storedIn_ = nodeRef->nodeId_;
+
+	auto storageNode = nodes->find(nodeRef->nodeId_);
+	if(nodes->end() == storageNode)
+	{
+		Error("Could not find node!\n");
+		return false;
+	}
+
+	storageNode->second.usedAsStorageBy_.push_back(nodeId_);
+
+	return true;
 }

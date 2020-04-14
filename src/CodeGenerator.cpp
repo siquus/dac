@@ -175,27 +175,21 @@ bool CodeGenerator::Generate(const Graph* graph)
 {
 	graph_ = graph;
 
-	// From here on we assume that the graph will no longer change
-	// this means we may use pointers to nodes now!
 	auto nodes = graph_->GetNodes();
-	for(const Node &node: *nodes)
-	{
-		nodeMap_.insert(std::make_pair(node.id, &node));
-	}
 
-	for(const auto &nodePair: nodeMap_)
+	for(const auto &nodePair: *nodes)
 	{
 		DEBUG("nodeMap Node%2u: %s,\t\t ObjType %2u,  Children ",
 				nodePair.first,
-				Node::getName(nodePair.second->type),
-				(unsigned int) nodePair.second->objectType);
+				Node::getName(nodePair.second.type),
+				(unsigned int) nodePair.second.objectType);
 
-		for(Node::Id_t nodeId: nodePair.second->children)
+		for(Node::Id_t nodeId: nodePair.second.children)
 		{
 			DEBUG("%u, ", nodeId);
 		}
 		DEBUG("Parents ");
-		for(Node::Id_t nodeId: nodePair.second->parents)
+		for(Node::Id_t nodeId: nodePair.second.parents)
 		{
 			DEBUG("%u, ", nodeId);
 		}
@@ -385,13 +379,13 @@ bool CodeGenerator::GetFirstNodesToExecute(std::set<Node::Id_t> * nodeSet)
 	std::set<Node::Id_t> roots;
 
 	auto nodes = graph_->GetNodes();
-	for(const Node &node: *nodes)
+	for(const auto &nodePair: *nodes)
 	{
-		if(0 == node.parents.size())
+		if(0 == nodePair.second.parents.size())
 		{
-			roots.insert(node.id);
+			roots.insert(nodePair.second.id);
 			std::copy(
-					node.children.begin(), node.children.end(),
+					nodePair.second.children.begin(), nodePair.second.children.end(),
 					std::inserter(*nodeSet, nodeSet->end()));
 		}
 	}
@@ -401,14 +395,14 @@ bool CodeGenerator::GetFirstNodesToExecute(std::set<Node::Id_t> * nodeSet)
 	std::vector<Node::Id_t> nonFirstGenerationChildren;
 	for(Node::Id_t childId: *nodeSet)
 	{
-		const auto childNodeIt =  nodeMap_.find(childId);
-		if(nodeMap_.end() == childNodeIt)
+		const auto childNodeIt =  nodes->find(childId);
+		if(nodes->end() == childNodeIt)
 		{
 			Error("Unknown Child, NodeId = %u!\n", childId);
 			return false;
 		}
 
-		const Node* childNode = childNodeIt->second;
+		const Node* childNode = &childNodeIt->second;
 
 		for(Node::Id_t parentId: childNode->parents)
 		{
@@ -433,13 +427,13 @@ bool CodeGenerator::GenerateInstructions()
 {
 	Node::Id_t arrayPos = 0;
 	const auto nodes = graph_->GetNodes();
-	for(const Node &node: *nodes)
+	for(const auto &nodePair: *nodes)
 	{
 		// Does this node require a function?
-		switch(node.type)
+		switch(nodePair.second.type)
 		{
 		default:
-			Error("Unknown Node-Type %u\n", (uint8_t) node.type);
+			Error("Unknown Node-Type %u\n", (uint8_t) nodePair.second.type);
 			return false;
 
 		case Node::Type::VECTOR: // no break intended
@@ -462,10 +456,10 @@ bool CodeGenerator::GenerateInstructions()
 
 		// Create function identifier
 		std::string fctId;
-		GenerateInstructionId(&fctId, node.id);
+		GenerateInstructionId(&fctId, nodePair.second.id);
 
 		// Set param to unused if not used
-		if(Node::Type::CONTROL_TRANSFER_WHILE != node.type)
+		if(Node::Type::CONTROL_TRANSFER_WHILE != nodePair.second.type)
 		{
 			fileInstructions_.PrintfLine("static void %s(void * instance __attribute__((unused)), void (*PushNode)(void * instance, struct node_s * node) __attribute__((unused)))", fctId.c_str());
 		}
@@ -478,7 +472,7 @@ bool CodeGenerator::GenerateInstructions()
 		fileInstructions_.Indent();
 
 		retFalseOnFalse(GenerateOperationCode(
-				&node,
+				&nodePair.second,
 				&fileInstructions_),
 				"Could not generate Operation Code!\n");
 
@@ -487,10 +481,10 @@ bool CodeGenerator::GenerateInstructions()
 		fileInstructions_.PrintfLine("}\n");
 
 		// Add node to "nodes with instruction"
-		nodesInstructionMap_.insert(std::pair<Node::Id_t, const Node*>(node.id, &node));
+		nodesInstructionMap_.insert(std::pair<Node::Id_t, const Node*>(nodePair.second.id, &nodePair.second));
 
 		// Determine Nodes array positions
-		nodeArrayPos_.insert(std::pair<Node::Id_t, uint32_t>(node.id, arrayPos));
+		nodeArrayPos_.insert(std::pair<Node::Id_t, uint32_t>(nodePair.second.id, arrayPos));
 		arrayPos++;
 	}
 
@@ -500,14 +494,14 @@ bool CodeGenerator::GenerateInstructions()
 bool CodeGenerator::GenerateCallbackPtCheck(FileWriter* file) const
 {
 	auto nodes = graph_->GetNodes();
-	for(const Node &node: *nodes)
+	for(const auto &nodePair: *nodes)
 	{
-		if(Node::Type::OUTPUT != node.type)
+		if(Node::Type::OUTPUT != nodePair.second.type)
 		{
 			continue;
 		}
 
-		auto output = (const Interface::Output*) node.object;
+		auto output = (const Interface::Output*) nodePair.second.object;
 
 		file->PrintfLine("if(NULL == Dac%sOutputCallback%s)",
 				graph_->Name().c_str(),
@@ -792,22 +786,23 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 {
 	file->PrintfLine("// %s\n", __func__);
 
-	const auto lnode = nodeMap_.find(node->parents[0]);
-	if(nodeMap_.end() == lnode)
+	auto nodes = graph_->GetNodes();
+	const auto lnode = nodes->find(node->parents[0]);
+	if(nodes->end() == lnode)
 	{
 		Error("Could not find Node for id %u\n", node->parents[0]);
 		return false;
 	}
 
-	const auto rnode = nodeMap_.find(node->parents[1]);
-	if(nodeMap_.end() == rnode)
+	const auto rnode = nodes->find(node->parents[1]);
+	if(nodes->end() == rnode)
 	{
 		Error("Could not find Node for id %u\n", node->parents[1]);
 		return false;
 	}
 
-	if((Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lnode->second->type) &&
-			(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == rnode->second->type))
+	if((Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lnode->second.type) &&
+			(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == rnode->second.type))
 	{
 		Error("Contraction of two KroneckerDeltas not supported: Should be handled in graph creation!\n");
 		return false;
@@ -816,16 +811,16 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 	const Node * argVecNode;
 	const Node * kronNode;
 	bool argVecIsLeftArg;
-	if(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lnode->second->type)
+	if(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lnode->second.type)
 	{
-		argVecNode = rnode->second;
-		kronNode = lnode->second;
+		argVecNode = &rnode->second;
+		kronNode = &lnode->second;
 		argVecIsLeftArg = false;
 	}
 	else
 	{
-		argVecNode = lnode->second;
-		kronNode = rnode->second;
+		argVecNode = &lnode->second;
+		kronNode = &rnode->second;
 		argVecIsLeftArg = true;
 	}
 
@@ -1060,14 +1055,15 @@ bool CodeGenerator::VectorPermutationCode(const Node* node, FileWriter * file)
 
 	const Algebra::Module::VectorSpace::Vector::permuteParameters_t * permuteParam = (const Algebra::Module::VectorSpace::Vector::permuteParameters_t *) node->typeParameters;
 
-	const auto argNode = nodeMap_.find(node->parents[0]);
-	if(nodeMap_.end() == argNode)
+	auto nodes = graph_->GetNodes();
+	const auto argNode = nodes->find(node->parents[0]);
+	if(nodes->end() == argNode)
 	{
 		Error("Could not find Node for id %u\n", node->parents[0]);
 		return false;
 	}
 
-	const Algebra::Module::VectorSpace::Vector* vec = (const Algebra::Module::VectorSpace::Vector*) argNode->second->object;
+	const Algebra::Module::VectorSpace::Vector* vec = (const Algebra::Module::VectorSpace::Vector*) argNode->second.object;
 
 	getVarRetFalseOnError(varOp, node->id);
 	getVarRetFalseOnError(varArg, node->parents[0]);
@@ -1153,22 +1149,23 @@ bool CodeGenerator::VectorContractionCode(const Node* node, FileWriter * file)
 {
 	file->PrintfLine("// %s\n", __func__);
 
-	const auto lnode = nodeMap_.find(node->parents[0]);
-	if(nodeMap_.end() == lnode)
+	auto nodes = graph_->GetNodes();
+	const auto lnode = nodes->find(node->parents[0]);
+	if(nodes->end() == lnode)
 	{
 		Error("Could not find Node for id %u\n", node->parents[0]);
 		return false;
 	}
 
-	const auto rnode = nodeMap_.find(node->parents[1]);
-	if(nodeMap_.end() == rnode)
+	const auto rnode = nodes->find(node->parents[1]);
+	if(nodes->end() == rnode)
 	{
 		Error("Could not find Node for id %u\n", node->parents[1]);
 		return false;
 	}
 
-	if((Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lnode->second->type) ||
-			(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == rnode->second->type))
+	if((Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lnode->second.type) ||
+			(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == rnode->second.type))
 	{
 		return VectorContractionKroneckerDeltaCode(node, file);
 	}
@@ -1177,8 +1174,8 @@ bool CodeGenerator::VectorContractionCode(const Node* node, FileWriter * file)
 	getVarRetFalseOnError(varLVec, node->parents[0]);
 	getVarRetFalseOnError(varRVec, node->parents[1]);
 
-	const Algebra::Module::VectorSpace::Vector* lVec = (const Algebra::Module::VectorSpace::Vector*) lnode->second->object;
-	const Algebra::Module::VectorSpace::Vector* rVec = (const Algebra::Module::VectorSpace::Vector*) rnode->second->object;
+	const Algebra::Module::VectorSpace::Vector* lVec = (const Algebra::Module::VectorSpace::Vector*) lnode->second.object;
+	const Algebra::Module::VectorSpace::Vector* rVec = (const Algebra::Module::VectorSpace::Vector*) rnode->second.object;
 
 	const Algebra::Module::VectorSpace::Vector* opVec = (const Algebra::Module::VectorSpace::Vector*) node->object;
 	const Algebra::Module::VectorSpace::Vector::contractValue_t * contractValue = (const Algebra::Module::VectorSpace::Vector::contractValue_t *) node->typeParameters;
@@ -1582,15 +1579,16 @@ bool CodeGenerator::VectorScalarProductKroneckerDeltaCode(const Node* node, File
 {
 	file->PrintfLine("// %s\n", __func__);
 
-	const auto lVecNode = nodeMap_.find(node->parents[0]);
-	if(nodeMap_.end() == lVecNode)
+	auto nodes = graph_->GetNodes();
+	const auto lVecNode = nodes->find(node->parents[0]);
+	if(nodes->end() == lVecNode)
 	{
 		Error("Could not find Node for id %u\n", node->parents[0]);
 		return false;
 	}
 
-	const auto rVecNode = nodeMap_.find(node->parents[1]);
-	if(nodeMap_.end() == rVecNode)
+	const auto rVecNode = nodes->find(node->parents[1]);
+	if(nodes->end() == rVecNode)
 	{
 		Error("Could not find Node for id %u\n", node->parents[1]);
 		return false;
@@ -1598,14 +1596,14 @@ bool CodeGenerator::VectorScalarProductKroneckerDeltaCode(const Node* node, File
 
 	Node::Id_t varScalarNodeId;
 	const Node * kronNode = nullptr;
-	if(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lVecNode->second->type)
+	if(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lVecNode->second.type)
 	{
-		kronNode = lVecNode->second;
+		kronNode = &lVecNode->second;
 		varScalarNodeId = node->parents[1];
 	}
 	else
 	{
-		kronNode = rVecNode->second;
+		kronNode = &rVecNode->second;
 
 		if(divide)
 		{
@@ -1715,22 +1713,24 @@ bool CodeGenerator::VectorVectorProductKroneckerDeltaCode(const Node* node, File
 {
 	file->PrintfLine("// %s\n", __func__);
 
-	const auto lnode = nodeMap_.find(node->parents[0]);
-	if(nodeMap_.end() == lnode)
+	auto nodes = graph_->GetNodes();
+
+	const auto lnode = nodes->find(node->parents[0]);
+	if(nodes->end() == lnode)
 	{
 		Error("Could not find Node for id %u\n", node->parents[0]);
 		return false;
 	}
 
-	const auto rnode = nodeMap_.find(node->parents[1]);
-	if(nodeMap_.end() == rnode)
+	const auto rnode = nodes->find(node->parents[1]);
+	if(nodes->end() == rnode)
 	{
 		Error("Could not find Node for id %u\n", node->parents[1]);
 		return false;
 	}
 
-	bool lNodeIsKron = (Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lnode->second->type);
-	bool rNodeIsKron = (Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == rnode->second->type);
+	bool lNodeIsKron = (Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lnode->second.type);
+	bool rNodeIsKron = (Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == rnode->second.type);
 
 	if(lNodeIsKron && rNodeIsKron)
 	{
@@ -1751,16 +1751,16 @@ bool CodeGenerator::VectorVectorProductKroneckerDeltaCode(const Node* node, File
 	if(lNodeIsKron)
 	{
 		vecNodeId = node->parents[1];
-		kronVec = (const Algebra::Module::VectorSpace::Vector*) lnode->second->object;
-		vec = (const Algebra::Module::VectorSpace::Vector*) rnode->second->object;
-		kroneckerParam = (const Algebra::Module::VectorSpace::KroneckerDeltaParameters_t *) lnode->second->typeParameters;
+		kronVec = (const Algebra::Module::VectorSpace::Vector*) lnode->second.object;
+		vec = (const Algebra::Module::VectorSpace::Vector*) rnode->second.object;
+		kroneckerParam = (const Algebra::Module::VectorSpace::KroneckerDeltaParameters_t *) lnode->second.typeParameters;
 	}
 	else
 	{
 		vecNodeId = node->parents[0];
-		kronVec = (const Algebra::Module::VectorSpace::Vector*) rnode->second->object;
-		vec = (const Algebra::Module::VectorSpace::Vector*) lnode->second->object;
-		kroneckerParam = (const Algebra::Module::VectorSpace::KroneckerDeltaParameters_t *) rnode->second->typeParameters;
+		kronVec = (const Algebra::Module::VectorSpace::Vector*) rnode->second.object;
+		vec = (const Algebra::Module::VectorSpace::Vector*) lnode->second.object;
+		kroneckerParam = (const Algebra::Module::VectorSpace::KroneckerDeltaParameters_t *) rnode->second.typeParameters;
 	}
 
 	getVarRetFalseOnError(varOp, node->id);
@@ -1914,22 +1914,24 @@ bool CodeGenerator::VectorVectorProductCode(const Node* node, FileWriter * file,
 {
 	file->PrintfLine("// %s\n", __func__);
 
-	const auto lnode = nodeMap_.find(node->parents[0]);
-	if(nodeMap_.end() == lnode)
+	auto nodes = graph_->GetNodes();
+
+	const auto lnode = nodes->find(node->parents[0]);
+	if(nodes->end() == lnode)
 	{
 		Error("Could not find Node for id %u\n", node->parents[0]);
 		return false;
 	}
 
-	const auto rnode = nodeMap_.find(node->parents[1]);
-	if(nodeMap_.end() == rnode)
+	const auto rnode = nodes->find(node->parents[1]);
+	if(nodes->end() == rnode)
 	{
 		Error("Could not find Node for id %u\n", node->parents[1]);
 		return false;
 	}
 
-	if((Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lnode->second->type) ||
-			(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == rnode->second->type))
+	if((Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lnode->second.type) ||
+			(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == rnode->second.type))
 	{
 		return VectorVectorProductKroneckerDeltaCode(node, file, divide);
 	}
@@ -1938,8 +1940,8 @@ bool CodeGenerator::VectorVectorProductCode(const Node* node, FileWriter * file,
 	getVarRetFalseOnError(varLVec, node->parents[0]);
 	getVarRetFalseOnError(varRVec, node->parents[1]);
 
-	const Algebra::Module::VectorSpace::Vector* lVec = (const Algebra::Module::VectorSpace::Vector*) lnode->second->object;
-	const Algebra::Module::VectorSpace::Vector* rVec = (const Algebra::Module::VectorSpace::Vector*) rnode->second->object;
+	const Algebra::Module::VectorSpace::Vector* lVec = (const Algebra::Module::VectorSpace::Vector*) lnode->second.object;
+	const Algebra::Module::VectorSpace::Vector* rVec = (const Algebra::Module::VectorSpace::Vector*) rnode->second.object;
 
 	const Algebra::Module::VectorSpace::Vector* opVec = (const Algebra::Module::VectorSpace::Vector*) node->object;
 
@@ -2077,19 +2079,21 @@ bool CodeGenerator::VectorJoinIndicesCode(const Node* node, FileWriter * file)
 {
 	file->PrintfLine("// %s\n", __func__);
 
+	auto nodes = graph_->GetNodes();
+
 	const Algebra::Module::VectorSpace::Vector::joinIndicesParameters_t * param = (const Algebra::Module::VectorSpace::Vector::joinIndicesParameters_t *) node->typeParameters;
 
 	getVarRetFalseOnError(varOp, node->id);
 	getVarRetFalseOnError(varArg, node->parents[0]);
 
-	const auto argNode = nodeMap_.find(node->parents[0]);
-	if(nodeMap_.end() == argNode)
+	const auto argNode = nodes->find(node->parents[0]);
+	if(nodes->end() == argNode)
 	{
 		Error("Could not find Node for id %u\n", node->parents[0]);
 		return false;
 	}
 
-	const Algebra::Module::VectorSpace::Vector* vecArg = (const Algebra::Module::VectorSpace::Vector*) argNode->second->object;
+	const Algebra::Module::VectorSpace::Vector* vecArg = (const Algebra::Module::VectorSpace::Vector*) argNode->second.object;
 	const Algebra::Module::VectorSpace::Vector* vecOp = (const Algebra::Module::VectorSpace::Vector*) node->object;
 
 	std::vector<uint32_t> opStrides;
@@ -2206,19 +2210,21 @@ bool CodeGenerator::VectorProjectionCode(const Node* node, FileWriter * file)
 {
 	file->PrintfLine("// %s\n", __func__);
 
+	auto nodes = graph_->GetNodes();
+
 	const Algebra::Module::VectorSpace::Vector::projectParameters_t * param = (const Algebra::Module::VectorSpace::Vector::projectParameters_t *) node->typeParameters;
 
 	getVarRetFalseOnError(varOp, node->id);
 	getVarRetFalseOnError(varArg, node->parents[0]);
 
-	const auto argNode = nodeMap_.find(node->parents[0]);
-	if(nodeMap_.end() == argNode)
+	const auto argNode = nodes->find(node->parents[0]);
+	if(nodes->end() == argNode)
 	{
 		Error("Could not find Node for id %u\n", node->parents[0]);
 		return false;
 	}
 
-	const Algebra::Module::VectorSpace::Vector* vecArg = (const Algebra::Module::VectorSpace::Vector*) argNode->second->object;
+	const Algebra::Module::VectorSpace::Vector* vecArg = (const Algebra::Module::VectorSpace::Vector*) argNode->second.object;
 	const Algebra::Module::VectorSpace::Vector* vecOp = (const Algebra::Module::VectorSpace::Vector*) node->object;
 
 	std::vector<uint32_t> opStrides;
@@ -2390,22 +2396,24 @@ bool CodeGenerator::VectorScalarProductCode(const Node* node, FileWriter * file,
 {
 	file->PrintfLine("// %s\n", __func__);
 
-	const auto lVecNode = nodeMap_.find(node->parents[0]);
-	if(nodeMap_.end() == lVecNode)
+	auto nodes = graph_->GetNodes();
+
+	const auto lVecNode = nodes->find(node->parents[0]);
+	if(nodes->end() == lVecNode)
 	{
 		Error("Could not find Node for id %u\n", node->parents[0]);
 		return false;
 	}
 
-	const auto rVecNode = nodeMap_.find(node->parents[1]);
-	if(nodeMap_.end() == rVecNode)
+	const auto rVecNode = nodes->find(node->parents[1]);
+	if(nodes->end() == rVecNode)
 	{
 		Error("Could not find Node for id %u\n", node->parents[1]);
 		return false;
 	}
 
-	if((Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lVecNode->second->type) ||
-			(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == rVecNode->second->type))
+	if((Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lVecNode->second.type) ||
+			(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == rVecNode->second.type))
 	{
 		return VectorScalarProductKroneckerDeltaCode(node, file, divide);
 	}
@@ -2530,17 +2538,18 @@ bool CodeGenerator::GenerateStaticVariableDeclarations()
 
 Variable* CodeGenerator::GetVariable(Node::Id_t id)
 {
-	const auto nodeIt = nodeMap_.find(id);
-	if(nodeMap_.end() == nodeIt)
+	auto nodes = graph_->GetNodes();
+	const auto nodeIt = nodes->find(id);
+	if(nodes->end() == nodeIt)
 	{
 		Error("Could not find Node for id %u\n", id);
 		return nullptr;
 	}
 
 	Node::Id_t storageNodeId;
-	if(Node::ID_NONE != nodeIt->second->storedIn_)
+	if(Node::ID_NONE != nodeIt->second.storedIn_)
 	{
-		storageNodeId = nodeIt->second->storedIn_;
+		storageNodeId = nodeIt->second.storedIn_;
 	}
 	else
 	{
@@ -2561,9 +2570,9 @@ bool CodeGenerator::FetchVariables()
 {
 	// Fetch all variables
 	auto nodes = graph_->GetNodes();
-	for(const Node &node: *nodes)
+	for(const auto &nodePair: *nodes)
 	{
-		if(node.noStorage_ || (Node::ID_NONE != node.storedIn_))
+		if(nodePair.second.noStorage_ || (Node::ID_NONE != nodePair.second.storedIn_))
 		{
 			continue; // This node is not stored in its own variable or doesn't require storage
 		}
@@ -2575,19 +2584,19 @@ bool CodeGenerator::FetchVariables()
 		const void * value;
 
 		char tmpIdStr[42];
-		SNPRINTF(tmpIdStr, sizeof(tmpIdStr), "Node%u", node.id);
+		SNPRINTF(tmpIdStr, sizeof(tmpIdStr), "Node%u", nodePair.second.id);
 		identifier.append(tmpIdStr);
 
-		switch(node.objectType)
+		switch(nodePair.second.objectType)
 		{
 		case Node::ObjectType::MODULE_VECTORSPACE_VECTOR:
 		{
-			if(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == node.type)
+			if(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == nodePair.second.type)
 			{
 				continue; // doesn't require variable.
 			}
 
-			auto vector = (const Algebra::Module::VectorSpace::Vector*) node.object;
+			auto vector = (const Algebra::Module::VectorSpace::Vector*) nodePair.second.object;
 
 			value = vector->__value_;
 			length = vector->__space_->GetDim();
@@ -2629,13 +2638,13 @@ bool CodeGenerator::FetchVariables()
 			return false;
 		}
 
-		if(variables_.end() != variables_.find(node.id))
+		if(variables_.end() != variables_.find(nodePair.second.id))
 		{
 			Error("Variable already exists!\n");
 			return false;
 		}
 
-		if(node.usedAsStorageBy_.size())
+		if(nodePair.second.usedAsStorageBy_.size())
 		{
 			properties = (Variable::properties_t) (
 					properties & ~Variable::PROPERTY_CONST);
@@ -2643,25 +2652,25 @@ bool CodeGenerator::FetchVariables()
 
 		variables_.insert(
 				std::make_pair(
-						node.id,
+						nodePair.second.id,
 						Variable(&identifier, properties, type, length, value)));
 	}
 
 	// Identify Outputs and mark output variables as such
-	for(const Node &node: *nodes)
+	for(const auto &nodePair: *nodes)
 	{
-		if(Node::Type::OUTPUT != node.type)
+		if(Node::Type::OUTPUT != nodePair.second.type)
 		{
 			continue;
 		}
 
 		// Find all variables of the output's parents, i.e. the nodes that
 		// shall be output
-		for(const Node &potparnode: *nodes)
+		for(const auto &potparnodePair: *nodes)
 		{
-			for(const Node::Id_t &parentNodeId: node.parents)
+			for(const Node::Id_t &parentNodeId: potparnodePair.second.parents)
 			{
-				if(parentNodeId != potparnode.id)
+				if(parentNodeId != potparnodePair.second.id)
 				{
 					continue;
 				}
@@ -2690,17 +2699,17 @@ bool CodeGenerator::GenerateOutputFunctions()
 	std::string fctDefinitions;
 
 	auto nodes = graph_->GetNodes();
-	for(const Node &node: *nodes)
+	for(const auto &nodePair: *nodes)
 	{
-		if(Node::Type::OUTPUT != node.type)
+		if(Node::Type::OUTPUT != nodePair.second.type)
 		{
 			continue;
 		}
 
-		auto * output = (const Interface::Output* ) node.object;
+		auto * output = (const Interface::Output* ) nodePair.second.object;
 
 		// Get Variable attached to node
-		getVarRetFalseOnError(var, node.parents[0]);
+		getVarRetFalseOnError(var, nodePair.second.parents[0]);
 
 		std::string fctPtTypeId = "Dac" + graph_->Name() + "OutputCallback";
 		fctPtTypeId += *(output->GetOutputName());
