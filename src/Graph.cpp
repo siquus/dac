@@ -84,9 +84,16 @@ const Node * Graph::GetNode(Node::Id_t id) const
 	return &node->second;
 }
 
-std::map<Node::Id_t, Node> * Graph::GetNodesModifyable()
+Node * Graph::GetNodeModifyable(Node::Id_t id)
 {
-	return &nodes_;
+	auto node = nodes_.find(id);
+	if(nodes_.end() == node)
+	{
+		Error("Could not find node!\n");
+		return nullptr;
+	}
+
+	return &node->second;
 }
 
 bool Graph::DeleteChildReferences(Node::Id_t child)
@@ -212,26 +219,24 @@ bool NodeRef::StoreIn(const NodeRef* nodeRef) const
 		return false;
 	}
 
-	auto nodes = graph_->GetNodesModifyable();
-
 	// TODO: Test that nodes are compatible!
-	auto thisNode = nodes->find(nodeId_);
-	if(nodes->end() == thisNode)
+	Node * thisNode = graph_->GetNodeModifyable(nodeId_);
+	if(nullptr == thisNode)
 	{
 		Error("Could not find node!\n");
 		return false;
 	}
 
-	thisNode->second.storedIn_ = nodeRef->nodeId_;
+	thisNode->storedIn_ = nodeRef->nodeId_;
 
-	auto storageNode = nodes->find(nodeRef->nodeId_);
-	if(nodes->end() == storageNode)
+	Node * storageNode = graph_->GetNodeModifyable(nodeRef->nodeId_);
+	if(nullptr == storageNode)
 	{
 		Error("Could not find node!\n");
 		return false;
 	}
 
-	storageNode->second.usedAsStorageBy_.push_back(nodeId_);
+	storageNode->usedAsStorageBy_.push_back(nodeId_);
 
 	return true;
 }

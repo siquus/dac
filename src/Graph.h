@@ -78,13 +78,11 @@ public:
 
 	virtual ~Graph();
 
-	Node::Id_t nextNodeId_ = Node::ID_NONE + 1;
-
 	Node::Id_t AddNode(Node * node);
 	bool AddParent(Node::Id_t parent, Node::Id_t child);
 	const std::map<Node::Id_t, Node> * GetNodes() const;
 	const Node * GetNode(Node::Id_t id) const;
-	std::map<Node::Id_t, Node> * GetNodesModifyable();
+	Node * GetNodeModifyable(Node::Id_t id);
 	bool DeleteChildReferences(Node::Id_t child);
 	const std::string &Name() const;
 
@@ -94,16 +92,18 @@ private:
 	std::map<Node::Id_t, Node> nodes_;
 	std::string name_;
 
+	Node::Id_t nextNodeId_ = Node::ID_NONE + 1;
+
 	void Init(const std::string &name);
 	bool AddChild(Node::Id_t parent, Node::Id_t child);
 };
 
 class NodeRef {
 public:
+	bool StoreIn(const NodeRef* nodeRef) const;
+
 	Node::Id_t nodeId_ = Node::ID_NONE;
 	Graph* graph_ = nullptr;
-
-	bool StoreIn(const NodeRef* nodeRef) const;
 };
 
 #endif /* SRC_GRAPH_H_ */
