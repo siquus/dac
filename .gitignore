@@ -33,3 +33,5 @@ Examples/SolarSystem/Executor/dac/
 Examples/SolarSystem/profile.gcda/
 
 Examples/SolarSystem/State.csv
+
+*.log

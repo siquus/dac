@@ -33,6 +33,7 @@ E.g. if only a few dozen vector/matrix operations in a few dimensions is require
 - 
 
 ## TODO
+- [ ]	Remove duplicate nodes!
 - [ ]   Create some clean interface to jobPool
 - [ ]	NodeRef::StoreIn offers no protection from overwriting data not yet consumed by other nodes
 - [ ]	Better solution for control transfer: Current solution only works if there is a single root to the while part.
