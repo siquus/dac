@@ -46,18 +46,6 @@ public:
 	typedef uint32_t Id_t;
 	static constexpr Id_t ID_NONE = 0;
 
-	typedef enum {
-		HARDWARE_TYPE_NONE,
-		HARDWARE_TYPE_CPU,
-	} hardwareType_t;
-
-	typedef uint16_t HardwareIdentifier_t;
-
-	typedef struct {
-		hardwareType_t type = HARDWARE_TYPE_NONE;
-		HardwareIdentifier_t identifier = UINT16_MAX;
-	} Hardware_t;
-
 	std::vector<Id_t> parents;
 	std::vector<Id_t> children;
 	Type type;
@@ -65,7 +53,6 @@ public:
 	ObjectType objectType;
 	const void* object = nullptr;
 	Id_t id = ID_NONE;
-	Hardware_t hardware;
 	Id_t storedIn_ = ID_NONE;
 	bool noStorage_ = false;
 	std::vector<Id_t> usedAsStorageBy_;
