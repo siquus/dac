@@ -846,7 +846,7 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 		kronContractFactors = &contractValue->lfactors;
 	}
 
-	const Algebra::Module::VectorSpace::KroneckerDeltaParameters_t * kroneckerParam = (const Algebra::Module::VectorSpace::KroneckerDeltaParameters_t *) kronNode->typeParameters;
+	const Node::KroneckerDeltaParameters_t * kroneckerParam = (Node::KroneckerDeltaParameters_t *) kronNode->typeParameters;
 
 	// Copy delta pairs array into file
 	std::string deltaPairs = "const uint32_t deltaPairs[] = {";
@@ -1617,7 +1617,7 @@ bool CodeGenerator::VectorScalarProductKroneckerDeltaCode(const Node* node, File
 	getVarRetFalseOnError(varOp, node->id);
 	getVarRetFalseOnError(varScalar, varScalarNodeId);
 
-	const Algebra::Module::VectorSpace::KroneckerDeltaParameters_t * kroneckerParam = (const Algebra::Module::VectorSpace::KroneckerDeltaParameters_t *) kronNode->typeParameters;
+	const Node::KroneckerDeltaParameters_t * kroneckerParam = (const Node::KroneckerDeltaParameters_t *) kronNode->typeParameters;
 
 	retFalseOnFalse(GenerateLocalVariableDeclaration(varOp), "Could not generate Var. Decl.\n");
 
@@ -1747,20 +1747,20 @@ bool CodeGenerator::VectorVectorProductKroneckerDeltaCode(const Node* node, File
 	Node::Id_t vecNodeId;
 	const Algebra::Module::VectorSpace::Vector* vec;
 	const Algebra::Module::VectorSpace::Vector* kronVec;
-	const Algebra::Module::VectorSpace::KroneckerDeltaParameters_t * kroneckerParam;
+	const Node::KroneckerDeltaParameters_t * kroneckerParam;
 	if(lNodeIsKron)
 	{
 		vecNodeId = node->parents[1];
 		kronVec = (const Algebra::Module::VectorSpace::Vector*) lnode->second.object;
 		vec = (const Algebra::Module::VectorSpace::Vector*) rnode->second.object;
-		kroneckerParam = (const Algebra::Module::VectorSpace::KroneckerDeltaParameters_t *) lnode->second.typeParameters;
+		kroneckerParam = (const Node::KroneckerDeltaParameters_t *) lnode->second.typeParameters;
 	}
 	else
 	{
 		vecNodeId = node->parents[0];
 		kronVec = (const Algebra::Module::VectorSpace::Vector*) rnode->second.object;
 		vec = (const Algebra::Module::VectorSpace::Vector*) lnode->second.object;
-		kroneckerParam = (const Algebra::Module::VectorSpace::KroneckerDeltaParameters_t *) rnode->second.typeParameters;
+		kroneckerParam = (const Node::KroneckerDeltaParameters_t *) rnode->second.typeParameters;
 	}
 
 	getVarRetFalseOnError(varOp, node->id);

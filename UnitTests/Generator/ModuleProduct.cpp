@@ -58,11 +58,7 @@ bool ModuleProduct::Generate(const std::string &path)
 	vecVecProdOutput.Set(vecVecProd);
 
 	// Try the same with delta_ij
-	Algebra::Module::VectorSpace::KroneckerDeltaParameters_t deltaKronParam = {
-			.DeltaPair{1, 0},
-			.Scaling = 2,
-	};
-	auto delta_ij = myMatrixSpace.Element(&graph, deltaKronParam);
+	auto delta_ij = myMatrixSpace.Element(&graph, std::vector<uint32_t>{1, 0}, 2);
 
 	auto vecKronProd = vector1->Multiply(delta_ij);
 	auto vecKronProdContr = delta_ij->Contract(vecKronProd, std::vector<uint32_t>{0, 1}, std::vector<uint32_t>{1, 2});

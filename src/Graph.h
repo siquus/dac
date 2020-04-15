@@ -49,6 +49,11 @@ public:
 		std::vector<std::vector<uint32_t>> Indices; // sorted, small to large
 	} joinIndicesParameters_t;
 
+	typedef struct {
+		std::vector<uint32_t> DeltaPair; // I.e. for delta^i_j * delta^k_l * , ... position i will contain j and vice versa.
+		float Scaling = 1.;
+	} KroneckerDeltaParameters_t;
+
 	static size_t getSize(Type type);
 
 	// TODO: Should be called getTypeStr or so

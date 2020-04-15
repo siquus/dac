@@ -409,7 +409,7 @@ const VectorSpace::Vector * VectorSpace::Element(Graph * graph, const std::vecto
 	return retVec;
 }
 
-const VectorSpace::Vector * VectorSpace::Element(Graph* graph, const KroneckerDeltaParameters_t &initializer) const
+const VectorSpace::Vector * VectorSpace::Element(Graph* graph, const std::vector<uint32_t> &DeltaPairs, float Scaling) const
 {
 	if(nullptr == graph)
 	{
@@ -417,10 +417,10 @@ const VectorSpace::Vector * VectorSpace::Element(Graph* graph, const KroneckerDe
 		return nullptr;
 	}
 
-	if(initializer.DeltaPair.size() != factors_.size())
+	if(DeltaPairs.size() != factors_.size())
 	{
 		Error("Initializer dimensions do not match (%lu vs %lu)!\n",
-				initializer.DeltaPair.size(), factors_.size());
+				DeltaPairs.size(), factors_.size());
 		return nullptr;
 	}
 
@@ -435,8 +435,9 @@ const VectorSpace::Vector * VectorSpace::Element(Graph* graph, const KroneckerDe
 	node.type = Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT;
 	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
 
-	KroneckerDeltaParameters_t * param = new KroneckerDeltaParameters_t;
-	*param = initializer;
+	Node::KroneckerDeltaParameters_t * param = new Node::KroneckerDeltaParameters_t;
+	param->DeltaPair = DeltaPairs;
+	param->Scaling = Scaling;
 
 	node.typeParameters = param;
 	node.object = retVec;
@@ -1286,10 +1287,10 @@ const VectorSpace::Vector* VectorSpace::Vector::Contract(const Vector* vec, cons
 		// 4. C *= |i|
 		// done.
 
-		const KroneckerDeltaParameters_t * thisKronParam = (const KroneckerDeltaParameters_t *) thisNode->typeParameters;
-		const KroneckerDeltaParameters_t * vecKronParam = (const KroneckerDeltaParameters_t *) vecNode->typeParameters;
+		const Node::KroneckerDeltaParameters_t * thisKronParam = (const Node::KroneckerDeltaParameters_t *) thisNode->typeParameters;
+		const Node::KroneckerDeltaParameters_t * vecKronParam = (const Node::KroneckerDeltaParameters_t *) vecNode->typeParameters;
 
-		KroneckerDeltaParameters_t * opKronParam = new KroneckerDeltaParameters_t;
+		Node::KroneckerDeltaParameters_t * opKronParam = new Node::KroneckerDeltaParameters_t;
 		opKronParam->Scaling = thisKronParam->Scaling * vecKronParam->Scaling;
 
 		opKronParam->DeltaPair = thisKronParam->DeltaPair;
@@ -1671,18 +1672,16 @@ const VectorSpace::Vector* VectorSpace::Vector::PowerDerivative(const Vector* ve
 
 	// d(a_ijk^2) / d(a_lmn) = 2 * delta_li * delta_mj * delta_nk * a_ijk (no sum)
 	// Multiply with Kronecker
-	KroneckerDeltaParameters_t kronParameters;
-	kronParameters.DeltaPair.resize(2 * arg->__space_->factors_.size());
-
-	for(size_t deltaFactor = 0; deltaFactor < kronParameters.DeltaPair.size() / 2; deltaFactor++)
+	std::vector<uint32_t> deltaPairs(2 * arg->__space_->factors_.size());
+	for(size_t deltaFactor = 0; deltaFactor < deltaPairs.size() / 2; deltaFactor++)
 	{
-		kronParameters.DeltaPair[deltaFactor] = deltaFactor + kronParameters.DeltaPair.size() / 2;
-		kronParameters.DeltaPair[deltaFactor + kronParameters.DeltaPair.size() / 2] = deltaFactor;
+		deltaPairs[deltaFactor] = deltaFactor + deltaPairs.size() / 2;
+		deltaPairs[deltaFactor + deltaPairs.size() / 2] = deltaFactor;
 	}
 
 	VectorSpace * kronVectorSpace = new VectorSpace(*arg->__space_, 2);
 
-	const Vector * kronVec = kronVectorSpace->Element(arg->graph_, kronParameters);
+	const Vector * kronVec = kronVectorSpace->Element(arg->graph_, deltaPairs);
 	if(nullptr == kronVec)
 	{
 		Error("Could not create Kronecker\n");
@@ -1754,18 +1753,16 @@ const VectorSpace::Vector* VectorSpace::Vector::MultiplyDerivative(const Vector*
 		return otherVec;
 	}
 
-	KroneckerDeltaParameters_t kronParameters;
-	kronParameters.DeltaPair.resize(2 * arg->__space_->factors_.size());
-
-	for(size_t deltaFactor = 0; deltaFactor < kronParameters.DeltaPair.size() / 2; deltaFactor++)
+	std::vector<uint32_t> deltaPairs(2 * arg->__space_->factors_.size());
+	for(size_t deltaFactor = 0; deltaFactor < deltaPairs.size() / 2; deltaFactor++)
 	{
-		kronParameters.DeltaPair[deltaFactor] = deltaFactor + kronParameters.DeltaPair.size() / 2;
-		kronParameters.DeltaPair[deltaFactor + kronParameters.DeltaPair.size() / 2] = deltaFactor;
+		deltaPairs[deltaFactor] = deltaFactor + deltaPairs.size() / 2;
+		deltaPairs[deltaFactor + deltaPairs.size() / 2] = deltaFactor;
 	}
 
 	VectorSpace * kronVectorSpace = new VectorSpace(*arg->__space_, 2);
 
-	const Vector * kronVec = kronVectorSpace->Element(arg->graph_, kronParameters);
+	const Vector * kronVec = kronVectorSpace->Element(arg->graph_, deltaPairs);
 	if(nullptr == kronVec)
 	{
 		Error("Could not create Kronecker\n");
@@ -1818,18 +1815,16 @@ const VectorSpace::Vector* VectorSpace::Vector::PermuteDerivative(const Vector* 
 	const Node::permuteParameters_t * permutation = (const Node::permuteParameters_t *) fctNode->typeParameters;
 
 	// The result will just be a Kronecker product
-	KroneckerDeltaParameters_t kronParameters;
-	kronParameters.DeltaPair.resize(2 * arg->__space_->factors_.size());
-
-	for(size_t deltaFactor = 0; deltaFactor < kronParameters.DeltaPair.size() / 2; deltaFactor++)
+	std::vector<uint32_t> deltaPairs(2 * arg->__space_->factors_.size());
+	for(size_t deltaFactor = 0; deltaFactor < deltaPairs.size() / 2; deltaFactor++)
 	{
-		kronParameters.DeltaPair[deltaFactor] = permutation->indices[deltaFactor] + kronParameters.DeltaPair.size() / 2;
-		kronParameters.DeltaPair[permutation->indices[deltaFactor] + kronParameters.DeltaPair.size() / 2] = deltaFactor;
+		deltaPairs[deltaFactor] = permutation->indices[deltaFactor] + deltaPairs.size() / 2;
+		deltaPairs[permutation->indices[deltaFactor] + deltaPairs.size() / 2] = deltaFactor;
 	}
 
 	VectorSpace * kronVectorSpace = new VectorSpace(*arg->__space_, 2);
 
-	return kronVectorSpace->Element(arg->graph_, kronParameters);
+	return kronVectorSpace->Element(arg->graph_, deltaPairs);
 }
 
 const VectorSpace::Vector* VectorSpace::Vector::ContractDerivative(const Vector* vecValuedFct, const Vector* arg)
@@ -1881,17 +1876,15 @@ const VectorSpace::Vector* VectorSpace::Vector::ContractDerivative(const Vector*
 
 	// Create the Kronecker the otherVec (i.e. non-arg factor of contraction) will be contracted with
 	// d/dB_lmn (A_opqr B_ops) = d(l,o) d(m,p) d(n,s) A_opqr
-	KroneckerDeltaParameters_t kronParameters;
-	kronParameters.DeltaPair.resize(2 * arg->__space_->factors_.size());
-
-	for(size_t deltaFactor = 0; deltaFactor < kronParameters.DeltaPair.size() / 2; deltaFactor++)
+	std::vector<uint32_t> deltaPairs(2 * arg->__space_->factors_.size());
+	for(size_t deltaFactor = 0; deltaFactor < deltaPairs.size() / 2; deltaFactor++)
 	{
-		kronParameters.DeltaPair[deltaFactor] = deltaFactor + kronParameters.DeltaPair.size() / 2;
-		kronParameters.DeltaPair[deltaFactor + kronParameters.DeltaPair.size() / 2] = deltaFactor;
+		deltaPairs[deltaFactor] = deltaFactor + deltaPairs.size() / 2;
+		deltaPairs[deltaFactor + deltaPairs.size() / 2] = deltaFactor;
 	}
 
 	VectorSpace * kronVectorSpace = new VectorSpace(*arg->__space_, 2);
-	const Vector * kronVec = kronVectorSpace->Element(arg->graph_, kronParameters);
+	const Vector * kronVec = kronVectorSpace->Element(arg->graph_, deltaPairs);
 
 	std::vector<uint32_t> lFactors;
 	lFactors.resize(otherContrFactors->size());
@@ -1958,7 +1951,7 @@ const VectorSpace::Vector* VectorSpace::Vector::AddDerivative(const Vector* vecV
 	// General derivative of Add is easy: Just the product of Kronecker Deltas
 	Node node;
 	node.type = Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT;
-	KroneckerDeltaParameters_t * opParameters = new KroneckerDeltaParameters_t;
+	Node::KroneckerDeltaParameters_t * opParameters = new Node::KroneckerDeltaParameters_t;
 	opParameters->DeltaPair.resize(factors.size());
 	for(size_t factor = 0; factor < opParameters->DeltaPair.size() / 2; factor++)
 	{

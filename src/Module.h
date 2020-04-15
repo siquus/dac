@@ -41,11 +41,6 @@ public:
 	Ring::type_t GetRing() const;
 	void GetStrides(std::vector<uint32_t> * strides) const;
 
-	typedef struct {
-		std::vector<uint32_t> DeltaPair; // I.e. for delta^i_j * delta^k_l * , ... position i will contain j and vice versa.
-		float Scaling = 1.;
-	} KroneckerDeltaParameters_t;
-
 	class Vector : public NodeRef {
 	public:
 		const VectorSpace * __space_;
@@ -143,7 +138,7 @@ public:
 			const std::vector<Vector::Property> &properties,
 			const std::vector<const void *> &propertiesParameter) const;  // initializer Pointer is taken
 
-	const Vector * Element(Graph* graph, const KroneckerDeltaParameters_t &initializer) const; // initializer Pointer is taken
+	const Vector * Element(Graph* graph, const std::vector<uint32_t> &DeltaPairs, float Scaling = 1.f) const;
 
 	template<typename T>
 	const Vector * Scalar(Graph* graph, const T &initializer) const; // Initializer is copied

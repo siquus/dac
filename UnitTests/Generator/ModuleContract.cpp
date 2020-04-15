@@ -84,11 +84,7 @@ bool ModuleContract::Generate(const std::string &path)
 	tensorMatrixContr12Output.Set(tensorMatrixContr12);
 
 	// Kronecker
-	Algebra::Module::VectorSpace::KroneckerDeltaParameters_t kronParam = {
-			.DeltaPair{1, 0},
-			.Scaling = 2
-	};
-	auto TwoDelta_ij = myMatrixSpace.Element(&graph, kronParam);
+	auto TwoDelta_ij = myMatrixSpace.Element(&graph, std::vector<uint32_t>{1, 0}, 2.);
 
 	auto matrixIdProd = matrix1->Contract(TwoDelta_ij, 1, 0);
 
@@ -105,11 +101,7 @@ bool ModuleContract::Generate(const std::string &path)
 	// Derivation
 
 	// Matrix Product
-	Algebra::Module::VectorSpace::KroneckerDeltaParameters_t deltaKronParam = {
-			.DeltaPair{1, 0},
-			.Scaling = 1,
-	};
-	auto delta_ij = myMatrixSpace.Element(&graph, deltaKronParam);
+	auto delta_ij = myMatrixSpace.Element(&graph, std::vector<uint32_t>{1, 0}, 1.);
 
 	auto dMatrixProdRight = matrixProd->Derivative(matrix2);
 
