@@ -1363,7 +1363,7 @@ const VectorSpace::Vector* VectorSpace::Vector::Contract(const Vector* vec, cons
 	}
 	else
 	{
-		contractValue_t * opParameters = new contractValue_t;
+		contractParameters_t * opParameters = new contractParameters_t;
 		opParameters->lfactors = lfactors;
 		opParameters->rfactors = rfactors;
 
@@ -1850,7 +1850,7 @@ const VectorSpace::Vector* VectorSpace::Vector::ContractDerivative(const Vector*
 		return nullptr;
 	}
 
-	const contractValue_t * contractValue = (const contractValue_t *) fctNode->typeParameters;
+	const contractParameters_t * contractValue = (const contractParameters_t *) fctNode->typeParameters;
 
 	const std::vector<uint32_t> * argContrFactors;
 	const std::vector<uint32_t> * otherContrFactors;

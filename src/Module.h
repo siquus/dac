@@ -73,7 +73,7 @@ public:
 		typedef struct {
 			std::vector<uint32_t> lfactors;
 			std::vector<uint32_t> rfactors;
-		} contractValue_t; // TODO: Not used here! Move!
+		} contractParameters_t; // TODO: Not used here! Move!
 
 		const Vector* Contract(const Vector* vec, uint32_t lfactor = 0, uint32_t rfactor = 0) const;
 		const Vector* Contract(const Vector* vec, const std::vector<uint32_t> &lfactors, const std::vector<uint32_t> &rfactors) const;
