@@ -819,7 +819,7 @@ const VectorSpace::Vector* VectorSpace::Vector::JoinIndices(std::vector<std::vec
 	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
 	node.object = retVec;
 
-	joinIndicesParameters_t * param = new joinIndicesParameters_t;
+	Node::joinIndicesParameters_t * param = new Node::joinIndicesParameters_t;
 	param->Indices = indices;
 	std::sort(param->Indices.begin(), param->Indices.end());
 
@@ -1363,7 +1363,7 @@ const VectorSpace::Vector* VectorSpace::Vector::Contract(const Vector* vec, cons
 	}
 	else
 	{
-		contractParameters_t * opParameters = new contractParameters_t;
+		Node::contractParameters_t * opParameters = new Node::contractParameters_t;
 		opParameters->lfactors = lfactors;
 		opParameters->rfactors = rfactors;
 
@@ -1451,7 +1451,7 @@ const VectorSpace::Vector* VectorSpace::Vector::Project(const std::vector<std::p
 	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
 	node.object = retVec;
 
-	projectParameters_t * opParameters = new projectParameters_t;
+	Node::projectParameters_t * opParameters = new Node::projectParameters_t;
 	opParameters->range = range;
 
 	node.typeParameters = opParameters;
@@ -1498,7 +1498,7 @@ const VectorSpace::Vector* VectorSpace::Vector::Permute(const std::vector<uint32
 	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
 	node.object = retVec;
 
-	permuteParameters_t * opParameters = new permuteParameters_t;
+	Node::permuteParameters_t * opParameters = new Node::permuteParameters_t;
 	opParameters->indices = indices;
 
 	node.typeParameters = opParameters;
@@ -1529,7 +1529,7 @@ const VectorSpace::Vector* VectorSpace::Vector::ProjectDerivative(const Vector* 
 		return nullptr;
 	}
 
-	const projectParameters_t * projParam = (const projectParameters_t *) fctNode->typeParameters;
+	const Node::projectParameters_t * projParam = (const Node::projectParameters_t *) fctNode->typeParameters;
 
 	auto retSpace = new VectorSpace(std::vector<const VectorSpace*>{arg->__space_, vecValuedFct->__space_});
 
@@ -1815,7 +1815,7 @@ const VectorSpace::Vector* VectorSpace::Vector::PermuteDerivative(const Vector* 
 		return nullptr;
 	}
 
-	const permuteParameters_t * permutation = (const permuteParameters_t *) fctNode->typeParameters;
+	const Node::permuteParameters_t * permutation = (const Node::permuteParameters_t *) fctNode->typeParameters;
 
 	// The result will just be a Kronecker product
 	KroneckerDeltaParameters_t kronParameters;
@@ -1850,7 +1850,7 @@ const VectorSpace::Vector* VectorSpace::Vector::ContractDerivative(const Vector*
 		return nullptr;
 	}
 
-	const contractParameters_t * contractValue = (const contractParameters_t *) fctNode->typeParameters;
+	const Node::contractParameters_t * contractValue = (const Node::contractParameters_t *) fctNode->typeParameters;
 
 	const std::vector<uint32_t> * argContrFactors;
 	const std::vector<uint32_t> * otherContrFactors;

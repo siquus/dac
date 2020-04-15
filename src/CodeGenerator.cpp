@@ -831,7 +831,7 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 	const Algebra::Module::VectorSpace::Vector* kronVec = (const Algebra::Module::VectorSpace::Vector*) kronNode->object;
 	const Algebra::Module::VectorSpace::Vector* opVec = (const Algebra::Module::VectorSpace::Vector*) node->object;
 
-	const Algebra::Module::VectorSpace::Vector::contractParameters_t * contractValue = (const Algebra::Module::VectorSpace::Vector::contractParameters_t *) node->typeParameters;
+	const Node::contractParameters_t * contractValue = (const Node::contractParameters_t *) node->typeParameters;
 
 	const std::vector<uint32_t> * argContractFactors;
 	const std::vector<uint32_t> * kronContractFactors;
@@ -1053,7 +1053,7 @@ bool CodeGenerator::VectorPermutationCode(const Node* node, FileWriter * file)
 {
 	file->PrintfLine("// %s\n", __func__);
 
-	const Algebra::Module::VectorSpace::Vector::permuteParameters_t * permuteParam = (const Algebra::Module::VectorSpace::Vector::permuteParameters_t *) node->typeParameters;
+	const Node::permuteParameters_t * permuteParam = (const Node::permuteParameters_t *) node->typeParameters;
 
 	auto nodes = graph_->GetNodes();
 	const auto argNode = nodes->find(node->parents[0]);
@@ -1178,7 +1178,7 @@ bool CodeGenerator::VectorContractionCode(const Node* node, FileWriter * file)
 	const Algebra::Module::VectorSpace::Vector* rVec = (const Algebra::Module::VectorSpace::Vector*) rnode->second.object;
 
 	const Algebra::Module::VectorSpace::Vector* opVec = (const Algebra::Module::VectorSpace::Vector*) node->object;
-	const Algebra::Module::VectorSpace::Vector::contractParameters_t * contractValue = (const Algebra::Module::VectorSpace::Vector::contractParameters_t *) node->typeParameters;
+	const Node::contractParameters_t * contractValue = (Node::contractParameters_t *) node->typeParameters;
 
 	// Calculate Strides, assume Row-Major Layout
 	// https://en.wikipedia.org/wiki/Row-_and_column-major_order#Address_calculation_in_general
@@ -2081,7 +2081,7 @@ bool CodeGenerator::VectorJoinIndicesCode(const Node* node, FileWriter * file)
 
 	auto nodes = graph_->GetNodes();
 
-	const Algebra::Module::VectorSpace::Vector::joinIndicesParameters_t * param = (const Algebra::Module::VectorSpace::Vector::joinIndicesParameters_t *) node->typeParameters;
+	const Node::joinIndicesParameters_t * param = (Node::joinIndicesParameters_t *) node->typeParameters;
 
 	getVarRetFalseOnError(varOp, node->id);
 	getVarRetFalseOnError(varArg, node->parents[0]);
@@ -2212,7 +2212,7 @@ bool CodeGenerator::VectorProjectionCode(const Node* node, FileWriter * file)
 
 	auto nodes = graph_->GetNodes();
 
-	const Algebra::Module::VectorSpace::Vector::projectParameters_t * param = (const Algebra::Module::VectorSpace::Vector::projectParameters_t *) node->typeParameters;
+	const Node::projectParameters_t * param = (const Node::projectParameters_t *) node->typeParameters;
 
 	getVarRetFalseOnError(varOp, node->id);
 	getVarRetFalseOnError(varArg, node->parents[0]);

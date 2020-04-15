@@ -32,6 +32,25 @@ public:
 		CONTROL_TRANSFER_WHILE,
 	};
 
+	typedef struct {
+		std::vector<uint32_t> lfactors;
+		std::vector<uint32_t> rfactors;
+	} contractParameters_t;
+
+	typedef struct {
+		std::vector<uint32_t> indices;
+	} permuteParameters_t;
+
+	typedef struct {
+		std::vector<std::pair<uint32_t, uint32_t>> range;
+	} projectParameters_t;
+
+	typedef struct {
+		std::vector<std::vector<uint32_t>> Indices; // sorted, small to large
+	} joinIndicesParameters_t;
+
+	static size_t getSize(Type type);
+
 	// TODO: Should be called getTypeStr or so
 	static const char* getName(Type type);
 	const char * getName() const;
@@ -49,7 +68,7 @@ public:
 	std::vector<Id_t> parents;
 	std::vector<Id_t> children;
 	Type type;
-	const void* typeParameters = nullptr;
+	const void* typeParameters = nullptr; // see fooParameters_t
 	ObjectType objectType;
 	const void* object = nullptr;
 	Id_t id = ID_NONE;

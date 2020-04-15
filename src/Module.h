@@ -70,28 +70,14 @@ public:
 
 		const Vector* IsSmaller(const Vector* vec) const;
 
-		typedef struct {
-			std::vector<uint32_t> lfactors;
-			std::vector<uint32_t> rfactors;
-		} contractParameters_t; // TODO: Not used here! Move!
-
 		const Vector* Contract(const Vector* vec, uint32_t lfactor = 0, uint32_t rfactor = 0) const;
 		const Vector* Contract(const Vector* vec, const std::vector<uint32_t> &lfactors, const std::vector<uint32_t> &rfactors) const;
 
-		typedef struct {
-			std::vector<uint32_t> indices;
-		} permuteParameters_t; // TODO: Not used here! Move!
 		const Vector* Permute(const std::vector<uint32_t> &indices) const; // I.e. the new vector is going to contain index indices[j] at position j.
 
-		typedef struct {
-			std::vector<std::pair<uint32_t, uint32_t>> range;
-		} projectParameters_t; // TODO: Not used here! Move!
 		const Vector* Project(const std::vector<std::pair<uint32_t, uint32_t>> &range) const; // I.e. new, smaller vector has only the indices in range.
 		const Vector* Project(const std::pair<uint32_t, uint32_t> &range) const; // I.e. new, smaller vector has only the indices in range.
 
-		typedef struct {
-			std::vector<std::vector<uint32_t>> Indices; // sorted, small to large
-		} joinIndicesParameters_t; // TODO: Not used here! Move!
 		const Vector* JoinIndices(std::vector<std::vector<uint32_t>> &indices) const; // B_ik = JoinIndices(A_ijk, {0, 1})= A_iik (no sum)
 
 		const Vector* Derivative(const Vector* vec) const;
