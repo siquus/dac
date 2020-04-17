@@ -456,6 +456,56 @@ const VectorSpace::Vector * VectorSpace::Element(Graph* graph, const std::vector
 	return retVec;
 }
 
+bool VectorSpace::AreEqual(const VectorSpace * lVs, const VectorSpace * rVs)
+{
+	if(lVs->factors_.size() != rVs->factors_.size())
+	{
+		return false;
+	}
+
+	for(size_t factor = 0; factor < lVs->factors_.size(); factor++)
+	{
+		if(memcmp(&lVs->factors_[factor], &rVs->factors_[factor], sizeof(lVs->factors_[factor])))
+		{
+			return false;
+		}
+	}
+
+	return true;
+}
+
+bool VectorSpace::Vector::SameValue(const Vector * lVec, const Vector * rVec)
+{
+	if(!AreEqual(lVec->__space_, rVec->__space_))
+	{
+		return false;
+	}
+
+	if(((lVec->__value_ == nullptr) && (rVec->__value_ != nullptr)) ||
+			((lVec->__value_ != nullptr) && (rVec->__value_ == nullptr)))
+	{
+		return false;
+	}
+
+	if(lVec->__value_ == nullptr)
+	{
+		return true; // by above, both are nullptr
+	}
+
+	size_t cmpSize = 0;
+	for(const auto &factor: lVec->__space_->factors_)
+	{
+		cmpSize += factor.dim_ * Ring::GetElementSize(factor.ring_);
+	}
+
+	if(memcmp(lVec->__value_, rVec->__value_, cmpSize))
+	{
+		return false;
+	}
+
+	return true;
+}
+
 void VectorSpace::Vector::PrintInfo() const {
 
 	const Node* thisNode = graph_->GetNode(nodeId_);

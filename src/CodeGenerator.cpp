@@ -478,7 +478,7 @@ bool CodeGenerator::GenerateInstructions()
 		retFalseOnFalse(GenerateOperationCode(
 				&nodePair.second,
 				&fileInstructions_),
-				"Could not generate Operation Code!\n");
+				"Could not generate Operation Code for Node%u!\n", nodePair.first);
 
 		// End function
 		fileInstructions_.Outdent();
@@ -2334,7 +2334,7 @@ bool CodeGenerator::VectorPowerCode(const Node* node, FileWriter * file)
 
 	if(!rVarIsScalar)
 	{
-		Error("Can't take to non-scalar powers!\n");
+		Error("Can't take to non-scalar powers (have length %lu)!\n", rVar->Length());
 		return false;
 	}
 

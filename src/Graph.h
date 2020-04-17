@@ -61,6 +61,12 @@ public:
 	static const char* getName(Type type);
 	const char * getName() const;
 
+	size_t getPartialHash() const;
+
+	static bool areDuplicate(const Node &lNode, const Node &rNode);
+	static bool sameObject(const Node &lNode, const Node &rNode);
+	static bool sameTypeParameters(const Node &lNode, const Node &rNode);
+
 	enum class ObjectType {
 		NONE,
 		MODULE_VECTORSPACE_VECTOR,
@@ -70,8 +76,8 @@ public:
 	typedef uint32_t Id_t;
 	static constexpr Id_t ID_NONE = 0;
 
-	std::vector<Id_t> parents;
-	std::vector<Id_t> children;
+	std::vector<Id_t> parents; // TODO: No std::set, because position matters
+	std::set<Id_t> children;
 	Id_t branchTrue = ID_NONE;
 	Id_t branchFalse = ID_NONE;
 
@@ -100,7 +106,11 @@ public:
 	bool DeleteChildReferences(Node::Id_t child);
 	const std::string &Name() const;
 
+	bool ReduceToOne(const std::vector<Node::Id_t> &nodes);
+
 	bool GetRootAncestors(std::set<Node::Id_t> * rootParents, Node::Id_t child) const;
+
+	void RemoveDuplicates();
 
 private:
 	std::map<Node::Id_t, Node> nodes_;

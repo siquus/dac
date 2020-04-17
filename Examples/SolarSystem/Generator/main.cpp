@@ -367,6 +367,9 @@ int main()
 			&Output,
 			nullptr);
 
+	// Perform graph optimization
+	graph.RemoveDuplicates();
+
 	// Generate Code
 
 	struct stat stCodePath = {};

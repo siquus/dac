@@ -23,6 +23,7 @@ typedef enum {
 } type_t;
 
 extern type_t GetSuperiorRing(type_t t1, type_t t2);
+extern size_t GetElementSize(type_t type);
 
 template<typename inType>
 bool IsCompatible(type_t type, const std::vector<inType>  &dataVector __attribute__((unused))) // using dataVector only to get its type

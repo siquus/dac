@@ -24,7 +24,7 @@ namespace Module {
 class VectorSpace {
 public:
 	typedef struct {
-		Ring::type_t ring_;
+		Ring::type_t ring_; // TODO: Do we really want to implement different rings in one vector?
 		dimension_t dim_;
 	} simpleVs_t;
 
@@ -40,6 +40,7 @@ public:
 	dimension_t GetDim() const;
 	Ring::type_t GetRing() const;
 	void GetStrides(std::vector<uint32_t> * strides) const;
+	static bool AreEqual(const VectorSpace * lVs, const VectorSpace * rVs);
 
 	class Vector : public NodeRef {
 	public:
@@ -47,6 +48,7 @@ public:
 		const void* __value_ = nullptr;
 
 		void PrintInfo() const;
+		static bool SameValue(const Vector * lVec, const Vector * rVec);
 
 		// TODO: Make these operators derived classes?
 		// Then we don't have to weirdly hand over the argument order and stuff. They could carry a pointer to their derivative.
