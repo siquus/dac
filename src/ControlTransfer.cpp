@@ -15,7 +15,7 @@ While::While(Graph * graph)
 }
 
 bool While::Set(
-		vector_t* condition,
+		const Algebra::Module::VectorSpace::Vector * condition,
 		const std::vector<const NodeRef*> &parents,
 		const NodeRef* trueNode,
 		const NodeRef* falseNode)
@@ -62,8 +62,16 @@ bool While::Set(
 	}
 
 	node.type = Node::Type::CONTROL_TRANSFER_WHILE;
-	node.objectType = Node::ObjectType::CONTROL_TRANSFER_WHILE;
-	node.object = this;
+
+	if(nullptr != falseNode)
+	{
+		node.branchFalse = falseNode->nodeId_;
+	}
+
+	if(nullptr != trueNode)
+	{
+		node.branchTrue = trueNode->nodeId_;
+	}
 
 	Node::Id_t nodeId = graph_->AddNode(&node);
 
@@ -73,25 +81,5 @@ bool While::Set(
 		return false;
 	}
 
-	if(nullptr != falseNode)
-	{
-		falseNode_ = falseNode->nodeId_;
-	}
-
-	if(nullptr != trueNode)
-	{
-		trueNode_ = trueNode->nodeId_;
-	}
-
 	return true;
-}
-
-Node::Id_t While::getTrueNode() const
-{
-	return trueNode_;
-}
-
-Node::Id_t While::getFalseNode() const
-{
-	return falseNode_;
 }

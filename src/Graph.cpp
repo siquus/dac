@@ -176,6 +176,10 @@ const char* Node::getName(Type type)
 	case Type::CONTROL_TRANSFER_WHILE:
 		return "CONTROL_TRANSFER_WHILE";
 
+	case Node::Type::NONE:
+		Error("Node::Type::None not allowed!!\n");
+		return nullptr;
+
 	default:
 		Error("Unknown Type %u\n", (uint8_t) type);
 		return nullptr;
@@ -236,7 +240,7 @@ bool NodeRef::StoreIn(const NodeRef* nodeRef) const
 		return false;
 	}
 
-	storageNode->usedAsStorageBy_.push_back(nodeId_);
+	storageNode->usedAsStorageBy_.insert(nodeId_);
 
 	return true;
 }

@@ -436,6 +436,10 @@ bool CodeGenerator::GenerateInstructions()
 			Error("Unknown Node-Type %u\n", (uint8_t) nodePair.second.type);
 			return false;
 
+		case Node::Type::NONE:
+			Error("Node::Type::None not allowed!!\n");
+			return false;
+
 		case Node::Type::VECTOR: // no break intended
 		case Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT:
 			continue; // does not have instruction
@@ -1499,12 +1503,10 @@ bool CodeGenerator::ControlTransferWhileCode(const Node* node, FileWriter * file
 		return false;
 	}
 
-	const auto * ctWhile = (ControlTransfer::While*) node->object;
-
 	std::set<uint32_t> arrayPosTrue;
-	if(Node::ID_NONE != ctWhile->getTrueNode())
+	if(Node::ID_NONE != node->branchTrue)
 	{
-		bool success = GetRootAncestorInstructionPositions(&arrayPosTrue, ctWhile->getTrueNode());
+		bool success = GetRootAncestorInstructionPositions(&arrayPosTrue, node->branchTrue);
 		if(!success)
 		{
 			Error("Could not get root ancestor instructions!\n");
@@ -1513,9 +1515,9 @@ bool CodeGenerator::ControlTransferWhileCode(const Node* node, FileWriter * file
 	}
 
 	std::set<uint32_t> arrayPosFalse;
-	if(Node::ID_NONE != ctWhile->getFalseNode())
+	if(Node::ID_NONE != node->branchFalse)
 	{
-		bool success = GetRootAncestorInstructionPositions(&arrayPosFalse, ctWhile->getFalseNode());
+		bool success = GetRootAncestorInstructionPositions(&arrayPosFalse, node->branchFalse);
 		if(!success)
 		{
 			Error("Could not get root ancestor instructions!\n");
@@ -2591,7 +2593,8 @@ bool CodeGenerator::FetchVariables()
 		{
 		case Node::ObjectType::MODULE_VECTORSPACE_VECTOR:
 		{
-			if(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == nodePair.second.type)
+			if((Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == nodePair.second.type) ||
+					(Node::Type::CONTROL_TRANSFER_WHILE == nodePair.second.type))
 			{
 				continue; // doesn't require variable.
 			}
@@ -2629,7 +2632,6 @@ bool CodeGenerator::FetchVariables()
 
 		case Node::ObjectType::NONE: // no break intended
 		case Node::ObjectType::INTERFACE_OUTPUT: // no break intended
-		case Node::ObjectType::CONTROL_TRANSFER_WHILE:
 			// No variable to create.
 			continue;
 

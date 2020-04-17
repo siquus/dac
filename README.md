@@ -33,6 +33,7 @@ E.g. if only a few dozen vector/matrix operations in a few dimensions is require
 - 
 
 ## TODO
+- [ ]	Restructure code: Interface user -> graph -> code generator should be well-defined.
 - [ ]	Remove duplicate nodes!
 - [ ]   Create some clean interface to jobPool
 - [ ]	NodeRef::StoreIn offers no protection from overwriting data not yet consumed by other nodes

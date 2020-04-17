@@ -17,6 +17,7 @@
 class Node {
 public:
 	enum class Type {
+		NONE, // Value not allowed!
 		VECTOR,
 		VECTOR_ADDITION,
 		VECTOR_CONTRACTION,
@@ -63,8 +64,7 @@ public:
 	enum class ObjectType {
 		NONE,
 		MODULE_VECTORSPACE_VECTOR,
-		INTERFACE_OUTPUT,
-		CONTROL_TRANSFER_WHILE,
+		INTERFACE_OUTPUT
 	};
 
 	typedef uint32_t Id_t;
@@ -72,14 +72,17 @@ public:
 
 	std::vector<Id_t> parents;
 	std::vector<Id_t> children;
-	Type type;
+	Id_t branchTrue = ID_NONE;
+	Id_t branchFalse = ID_NONE;
+
+	Type type = Type::NONE;
 	const void* typeParameters = nullptr; // see fooParameters_t
-	ObjectType objectType;
+	ObjectType objectType = ObjectType::NONE;
 	const void* object = nullptr;
 	Id_t id = ID_NONE;
 	Id_t storedIn_ = ID_NONE;
 	bool noStorage_ = false;
-	std::vector<Id_t> usedAsStorageBy_;
+	std::set<Id_t> usedAsStorageBy_;
 };
 
 class Graph {
