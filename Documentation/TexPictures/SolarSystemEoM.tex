@@ -1,0 +1,44 @@
+\documentclass{amsart}
+\usepackage{tikz}
+\usetikzlibrary{matrix}
+\begin{document}
+\thispagestyle{empty}
+
+Say, we have a list of objects
+\vspace{2em}
+\begin{center}
+\begin{tabular}{c c c c}
+  \hline
+  Name & Mass & position vector & momentum vector\\
+  \hline
+  Sun & $m_1$ & $q_1$ & $p_1$ \\
+  Jupiter & $m_2$ & $q_2$ & $p_2$ \\
+  $\vdots$ & $\vdots$ & $\vdots$ & $\vdots$\\
+  \hline
+\end{tabular}
+\end{center}
+\vspace{2em}
+Then the Hamiltonian for these objects interacting through their gravity reads
+
+\begin{align*}
+  H &= \text{kinetik energy} + \text{potential energy}\\
+  &= \sum_i \frac{p_i^2}{2m_i} - G\sum_{i<j}\frac{m_im_j}{|q_i-q_j|} 
+\end{align*}
+
+and the differential equation governing the movement
+
+\begin{align*}
+  \dot{p_i} &= -\frac{\partial H}{\partial q_i}\\
+  \dot{q_i} &= \frac{\partial H}{\partial p_i}
+\end{align*}
+
+The easiest way of generating the trajectory (i.e. the motion of the objects)
+
+\begin{align*}
+  p_i(t + \Delta t) &= p_i(t) + \dot{p_i}(t)\Delta t \\
+ q_i(t + \Delta t) &= q_i(t) + \dot{q_i}(t)\Delta t
+\end{align*}
+
+using sufficiently small time steps $\Delta t$.
+
+\end{document}

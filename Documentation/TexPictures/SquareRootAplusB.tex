@@ -1,0 +1,27 @@
+\documentclass{amsart}
+\usepackage{tikz}
+\usetikzlibrary{matrix}
+\begin{document}
+\thispagestyle{empty}
+
+\begin{flalign*}
+  c &= \sqrt{a + b}&
+\end{flalign*}
+
+\begin{center}
+  \begin{tikzpicture}
+    \def\vert{1}
+    \def\hor{1}
+    \node (a) at (0,0) {a};
+    \node (b) at (2*\hor,0) {b};
+    \node (plus) at (\hor,-\vert) {$+$};
+    \node (sqrt) at (\hor,-2*\vert) {$\sqrt{\cdots}$};
+    \node (c) at (\hor,-3*\vert) {c};
+    
+    \path [->] (a) edge (plus);
+    \path [->] (b) edge (plus);
+    \path [->] (plus) edge (sqrt);
+    \path [->] (sqrt) edge (c);
+  \end{tikzpicture}
+\end{center}
+\end{document}

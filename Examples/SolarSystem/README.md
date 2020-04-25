@@ -1,8 +1,12 @@
 # Solar System
 
+![Picture Missing](./OuterSolarSystem.png "Outer solar system") 
+
 ## Equations of motion
 
-TODO
+This simulation uses [Hamiltonian mechanics](https://en.wikipedia.org/wiki/Hamiltonian_mechanics) to calculate the dynamics of the solar system:
+
+![Picture Missing](../../Documentation/TexPictures/SolarSystemEoM.png "Hamiltonian mechanics")     
 
 ## Building and Running
 ```console

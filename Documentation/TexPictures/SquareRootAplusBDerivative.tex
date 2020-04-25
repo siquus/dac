@@ -1,0 +1,34 @@
+\documentclass{amsart}
+\usepackage{tikz}
+\usetikzlibrary{matrix}
+\begin{document}
+\thispagestyle{empty}
+
+\begin{flalign*}
+  \frac{dc}{da} &= \frac{1}{2\sqrt{a + b}}&
+\end{flalign*}
+
+\begin{center}
+  \begin{tikzpicture}
+    \def\vert{1}
+    \def\hor{1}
+    \node (a) at (0,0) {a};
+    \node (b) at (2*\hor,0) {b};
+    \node (plus) at (\hor,-\vert) {$+$};
+    \node (sqrt) at (\hor,-2*\vert) {$\sqrt{\cdots}$};
+    \node (c) at (0,-3*\vert) {c};
+    \node (inv) at (2*\hor,-3*\vert) {$(\cdots)^{-1}$};
+    \node (half) at (2*\hor,-4*\vert) {$*\frac{1}{2}$};
+    \node (dc) at (2*\hor,-5*\vert) {$\frac{dc}{da}$};
+    
+    \path [->] (a) edge (plus);
+    \path [->] (b) edge (plus);
+    \path [->] (plus) edge (sqrt);
+    \path [->] (sqrt) edge (c);
+    \path [->] (sqrt) edge (inv);
+    \path [->] (inv) edge (half);
+    \path [->] (half) edge (dc);
+  \end{tikzpicture}
+\end{center}
+
+\end{document}
