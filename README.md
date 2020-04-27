@@ -3,12 +3,18 @@ DAC provides a tool to express and perform algebraic computations through [compu
 
 The library is currently in an early alpha state with many interface changes ahead.
 
+* [TL;DR](#tldr)
 * [Target use case](#usecase)
 * [Features](#features)
 * [Workflow](#workflow)
 * [Computational graphs?](#computationalgraphs)
 * [Design decisions](#design)
 * [ToDo](#todo)
+
+<a name="tldr"></a>
+## TL;DR
+
+Check out the [solar system](Examples/SolarSystem) example. Start by following the suggestions in the [README](Examples/SolarSystem/README.md).
 
 <a name="usecase"></a>
 ## Target use case

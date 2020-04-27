@@ -56,8 +56,8 @@ typedef struct {
 static const cmdLineArgument_t cmdLineArguments[CMD_LINE_OPTION_NROF] =
 {
 		{"-h", "", "Help", "Prints this help"},
-		{"-i", "%%u", "Interval", "[optional] Simulation step interval of logging the state"},
-		{"-p", "%%s", "Path", "[optional] Path to which the state will be written."}
+		{"-i", "%u", "Interval", "[optional] Simulation step interval of logging the state"},
+		{"-p", "%s", "Path", "[optional] Path to which the state will be written."}
 };
 
 typedef struct {

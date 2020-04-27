@@ -8,12 +8,18 @@ This simulation uses [Hamiltonian mechanics](https://en.wikipedia.org/wiki/Hamil
 
 ![Picture Missing](../../Documentation/TexPictures/SolarSystemEoM.png "Hamiltonian mechanics")     
 
-## Building and Running
+## Building and running
+To just build & run to check if it works, execute 
+
 ```console
 $ ./makeRun.sh
 ```
 
-## Plotting
+## Plotting and playing
+Reminder from [DAC-Readme](../../README.md): The [Generator](Generator)-binary generates the computational graph and from that the C-code which will perform the actual simulation. The [Executor](Executor)-binary runs this code and registers a callback function, which receives the state of the simulation at each time step.
+
+Consequently, if you want to change any simulation parameters (time-increment step size, number of iterations, ...), you have to compile & run the Generator and then compile & run the Executor again.
+    
 Use
  
 ```console

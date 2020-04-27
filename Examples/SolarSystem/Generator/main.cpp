@@ -44,8 +44,8 @@ typedef struct {
 static const cmdLineArgument_t cmdLineArguments[CMD_LINE_OPTION_NROF] =
 {
 		{"-h", "", "Help", "Prints this help"},
-		{"-i", "%%i", "Iterations", "Number of simulation steps"},
-		{"-s", "%%f", "Stepsize", "Time increment of simulation step"}
+		{"-i", "%i", "Iterations", "Number of simulation steps"},
+		{"-s", "%f", "Stepsize", "Time increment of simulation step"}
 };
 
 static const float GravitationalConstant = 2.95912208286E-4;
