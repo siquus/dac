@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <string.h>
 #include <vector>
 
 #include "common.h"
@@ -20,6 +21,32 @@
 #include "CodeGenerator.h"
 
 #define FATAL_ON_FALSE(arg) if(!arg){fatalLine(__FILE__, __LINE__, #arg);}
+
+typedef struct {
+	int32_t Iterations = 100000;
+	float Stepsize = 1.0;
+} cmdLineArgs_t;
+
+typedef enum {
+	CMD_LINE_OPTION_HELP,
+	CMD_LINE_OPTION_ITERATIONS_NROF,
+	CMD_LINE_OPTION_STEPSIZE,
+	CMD_LINE_OPTION_NROF,
+} cmdLineOption_t;
+
+typedef struct {
+	char Option[5];
+	char Param[4];
+	char Name[100];
+	char Help[100];
+} cmdLineArgument_t;;
+
+static const cmdLineArgument_t cmdLineArguments[CMD_LINE_OPTION_NROF] =
+{
+		{"-h", "", "Help", "Prints this help"},
+		{"-i", "%%i", "Iterations", "Number of simulation steps"},
+		{"-s", "%%f", "Stepsize", "Time increment of simulation step"}
+};
 
 static const float GravitationalConstant = 2.95912208286E-4;
 
@@ -245,9 +272,120 @@ static const Algebra::Module::VectorSpace::Vector * SymplecticMatrix(
 			propertiesParam);
 }
 
-
-int main()
+static void printHelp()
 {
+	printf("\n");
+	for(int option = 0; option < CMD_LINE_OPTION_NROF; option++)
+	{
+		printf("%s\t %s\t %s: %s\n",
+				cmdLineArguments[option].Option,
+				cmdLineArguments[option].Param,
+				cmdLineArguments[option].Name,
+				cmdLineArguments[option].Help);
+	}
+	printf("\n");
+}
+
+static void handleCmdLineOption(cmdLineArgs_t * cmdLineArgs, cmdLineOption_t option, const char* arg)
+{
+	switch(option)
+	{
+	case CMD_LINE_OPTION_STEPSIZE:
+	{
+		errno = 0;
+		char * tailptr;
+		cmdLineArgs->Stepsize = strtof(arg, &tailptr);
+		if(errno)
+		{
+			Fatal("Could not convert \"%s\" to Number: %s!\n",
+					arg,
+					strerror(errno));
+		}
+		else if(arg == tailptr)
+		{
+			Fatal("Could not convert \"%s\" to Number!\n", arg);
+		}
+		else if(0.f >= cmdLineArgs->Stepsize)
+		{
+			Fatal("%f is not a valid number for stepsize!\n", (double) cmdLineArgs->Stepsize);
+		}
+	}
+		break;
+
+	case CMD_LINE_OPTION_ITERATIONS_NROF:
+	{
+		errno = 0;
+		char * tailptr;
+		cmdLineArgs->Iterations = strtol(arg, &tailptr, 10);
+
+		if(errno)
+		{
+			Fatal("Could not convert \"%s\" to Number: %s!\n",
+					arg,
+					strerror(errno));
+		}
+		else if(arg == tailptr)
+		{
+			Fatal("Could not convert \"%s\" to Number!\n", arg);
+		}
+		else if(0 >= cmdLineArgs->Iterations)
+		{
+			Fatal("%i is not a valid number of iterations!\n", cmdLineArgs->Iterations);
+		}
+	}
+		break;
+
+	default: // no break intended
+	case CMD_LINE_OPTION_NROF:
+		Fatal("Unhandled option nr %u!\n", option);
+	}
+}
+
+static void parseCmdLineArgs(cmdLineArgs_t * cmdLineArgs, int argc, char* argv[])
+{
+	for(int arg = 1; arg < argc; arg++)
+	{
+		bool foundOption = false;
+		for(int option = 0; option < CMD_LINE_OPTION_NROF; option++)
+		{
+			if(0 == strncmp(cmdLineArguments[option].Option, argv[arg], sizeof(cmdLineArguments[option])))
+			{
+				foundOption = true;
+
+				if(CMD_LINE_OPTION_HELP == option)
+				{
+					printHelp();
+					exit(0);
+				}
+
+				if(arg + 1 >= argc)
+				{
+					printHelp();
+					Fatal("Missing parameter for %s\n", cmdLineArguments[option].Option);
+				}
+
+				arg++;
+
+				handleCmdLineOption(cmdLineArgs, (cmdLineOption_t) option, argv[arg]);
+
+				break;
+			}
+		}
+
+		if(!foundOption)
+		{
+			printHelp();
+			Fatal("Unknown Option: %s\n", argv[arg]);
+		}
+	}
+}
+
+
+int main(int argc, char* argv[])
+{
+	cmdLineArgs_t cmdLineArgs;
+	parseCmdLineArgs(&cmdLineArgs, argc, argv);
+
 	Graph graph("SolarSystem");
 
 	// Create initial state
@@ -341,7 +479,7 @@ int main()
 
 	auto X_H = symplecticMatrix->Contract(dH, 1, 0);
 
-	auto timeIncrement = X_H->__space_->Scalar(&graph, 1.f);
+	auto timeIncrement = X_H->__space_->Scalar(&graph, cmdLineArgs.Stepsize);
 	auto step = X_H->Multiply(timeIncrement);
 
 	auto newState = state->Add(step);
@@ -352,7 +490,7 @@ int main()
 
 	auto iterationVs = Algebra::Module::VectorSpace(Algebra::Ring::Int32, 1);
 
-	auto SimIterations = iterationVs.Scalar(&graph, 10000);
+	auto SimIterations = iterationVs.Scalar(&graph, cmdLineArgs.Iterations);
 	auto minusOne = iterationVs.Scalar(&graph, -1);
 
 	auto IterationCntDown = SimIterations->Add(minusOne);

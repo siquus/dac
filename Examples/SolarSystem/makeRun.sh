@@ -8,7 +8,7 @@ make -j3
 rc=$?; if [[ $rc != 0 ]]; then exit $rc; fi
 
 printf "\n\nRunning Code generator...\n\n"
-build/main.out
+build/main.out -s 1.0 -i 10000
 rc=$?; if [[ $rc != 0 ]]; then exit $rc; fi
 
 printf "\n\nBuilding generated Code...\n\n"

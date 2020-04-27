@@ -14,7 +14,12 @@ $ ./makeRun.sh
 ```
 
 ## Plotting
-Run the simulation with 
+Use
+ 
+```console
+dac/Examples/SolarSystem$ Executor/build/main.out -h
+```
+for an overview of provided options. Run the simulation with 
 
 ```console
 dac/Examples/SolarSystem$ Executor/build/main.out -p ./State.csv -i 1000
@@ -26,6 +31,14 @@ After running the simulation, open Gnuplot and
 dac/Examples/SolarSystem$ gnuplot 
 gnuplot> load "gnuplot.p"
 ```
+
+To change the number of simulation steps or the stepsize, use
+
+```console
+dac/Examples/SolarSystem$ Generator/build/main.out -h
+```
+
+for an overview of provided options and run it afterwards to generate the code with new stepsize/runtime.
 
 ## Optimization
 You may use gcc's feedback directed optimization feature to optimize the code: 

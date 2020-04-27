@@ -39,6 +39,27 @@ typedef struct {
 	std::string WritePath;
 } cmdLineArgs_t;
 
+typedef enum {
+	CMD_LINE_OPTION_HELP,
+	CMD_LINE_OPTION_WRITE_INTERVAL,
+	CMD_LINE_OPTION_WRITE_PATH,
+	CMD_LINE_OPTION_NROF,
+} cmdLineOption_t;
+
+typedef struct {
+	char Option[5];
+	char Param[4];
+	char Name[100];
+	char Help[100];
+} cmdLineArgument_t;;
+
+static const cmdLineArgument_t cmdLineArguments[CMD_LINE_OPTION_NROF] =
+{
+		{"-h", "", "Help", "Prints this help"},
+		{"-i", "%%u", "Interval", "[optional] Simulation step interval of logging the state"},
+		{"-p", "%%s", "Path", "[optional] Path to which the state will be written."}
+};
+
 typedef struct {
 	FILE * File = nullptr;
 	uint32_t Interval;
@@ -90,44 +111,92 @@ static void StateCallback(const float* pt, size_t size)
 	}
 }
 
+static void printHelp()
+{
+	printf("\n");
+	for(int option = 0; option < CMD_LINE_OPTION_NROF; option++)
+	{
+		printf("%s\t %s\t %s: %s\n",
+				cmdLineArguments[option].Option,
+				cmdLineArguments[option].Param,
+				cmdLineArguments[option].Name,
+				cmdLineArguments[option].Help);
+	}
+	printf("\n");
+}
+
+static void handleCmdLineOption(cmdLineArgs_t * cmdLineArgs, cmdLineOption_t option, const char* arg)
+{
+	switch(option)
+	{
+	case CMD_LINE_OPTION_WRITE_INTERVAL:
+	{
+		errno = 0;
+		char * tailptr;
+		cmdLineArgs->WriteInterval = strtol(arg, &tailptr, 10);
+		if(errno)
+		{
+			fatal("Could not convert \"%s\" to Number: %s!\n",
+					arg,
+					strerror(errno));
+		}
+		else if(arg == tailptr)
+		{
+			fatal("Could not convert \"%s\" to Number!\n", arg);
+		}
+		else if(0 == cmdLineArgs->WriteInterval)
+		{
+			fatal("0 is not a valid write interval!\n");
+		}
+	}
+	break;
+
+
+	case CMD_LINE_OPTION_WRITE_PATH:
+		cmdLineArgs->WritePath = arg;
+		break;
+
+	default: // no break intended
+	case CMD_LINE_OPTION_NROF:
+		fatal("Unhandled option nr %u!\n", option);
+	}
+}
+
 static void parseCmdLineArgs(cmdLineArgs_t * cmdLineArgs, int argc, char* argv[])
 {
 	for(int arg = 1; arg < argc; arg++)
 	{
-		if(arg + 1 >= argc)
+		bool foundOption = false;
+		for(int option = 0; option < CMD_LINE_OPTION_NROF; option++)
 		{
-			fatal("Every command line argument has the format -%%c [input]\n");
-		}
-		else if(0 == memcmp("-p", argv[arg], sizeof("-p")))
-		{
-			arg++;
-			cmdLineArgs->WritePath = argv[arg];
-		}
-		else if(0 == memcmp("-i", argv[arg], sizeof("-i")))
-		{
-			arg++;
+			if(0 == strncmp(cmdLineArguments[option].Option, argv[arg], sizeof(cmdLineArguments[option])))
+			{
+				foundOption = true;
 
-			errno = 0;
-			char * tailptr;
-			cmdLineArgs->WriteInterval = strtol(argv[arg], &tailptr, 10);
-			if(errno)
-			{
-				fatal("Could not convert \"%s\" to Number: %s!\n",
-						argv[arg],
-						strerror(errno));
-			}
-			else if(argv[arg] == tailptr)
-			{
-				fatal("Could not convert \"%s\" to Number!\n", argv[arg]);
-			}
-			else if(0 == cmdLineArgs->WriteInterval)
-			{
-				fatal("0 is not a valid write interval!\n");
+				if(CMD_LINE_OPTION_HELP == option)
+				{
+					printHelp();
+					exit(0);
+				}
+
+				if(arg + 1 >= argc)
+				{
+					printHelp();
+					fatal("Missing parameter for %s\n", cmdLineArguments[option].Option);
+				}
+
+				arg++;
+
+				handleCmdLineOption(cmdLineArgs, (cmdLineOption_t) option, argv[arg]);
+
+				break;
 			}
 		}
-		else
+
+		if(!foundOption)
 		{
-			fatal("Unknown cmd line argument \"%s\"!\n", argv[arg]);
+			printHelp();
+			fatal("Unknown Option: %s\n", argv[arg]);
 		}
 	}
 }
