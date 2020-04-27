@@ -77,9 +77,16 @@ Furthermore, graphs make for easy parallelization, that is destribution of work 
 
 <a name="todo"></a>
 ## TODO
+
+### Projects
+- [ ]	[Convolutional neural network](https://en.wikipedia.org/wiki/Convolutional_neural_network) operations (ongoing)
+- [ ]	[Partial differential equations](https://en.wikipedia.org/wiki/Partial_differential_equation): Current ultimate goal of this project is to provide a framework where (physical) PDEs may be solved geometrically, based on their formulation in the language of [differential forms](https://en.wikipedia.org/wiki/Differential_form). This will require some form of [triangulation](https://en.wikipedia.org/wiki/Triangulation_(geometry)) and operations thereon. It's going to take a while.
+
+### Improvements
 - [ ]	Include gcov with unitTests and generate coverage.
 - [ ]	Restructure code: Interface user -> graph -> code generator should be well-defined.
 - [ ]   Create some clean interface to jobPool
+- [ ]	Rename Helpers.c to something reflecting that it's handling the jobPool and threads.
 - [ ]	NodeRef::StoreIn offers no protection from overwriting data not yet consumed by other nodes
 - [ ]	Better solution for control transfer: Current solution only works if there is a single root to the while part.
 - [ ]	For debugging, NodeRefs should implement PrintInfo()
@@ -90,10 +97,10 @@ Furthermore, graphs make for easy parallelization, that is destribution of work 
 - [ ]   Put initializer values into separate header? they can become very long.
 - [ ]   __space_ should be private. And offer a function which returns a const pointer/ref to it.
 - [ ]	It's weird that VectorSpace::Vector rather than VectorSpace::Element.
-- [ ]	Rename Vector -> Tensor? It's imagine someone using namespace std
+- [ ]	Rename Vector -> Tensor? Imagine someone using namespace std and then Cpp-Vectors.
 - [ ]	Rethink that vector space pointer business.
 - [ ]	Introduce "scaling" to vectors, so that e.g. for scalar multiplication not the whole vector needs to be multiplied
 - [ ]   Introduce optimized memory handling: Not every node needs to be statically allocated. Memory may actually be globally optimized on graph
-- [ ]   How to deal with special vectors? E.g. starting with Kronecker? They all require a special implementation.
-- [ ]   To enable DAC on non-unix single-core targets, it should be possible to build without threads.
+- [ ]   How to deal with special vectors? E.g. starting with Kronecker? They all require special operator-implementation. The current solution isn't scalable.
+- [ ]   To enable DAC on non-unix single-core targets, it should be possible to build without pthreads.
 - [ ]	Check that all printf of floats uses all floating digits in code generator!
