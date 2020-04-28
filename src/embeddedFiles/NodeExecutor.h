@@ -20,8 +20,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef SRC_HELPERS_H_
-#define SRC_HELPERS_H_
+#ifndef SRC_NODEEXECUTOR_H_
+#define SRC_NODEEXECUTOR_H_
 
 #include <stdatomic.h>
 #include <pthread.h>
@@ -48,4 +48,4 @@ extern void * threadFunction(void * arg);
 extern void StartThreads(void ** instance, size_t threadsNrOf, jobPoolInit_t * jobPoolInit);
 extern void JoinThreads(void * instance);
 
-#endif /* SRC_HELPERS_H_ */
+#endif /* SRC_NODEEXECUTOR_H_ */
