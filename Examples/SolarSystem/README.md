@@ -12,7 +12,7 @@ This simulation uses [Hamiltonian mechanics](https://en.wikipedia.org/wiki/Hamil
 To just build & run to check if it works, execute 
 
 ```console
-$ ./makeRun.sh
+dac/Examples/SolarSystem$ ./makeRun.sh
 ```
 
 ## Plotting and playing
