@@ -1,0 +1,13 @@
+\documentclass{amsart}
+\usepackage{tikz}
+\usetikzlibrary{matrix}
+\begin{document}
+\thispagestyle{empty}
+
+\begin{align*}
+  &A_{ij}(x)\in\mathbb{R}^m\otimes\mathbb{R}^n,~x_k\in\mathbb{R}^o\\
+  &B_{ijk}(x) := \frac{dA_{jk}(x)}{dx_i} = \{\frac{dA_{jk}(x)}{dx_1}, \frac{dA_{jk}(x)}{dx_2}, \cdots\}\in\mathbb{R}^o\otimes\mathbb{R}^m\otimes\mathbb{R}^n\\
+  &C_{ijkl}(x) := \frac{dB_{jkl}(x)}{dx_i} = \{\frac{dB_{jkl}(x)}{dx_1}, \frac{dB_{jkl}(x)}{dx_2}, \cdots\}\in\mathbb{R}^o\otimes\mathbb{R}^o\otimes\mathbb{R}^m\otimes\mathbb{R}^n\\
+\end{align*}
+
+\end{document}

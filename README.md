@@ -30,7 +30,7 @@ If only a few dozen vector/matrix operations in a couple of dimensions is requir
 - Global optimization over whole [computational graph](#computationalgraphs)
 
 ### Unique
-- Everything is a n-Tensor, greatly simplifying derivative handling. In particular, it enables taking more than the first derivative in a consistent fashion, e.g. derivative of a 2-Tensor = Matrix is a 3-Tensor: If A_ij(x_k) is the matrix depending on the vector x_k, then dA_ij / dx_k = B_kij, dB_kij / dx_l = C_lkij, ...
+- Everything is a n-Tensor, greatly simplifying derivative handling. In particular, it enables taking more than the first derivative in a consistent fashion, e.g. derivative of a 2-Tensor = Matrix is a 3-Tensor and so forth (notice, that DAC uses the convention that derivative indices are added in the front): ![alt text](Documentation/TexPictures/tensorDerivative.png "tensor derivative")  
 - Easy access to special objects (e.g. [Kronecker delta](https://en.wikipedia.org/wiki/Kronecker_delta), ...) with efficient implementations for operations using them.
 - Interface is closer to standard mathematical literature, e.g. one defines a [vector space](https://en.wikipedia.org/wiki/Vector_space) and may then declare something an element of that space
 - This enables [group representations](https://en.wikipedia.org/wiki/Group_representation) on that space which in turn optimize numerics: E.g. the product of [rotation matrices](https://en.wikipedia.org/wiki/Rotation_matrix) is a [rotation matrix](https://en.wikipedia.org/wiki/Rotation_matrix). Their determinant equals one, ...
