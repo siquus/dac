@@ -1,5 +1,6 @@
 #!/bin/sh
 #
+# Copied from http://man7.org/tlpi/ (Michael Kerrisk, 2019)
 # Create a new version of the file ename.c.inc by parsing symbolic
 # error names defined in errno.h
 #
