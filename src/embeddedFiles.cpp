@@ -15,11 +15,11 @@
 // See https://csl.name/post/embedding-binary-data/
 // TODO: The identifiers below depend on the path to that file.
 extern "C" {
-extern const char _binary_build_Helpers_c_copy_start;
-extern const char _binary_build_Helpers_c_copy_end;
+extern const char _binary_build_NodeExecutor_c_copy_start;
+extern const char _binary_build_NodeExecutor_c_copy_end;
 
-extern const char _binary_build_Helpers_h_copy_start;
-extern const char _binary_build_Helpers_h_copy_end;
+extern const char _binary_build_NodeExecutor_h_copy_start;
+extern const char _binary_build_NodeExecutor_h_copy_end;
 
 extern const char _binary_build_error_functions_c_copy_start;
 extern const char _binary_build_error_functions_c_copy_end;
@@ -41,8 +41,8 @@ extern const char _binary_build_ename_c_inc_copy_end;
 }
 
 typedef enum {
-	EMBEDDED_FILES_HELPERS_C,
-	EMBEDDED_FILES_HELPERS_H,
+	EMBEDDED_FILES_NodeExecutor_C,
+	EMBEDDED_FILES_NodeExecutor_H,
 	EMBEDDED_FILES_ERROR_FUNCTIONS_C,
 	EMBEDDED_FILES_ERROR_FUNCTIONS_H,
 	EMBEDDED_FILES_GET_NUM_C,
@@ -59,15 +59,15 @@ typedef struct {
 } embeddedFile_t;
 
 const embeddedFile_t embeddedFiles[] = {
-		[EMBEDDED_FILES_HELPERS_C] = {
-				&_binary_build_Helpers_c_copy_start,
-				&_binary_build_Helpers_c_copy_end,
-				"Helpers.c"
+		[EMBEDDED_FILES_NodeExecutor_C] = {
+				&_binary_build_NodeExecutor_c_copy_start,
+				&_binary_build_NodeExecutor_c_copy_end,
+				"NodeExecutor.c"
 		},
-		[EMBEDDED_FILES_HELPERS_H] = {
-				&_binary_build_Helpers_h_copy_start,
-				&_binary_build_Helpers_h_copy_end,
-				"Helpers.h"
+		[EMBEDDED_FILES_NodeExecutor_H] = {
+				&_binary_build_NodeExecutor_h_copy_start,
+				&_binary_build_NodeExecutor_h_copy_end,
+				"NodeExecutor.h"
 		},
 		[EMBEDDED_FILES_ERROR_FUNCTIONS_C] = {
 				&_binary_build_error_functions_c_copy_start,

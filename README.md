@@ -1,5 +1,6 @@
 # DAC (Distributed Algebraic Computations)
 DAC provides a tool to express and perform algebraic computations through [computational graphs](#computationalgraphs).
+It is currently developed for Linux use. This limitation, however, is only due to the use of [pthreads](https://en.wikipedia.org/wiki/POSIX_Threads) and will be improved upon in the future.
 
 The library is currently in an early alpha state with many interface changes ahead.
 
@@ -83,10 +84,11 @@ Furthermore, graphs make for easy parallelization, that is destribution of work 
 - [ ]	[Partial differential equations](https://en.wikipedia.org/wiki/Partial_differential_equation): Current ultimate goal of this project is to provide a framework where (physical) PDEs may be solved geometrically, based on their formulation in the language of [differential forms](https://en.wikipedia.org/wiki/Differential_form). This will require some form of [triangulation](https://en.wikipedia.org/wiki/Triangulation_(geometry)) and operations thereon. It's going to take a while.
 
 ### Improvements
+- [ ]	Introduce some coding convention
+- [ ]	The files copied from [The Linux Programming Interface](http://man7.org/tlpi/) should either be replaced or used more consistently
 - [ ]	Include gcov with unitTests and generate coverage.
 - [ ]	Restructure code: Interface user -> graph -> code generator should be well-defined.
 - [ ]   Create some clean interface to jobPool
-- [ ]	Rename Helpers.c to something reflecting that it's handling the jobPool and threads.
 - [ ]	NodeRef::StoreIn offers no protection from overwriting data not yet consumed by other nodes
 - [ ]	Better solution for control transfer: Current solution only works if there is a single root to the while part.
 - [ ]	For debugging, NodeRefs should implement PrintInfo()

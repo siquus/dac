@@ -374,7 +374,7 @@ bool CodeGenerator::GenerateNodesArray()
 	fileInstructions_.Outdent();
 	fileInstructions_.PrintfLine("};");
 
-	fileInstructionsH_.PrintfLine("#include \"Helpers.h\"\n");
+	fileInstructionsH_.PrintfLine("#include \"NodeExecutor.h\"\n");
 	fileInstructionsH_.PrintfLine("\n");
 	fileInstructionsH_.PrintfLine("extern %s;", jobPoolInitId.c_str());
 

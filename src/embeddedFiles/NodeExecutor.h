@@ -1,5 +1,5 @@
 /*
- * Helpers.h
+ * NodeExecutor.h
  *
  *  Created on: Jul 17, 2019
  *      Author: derommo
@@ -10,6 +10,7 @@
 
 #include <stdatomic.h>
 #include <pthread.h>
+#include <stdint.h>
 
 #define NODE_T_MAX_EDGE_NUMBER 42u
 

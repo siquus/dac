@@ -5,6 +5,8 @@
  *      Author: derommo
  */
 
+#include "NodeExecutor.h"
+
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,7 +17,6 @@
 
 #include "error_functions.h"
 
-#include "Helpers.h"
 
 #define ENABLE_DEBUG_OUTPUT 0
 

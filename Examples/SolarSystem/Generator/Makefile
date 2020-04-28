@@ -6,7 +6,7 @@ DAC_DIR_REL ?= ../../../src
 DAC_DIR ?= $(shell realpath $(DAC_DIR_REL))# otherwise the *.o files end up anywhere
 SRC_DIRS ?= ./ $(DAC_DIR)
 
-FILES := Helpers.c Helpers.h error_functions.c error_functions.h\
+FILES := NodeExecutor.c NodeExecutor.h error_functions.c error_functions.h\
 	get_num.c get_num.h tlpi_hdr.h ename.c.inc
 	
 FILES_OBJ := $(FILES:%=$(BUILD_DIR)/%.file)
