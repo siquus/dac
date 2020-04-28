@@ -55,8 +55,6 @@ public:
 		float Scaling = 1.;
 	} KroneckerDeltaParameters_t;
 
-	static size_t getSize(Type type);
-
 	// TODO: Should be called getTypeStr or so
 	static const char* getName(Type type);
 	const char * getName() const;

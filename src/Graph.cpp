@@ -152,47 +152,6 @@ bool Graph::AddParent(Node::Id_t parent, Node::Id_t child)
 	return AddChild(parent, child);
 }
 
-size_t Node::getSize(Type type)
-{
-	switch(type)
-	{
-	case Type::VECTOR: // no break intended
-	case Type::VECTOR_ADDITION:
-	case Type::VECTOR_SCALAR_PRODUCT:
-	case Type::VECTOR_VECTOR_PRODUCT:
-	case Type::VECTOR_POWER:
-	case Type::VECTOR_COMPARISON_IS_SMALLER:
-		return 0; // These do not have parameters
-
-	case Type::VECTOR_CONTRACTION:
-		return sizeof(contractParameters_t);
-
-	case Type::VECTOR_KRONECKER_DELTA_PRODUCT:
-		return 0;
-
-	case Type::VECTOR_PERMUTATION:
-		return 0;
-
-	case Type::VECTOR_PROJECTION:
-		return 0;
-
-	case Type::VECTOR_JOIN_INDICES:
-		return 0;
-
-	case Type::OUTPUT:
-		return 0;
-
-	case Type::CONTROL_TRANSFER_WHILE:
-		return 0;
-
-	default:
-		Error("Unknown Type %u\n", (uint8_t) type);
-		return SIZE_MAX;
-	}
-
-	return SIZE_MAX;
-}
-
 const char * Node::getName() const
 {
 	return getName(type);
