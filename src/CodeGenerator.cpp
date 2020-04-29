@@ -109,6 +109,62 @@ static const char fileHeader[] = \
  */\n\
 \n";
 
+// TODO: This is very wasteful
+static void getAllTuples(std::vector<std::vector<uint32_t>> &tuples, const std::vector<std::pair<uint32_t, uint32_t>> &ranges)
+{
+	const size_t nrOfTuplesLimit = 1000;
+
+	size_t nrOfTuples = 1;
+	for(const auto &range: ranges)
+	{
+		nrOfTuples *= range.second - range.first;
+	}
+
+	if(nrOfTuples > nrOfTuplesLimit)
+	{
+		Fatal("Tried to generated %lu tuples. Limit is %lu!\n",
+				nrOfTuples, nrOfTuplesLimit);
+	}
+
+	tuples.resize(nrOfTuples);
+
+	// Initialize first tuple to all lowest indices
+	tuples[0].resize(ranges.size());
+	for(size_t index = 0; index < ranges.size(); index++)
+	{
+		tuples[0].at(index) = ranges[index].first;
+	}
+
+	const uint32_t lastIndexLimit = ranges[ranges.size() - 1].second;
+	for(size_t tuple = 1; tuple < nrOfTuples; tuple++)
+	{
+		tuples[tuple] = tuples[tuple -1];
+
+		 uint32_t lastIndex = tuples[tuple].at(ranges.size() - 1);
+
+		 if(lastIndex < lastIndexLimit - 1)
+		 {
+			 tuples[tuple].at(ranges.size() - 1)++;
+		 }
+		 else // Increase other index
+		 {
+			 tuples[tuple].at(ranges.size() - 1) = 0;
+
+			 for(int index = ranges.size() - 2; index >= 0; index--)
+			 {
+				 if(tuples[tuple].at(index) < ranges[index].second - 1)
+				 {
+					 tuples[tuple].at(index)++;
+					 break;
+				 }
+				 else
+				 {
+					 tuples[tuple].at(index) = 0;
+				 }
+			 }
+		 }
+	}
+}
 
 static const uint32_t NODE_T_MAX_EDGE_NUMBER = 42;
 
@@ -478,6 +534,7 @@ bool CodeGenerator::GenerateInstructions()
 		case Node::Type::VECTOR_PERMUTATION: // no break intended
 		case Node::Type::VECTOR_PROJECTION: // no break intended
 		case Node::Type::VECTOR_JOIN_INDICES: // no break intended
+		case Node::Type::VECTOR_CROSS_CORRELATION: // no break intended
 		case Node::Type::OUTPUT:
 			break; // create instruction
 		}
@@ -714,6 +771,11 @@ bool CodeGenerator::GenerateOperationCode(const Node* node, FileWriter * file)
 	case Node::Type::VECTOR_PROJECTION:
 		retFalseOnFalse(VectorProjectionCode(node, file),
 				"Could not generate Vector Projection Code!\n");
+		break;
+
+	case Node::Type::VECTOR_CROSS_CORRELATION:
+		retFalseOnFalse(VectorCrossCorrelationCode(node, file),
+				"Could not generate Vector Cross-Correlation Code!\n");
 		break;
 
 	case Node::Type::VECTOR_VECTOR_PRODUCT:
@@ -2225,6 +2287,165 @@ bool CodeGenerator::VectorJoinIndicesCode(const Node* node, FileWriter * file)
 	equationStr += "];";
 
 	file->PrintfLine(equationStr.c_str());
+
+	file->Outdent();
+	file->PrintfLine("}");
+
+	return true;
+}
+
+bool CodeGenerator::VectorCrossCorrelationCode(const Node* node, FileWriter * file)
+{
+	file->PrintfLine("// %s\n", __func__);
+
+	getVarRetFalseOnError(varOp, node->id);
+	getVarRetFalseOnError(varIn, node->parents[0]);
+	getVarRetFalseOnError(varKernel, node->parents[1]);
+
+	const char * varOpId = varOp->GetIdentifier()->c_str();
+	const char * varInId = varIn->GetIdentifier()->c_str();
+	const char * varKernelId = varKernel->GetIdentifier()->c_str();
+
+	auto nodes = graph_->GetNodes();
+	const auto inNode = nodes->find(node->parents[0]);
+	if(nodes->end() == inNode)
+	{
+		Error("Could not find Node for id %u\n", node->parents[0]);
+		return false;
+	}
+
+	const auto kernelNode = nodes->find(node->parents[1]);
+	if(nodes->end() == kernelNode)
+	{
+		Error("Could not find Node for id %u\n", node->parents[1]);
+		return false;
+	}
+
+	auto inVec = (const Algebra::Module::VectorSpace::Vector*) inNode->second.object;
+	auto KernelVec = (const Algebra::Module::VectorSpace::Vector*) kernelNode->second.object;
+	auto opVec = (const Algebra::Module::VectorSpace::Vector*) node->object;
+
+	// Get strides
+	std::vector<uint32_t> InStrides;
+	inVec->__space_->GetStrides(&InStrides);
+	const char inStridesId[] = "InStrides";
+	file->PrintfLine("const uint32_t %s[] = {", inStridesId);
+	for(const uint32_t &stride: InStrides)
+	{
+		file->PrintfLine("\t %u,", stride);
+	}
+	file->PrintfLine("};");
+
+	std::vector<uint32_t> KernelStrides;
+	KernelVec->__space_->GetStrides(&KernelStrides);
+	const char kernelStridesId[] = "KernelStrides";
+	file->PrintfLine("const uint32_t %s[] = {", kernelStridesId);
+	for(const uint32_t &stride: KernelStrides)
+	{
+		file->PrintfLine("\t %u,", stride);
+	}
+	file->PrintfLine("};");
+
+	std::vector<uint32_t> opStrides;
+	opVec->__space_->GetStrides(&opStrides);
+	const char opstridesId[] = "opStrides";
+	file->PrintfLine("const uint32_t %s[] = {", opstridesId);
+	for(const uint32_t &stride: opStrides)
+	{
+		file->PrintfLine("\t %u,", stride);
+	}
+	file->PrintfLine("};\n");
+
+	// Generate all possible tuples
+	std::vector<std::pair<uint32_t, uint32_t>> ranges;
+	ranges.resize(KernelVec->__space_->factors_.size());
+
+	for(size_t range = 0; range < ranges.size(); range++)
+	{
+		ranges[range].first = 0;
+		ranges[range].second = KernelVec->__space_->factors_[range].dim_;
+	}
+
+	std::vector<std::vector<uint32_t>> tuples;
+	getAllTuples(tuples, ranges);
+
+	// Loop over all result elements
+	file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
+			varOpId, varOpId);
+	file->PrintfLine("{");
+	file->Indent();
+
+	std::string opIndexTuple = "const uint32_t opIndexTuple[] = {";
+	for(uint32_t stride = 0; stride < opStrides.size(); stride++)
+	{
+		if(0 == stride)
+		{
+			opIndexTuple += "opIndex / ";
+			opIndexTuple += opstridesId;
+			opIndexTuple += "[";
+			opIndexTuple += std::to_string(stride);
+			opIndexTuple += "]";
+			opIndexTuple += ", ";
+		}
+		else
+		{
+			opIndexTuple += "(opIndex % opStrides[";
+			opIndexTuple += std::to_string(stride - 1);
+			opIndexTuple += "]) / opStrides[";
+			opIndexTuple += std::to_string(stride);
+			opIndexTuple += "], ";
+		}
+	}
+	opIndexTuple.erase(opIndexTuple.end() - 2, opIndexTuple.end()); // remove last ", "
+	opIndexTuple += "};\n";
+
+	file->PrintfLine("%s", opIndexTuple.c_str());
+
+	file->PrintfLine("%s[opIndex] =", varOpId);
+	file->Indent();
+
+	for(size_t tuple = 0; tuple < tuples.size(); tuple++)
+	{
+		std::string kernelMult = varInId;
+
+		kernelMult += "[";
+		for(size_t index = 0; index < tuples[tuple].size(); index++)
+		{
+			kernelMult += "opIndexTuple[" + std::to_string(index) + "]";
+			if(tuples[tuple][index])
+			{
+				kernelMult += " + " + std::to_string(tuples[tuple][index]);
+			}
+			kernelMult += " * InStrides[" + std::to_string(index) + "] + ";
+		}
+		kernelMult.erase(kernelMult.end() - 3, kernelMult.end()); // remove last " + "
+
+		kernelMult += "]";
+
+		kernelMult += " * ";
+		kernelMult += varKernelId;
+		kernelMult += "[";
+		for(size_t index = 0; index < tuples[tuple].size(); index++)
+		{
+			kernelMult += std::to_string(tuples[tuple][index]);
+			kernelMult += " * KernelStrides[" + std::to_string(index) + "] + ";
+		}
+		kernelMult.erase(kernelMult.end() - 3, kernelMult.end()); // remove last " + "
+		kernelMult += "]";
+
+		if(tuple != tuples.size() - 1)
+		{
+			kernelMult += " +";
+		}
+		else
+		{
+			kernelMult += ";";
+		}
+
+		file->PrintfLine(kernelMult.c_str());
+	}
+
+	file->Outdent();
 
 	file->Outdent();
 	file->PrintfLine("}");

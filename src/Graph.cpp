@@ -206,6 +206,9 @@ const char* Node::getName(Type type)
 	case Type::VECTOR_PROJECTION:
 		return "VECTOR_PROJECTION";
 
+	case Type::VECTOR_CROSS_CORRELATION:
+		return "VECTOR_CROSS_CORRELATION";
+
 	case Type::VECTOR_JOIN_INDICES:
 		return "VECTOR_JOIN_INDICES";
 
@@ -324,6 +327,7 @@ bool Node::sameTypeParameters(const Node &lNode, const Node &rNode)
 	case Type::VECTOR_POWER: // no break intended
 	case Type::VECTOR_COMPARISON_IS_SMALLER: // no break intended
 	case Type::OUTPUT: // no break intended
+	case Type::VECTOR_CROSS_CORRELATION: // no break intended
 	case Type::CONTROL_TRANSFER_WHILE:
 		Error("Error comparing node types!\n");
 		return false;

@@ -938,6 +938,72 @@ const VectorSpace::Vector* VectorSpace::Vector::IsSmaller(const Vector* vec) con
 	return retVec;
 }
 
+const VectorSpace::Vector * VectorSpace::Vector::CrossCorrelate(const Vector* Kernel) const
+{
+	if(graph_ != Kernel->graph_)
+	{
+		Error("Not on the same Graph!\n");
+		return nullptr;
+	}
+
+	if(__space_->factors_.size() != Kernel->__space_->factors_.size())
+	{
+		Error("Different number of factors!\n");
+		return nullptr;
+	}
+
+	for(size_t factor = 0; factor < __space_->factors_.size(); factor++)
+	{
+		if(__space_->factors_[factor].dim_ < Kernel->__space_->factors_[factor].dim_)
+		{
+			Error("Can't cross-correlate w.r.t. kernel-factor of smaller dimension than input!\n");
+			return nullptr;
+		}
+	}
+
+	for(const simpleVs_t &simpleVs: Kernel->__space_->factors_)
+	{
+		if(2 > simpleVs.dim_)
+		{
+			Error("Can't cross-correlate w.r.t. kernel-factor of dimension less than 2!\n");
+			return nullptr;
+		}
+	}
+
+	// Results of cross-correlation is a vector with the same number of factors
+	// However, the dimension of the factors decreases as
+	// "the output is restricted to only positions where the kernel lies entirely within the image"
+	// - "Deep Learning", Goodfellow et al.
+	// This means if the Input (kernel) has dimension I (K), then the Output has dimension
+	// O = I - (K - 1)
+	VectorSpace * retSpace = new VectorSpace(__space_->factors_);
+	for(size_t factor = 0; factor < retSpace->factors_.size(); factor++)
+	{
+		retSpace->factors_[factor].dim_ -= Kernel->__space_->factors_[factor].dim_ - 1;
+	}
+
+	Vector* retVec = new Vector;
+	retVec->graph_ = graph_;
+	retVec->__space_ = retSpace;
+
+	Node node;
+	node.parents.push_back(nodeId_);
+	node.parents.push_back(Kernel->nodeId_);
+	node.type = Node::Type::VECTOR_CROSS_CORRELATION;
+	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
+	node.object = retVec;
+
+	retVec->nodeId_ = graph_->AddNode(&node);
+
+	if(Node::ID_NONE == retVec->nodeId_)
+	{
+		Error("Could not add Node!\n");
+		return nullptr;
+	}
+
+	return retVec;
+}
+
 bool VectorSpace::Vector::AreCompatible(const Vector* vec1, const Vector* vec2)
 {
 	if(vec1->graph_ != vec2->graph_)
