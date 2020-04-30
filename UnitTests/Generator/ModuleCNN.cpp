@@ -20,11 +20,12 @@ bool ModuleCNN::Generate(const std::string &path)
 	Graph graph("ModuleCNN");
 
 	// Generate Code
-	auto inputSpace = Algebra::Module::VectorSpace(Algebra::Ring::Float32, std::vector<dimension_t>{28, 28});
+	auto inputSpace = Algebra::Module::VectorSpace(Algebra::Ring::Float32, std::vector<dimension_t>{10, 10});
 	auto kernelSpace = Algebra::Module::VectorSpace(Algebra::Ring::Float32, std::vector<dimension_t>{3, 3});
 
-	auto inputInit = std::vector<float>(28 * 28);
+	auto inputInit = std::vector<float>(10 * 10);
 	std::iota(inputInit.begin(), inputInit.end(), 1);
+
 	auto input = inputSpace.Element(&graph, inputInit);
 
 	auto kernelInit = std::vector<float>{1, 2, 3, 4, 5, 6, 7, 8, 9};

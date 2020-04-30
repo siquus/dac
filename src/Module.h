@@ -93,6 +93,8 @@ public:
 		const Vector* JoinIndices(std::vector<std::vector<uint32_t>> &indices) const; // B_ik = JoinIndices(A_ijk, {0, 1})= A_iik (no sum)
 
 		const Vector * CrossCorrelate(const Vector* Kernel) const; // TODO: Description. See "Deep learning", p.324
+		const Vector * MaxPool(const std::vector<uint32_t> &poolSize) const;
+
 		const Vector* Derivative(const Vector* vec) const;
 
 		typedef struct {

@@ -45,6 +45,7 @@ public:
 		VECTOR_JOIN_INDICES,
 		VECTOR_PROJECTION,
 		VECTOR_CROSS_CORRELATION,
+		VECTOR_MAX_POOL,
 		OUTPUT,
 		CONTROL_TRANSFER_WHILE,
 	};
@@ -70,6 +71,10 @@ public:
 		std::vector<uint32_t> DeltaPair; // I.e. for delta^i_j * delta^k_l * , ... position i will contain j and vice versa.
 		float Scaling = 1.;
 	} KroneckerDeltaParameters_t;
+
+	typedef struct {
+		std::vector<uint32_t> PoolSize;
+	} PoolParameters_t;
 
 	// TODO: Should be called getTypeStr or so
 	static const char* getName(Type type);

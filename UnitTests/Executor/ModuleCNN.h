@@ -20,50 +20,31 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <stdint.h>
+#ifndef MODULECNN_H_
+#define MODULECNN_H_
 
-#include "error_functions.h"
+#include "main.h"
 
-#include "ModuleContract.h"
-#include "ModulePermute.h"
-#include "ModuleProduct.h"
-#include "ModuleCNN.h"
+class ModuleCNN: public TestExecutor {
+public:
+	ModuleCNN();
 
-int main() {
+	void Execute(size_t threadsNrOf);
 
-	ModuleContract moduleContract;
-	moduleContract.Execute(4);
-	if(!moduleContract.Success())
-	{
-		fatal("Not all tests passed!\n");
-	}
+	void CC(const float * data, size_t size);
+	void CCMaxPool(const float * data, size_t size);
 
-	ModulePermute modulePermute;
-	modulePermute.Execute(4);
-	if(!modulePermute.Success())
-	{
-		fatal("Not all tests passed!\n");
-	}
+private:
+	size_t ThreadsNrOf_ = 0;
 
-	ModuleProduct moduleProduct;
-	moduleProduct.Execute(4);
-	if(!moduleProduct.Success())
-	{
-		fatal("Not all tests passed!\n");
-	}
+	enum {
+		CALLED_CC,
+		CALLED_CCMaxPool,
+		CALLED_NrOf,
+	};
 
-	ModuleCNN moduleCNN;
-	moduleCNN.Execute(4);
-	if(!moduleCNN.Success())
-	{
-		fatal("Not all tests passed!\n");
-	}
+	bool called_[CALLED_NrOf] = {false};
+};
 
-	fprintf(stdout, "SUCCESS!!\n");
-	fflush(stdout);
 
-	return 0;
-}
+#endif /* MODULECNN_H_ */

@@ -938,6 +938,66 @@ const VectorSpace::Vector* VectorSpace::Vector::IsSmaller(const Vector* vec) con
 	return retVec;
 }
 
+const VectorSpace::Vector * VectorSpace::Vector::MaxPool(const std::vector<uint32_t> &poolSize) const
+{
+	if(poolSize.size() != __space_->factors_.size())
+	{
+		Error("Number of pool dimensions does not match number of argument factors!\n");
+		return nullptr;
+	}
+
+	for(size_t factor = 0; factor < __space_->factors_.size(); factor++)
+	{
+		if(poolSize[factor] > __space_->factors_[factor].dim_)
+		{
+			Error("Pool dimension is larger than dimension of vector!\n");
+			return nullptr;
+		}
+
+		if(__space_->factors_[factor].dim_ % poolSize[factor])
+		{
+			Error("Pool factor %lu does not divide factor %lu: %u vs. %u!\n",
+					factor, factor,
+					poolSize[factor],
+					__space_->factors_[factor].dim_);
+			return nullptr;
+		}
+	}
+
+	VectorSpace * retSpace = new VectorSpace(__space_->factors_);
+
+	// Pooling reduces the dimensions
+	for(size_t factor = 0; factor < retSpace->factors_.size(); factor++)
+	{
+		retSpace->factors_[factor].dim_ /= poolSize[factor];
+	}
+
+	auto param = new Node::PoolParameters_t;
+	param->PoolSize = poolSize;
+
+	Vector* retVec = new Vector;
+	retVec->graph_ = graph_;
+	retVec->__space_ = retSpace;
+
+	Node node;
+	node.parents.push_back(nodeId_);
+	node.type = Node::Type::VECTOR_MAX_POOL;
+	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
+	node.object = retVec;
+	node.typeParameters = param;
+
+	retVec->nodeId_ = graph_->AddNode(&node);
+
+	if(Node::ID_NONE == retVec->nodeId_)
+	{
+		Error("Could not add Node!\n");
+		return nullptr;
+	}
+
+	return retVec;
+}
+
+
 const VectorSpace::Vector * VectorSpace::Vector::CrossCorrelate(const Vector* Kernel) const
 {
 	if(graph_ != Kernel->graph_)

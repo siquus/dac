@@ -535,6 +535,7 @@ bool CodeGenerator::GenerateInstructions()
 		case Node::Type::VECTOR_PROJECTION: // no break intended
 		case Node::Type::VECTOR_JOIN_INDICES: // no break intended
 		case Node::Type::VECTOR_CROSS_CORRELATION: // no break intended
+		case Node::Type::VECTOR_MAX_POOL: // no break intended
 		case Node::Type::OUTPUT:
 			break; // create instruction
 		}
@@ -776,6 +777,11 @@ bool CodeGenerator::GenerateOperationCode(const Node* node, FileWriter * file)
 	case Node::Type::VECTOR_CROSS_CORRELATION:
 		retFalseOnFalse(VectorCrossCorrelationCode(node, file),
 				"Could not generate Vector Cross-Correlation Code!\n");
+		break;
+
+	case Node::Type::VECTOR_MAX_POOL:
+		retFalseOnFalse(VectorMaxPoolCode(node, file),
+				"Could not generate Vector max pool Code!\n");
 		break;
 
 	case Node::Type::VECTOR_VECTOR_PRODUCT:
@@ -2294,6 +2300,193 @@ bool CodeGenerator::VectorJoinIndicesCode(const Node* node, FileWriter * file)
 	return true;
 }
 
+bool CodeGenerator::VectorMaxPoolCode(const Node* node, FileWriter * file)
+{
+	file->PrintfLine("// %s\n", __func__);
+
+	getVarRetFalseOnError(varOp, node->id);
+	getVarRetFalseOnError(varIn, node->parents[0]);
+
+	const Node::PoolParameters_t * param = (const Node::PoolParameters_t *) node->typeParameters;
+
+	const char * varOpId = varOp->GetIdentifier()->c_str();
+	const char * varInId = varIn->GetIdentifier()->c_str();
+
+	auto nodes = graph_->GetNodes();
+	const auto inNode = nodes->find(node->parents[0]);
+	if(nodes->end() == inNode)
+	{
+		Error("Could not find Node for id %u\n", node->parents[0]);
+		return false;
+	}
+
+	auto inVec = (const Algebra::Module::VectorSpace::Vector*) inNode->second.object;
+	auto opVec = (const Algebra::Module::VectorSpace::Vector*) node->object;
+
+	const char maxFunctions[][6] =
+	{
+			"fmaxf",
+	};
+
+	const char* maxFctString = nullptr;
+	switch(varIn->GetType())
+	{
+	case Variable::Type::uint8_: // no break intended
+	case Variable::Type::int8_: // no break intended
+	case Variable::Type::int32_: // no break intended
+		// TODO: Implement https://graphics.stanford.edu/~seander/bithacks.html#IntegerMinOrMax
+		return false; // TODO: #define something like #define max(m,n) ((m) > (n) ? (m) : (n))
+
+	case Variable::Type::float_:
+		maxFctString = maxFunctions[0];
+		break;
+
+	default: // no break intended
+	case Variable::Type::none: // no break intended
+	case Variable::Type::nrOf:
+		Error("Reached default case!\n");
+		return false;
+	}
+
+	// Get strides
+	std::vector<uint32_t> InStrides;
+	inVec->__space_->GetStrides(&InStrides);
+	const char inStridesId[] = "InStrides";
+	file->PrintfLine("const uint32_t %s[] = {", inStridesId);
+	for(const uint32_t &stride: InStrides)
+	{
+		file->PrintfLine("\t %u,", stride);
+	}
+	file->PrintfLine("};");
+
+	std::vector<uint32_t> opStrides;
+	opVec->__space_->GetStrides(&opStrides);
+	const char opstridesId[] = "opStrides";
+	file->PrintfLine("const uint32_t %s[] = {", opstridesId);
+	for(const uint32_t &stride: opStrides)
+	{
+		file->PrintfLine("\t %u,", stride);
+	}
+	file->PrintfLine("};\n");
+
+	// Generate all possible tuples
+	std::vector<std::pair<uint32_t, uint32_t>> ranges;
+	ranges.resize(inVec->__space_->factors_.size());
+
+	for(size_t range = 0; range < ranges.size(); range++)
+	{
+		ranges[range].first = 0;
+		ranges[range].second = param->PoolSize[range];
+	}
+
+	std::vector<std::vector<uint32_t>> tuples;
+	getAllTuples(tuples, ranges);
+
+	// Loop over all result elements
+	file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
+			varOpId, varOpId);
+	file->PrintfLine("{");
+	file->Indent();
+
+	std::string opIndexTuple = "const uint32_t opIndexTuple[] = {";
+	for(uint32_t stride = 0; stride < opStrides.size(); stride++)
+	{
+		if(0 == stride)
+		{
+			opIndexTuple += "opIndex / ";
+			opIndexTuple += opstridesId;
+			opIndexTuple += "[";
+			opIndexTuple += std::to_string(stride);
+			opIndexTuple += "]";
+			opIndexTuple += ", ";
+		}
+		else
+		{
+			opIndexTuple += "(opIndex % opStrides[";
+			opIndexTuple += std::to_string(stride - 1);
+			opIndexTuple += "]) / opStrides[";
+			opIndexTuple += std::to_string(stride);
+			opIndexTuple += "], ";
+		}
+	}
+	opIndexTuple.erase(opIndexTuple.end() - 2, opIndexTuple.end()); // remove last ", "
+	opIndexTuple += "};";
+
+	file->PrintfLine("%s", opIndexTuple.c_str());
+
+	std::string inPoolOrigin = "const uint32_t inPoolOrigin[] = {";
+
+	for(uint32_t stride = 0; stride < opStrides.size(); stride++)
+	{
+		inPoolOrigin += "opIndexTuple[" + std::to_string(stride) + "] ";
+		inPoolOrigin += "* " + std::to_string(param->PoolSize[stride]) + ", ";
+	}
+
+	inPoolOrigin.erase(inPoolOrigin.end() - 2, inPoolOrigin.end()); // remove last ", "
+	inPoolOrigin += "};\n";
+
+	file->PrintfLine("%s", inPoolOrigin.c_str());
+
+	file->PrintfLine("%s[opIndex] =", varOpId);
+	file->Indent();
+
+	for(size_t tuple = 0; tuple < tuples.size(); tuple++)
+	{
+		std::string value;
+
+		if(tuple != tuples.size() - 1)
+		{
+			value +=  maxFctString;
+			value += "(";
+		}
+
+		value += varInId;
+		value += "[";
+
+		for(size_t factor = 0; factor < inVec->__space_->factors_.size(); factor++)
+		{
+			if(tuples[tuple][factor])
+			{
+				value += "(";
+			}
+
+			value += "inPoolOrigin[" + std::to_string(factor) + "]";
+
+			if(tuples[tuple][factor])
+			{
+				value += " + " + std::to_string(tuples[tuple][factor]) + ")";
+			}
+
+			value += " * InStrides[" + std::to_string(factor) + "] + ";
+		}
+		value.erase(value.end() - 3, value.end()); // remove last " + "
+
+		value += "]";
+
+		if(tuple != tuples.size() - 1)
+		{
+			value += ", ";
+		}
+		else
+		{
+			for(size_t tuple = 0; tuple < tuples.size() - 1; tuple++)
+			{
+				value += ")";
+			}
+			value += ";";
+		}
+
+		file->PrintfLine("%s", value.c_str());
+	}
+
+	file->Outdent();
+
+	file->Outdent();
+	file->PrintfLine("}");
+
+	return true;
+}
+
 bool CodeGenerator::VectorCrossCorrelationCode(const Node* node, FileWriter * file)
 {
 	file->PrintfLine("// %s\n", __func__);
@@ -2411,11 +2604,18 @@ bool CodeGenerator::VectorCrossCorrelationCode(const Node* node, FileWriter * fi
 		kernelMult += "[";
 		for(size_t index = 0; index < tuples[tuple].size(); index++)
 		{
-			kernelMult += "opIndexTuple[" + std::to_string(index) + "]";
 			if(tuples[tuple][index])
 			{
-				kernelMult += " + " + std::to_string(tuples[tuple][index]);
+				kernelMult += "(";
 			}
+
+			kernelMult += "opIndexTuple[" + std::to_string(index) + "]";
+
+			if(tuples[tuple][index])
+			{
+				kernelMult += " + " + std::to_string(tuples[tuple][index]) + ")";
+			}
+
 			kernelMult += " * InStrides[" + std::to_string(index) + "] + ";
 		}
 		kernelMult.erase(kernelMult.end() - 3, kernelMult.end()); // remove last " + "
@@ -2427,8 +2627,15 @@ bool CodeGenerator::VectorCrossCorrelationCode(const Node* node, FileWriter * fi
 		kernelMult += "[";
 		for(size_t index = 0; index < tuples[tuple].size(); index++)
 		{
-			kernelMult += std::to_string(tuples[tuple][index]);
-			kernelMult += " * KernelStrides[" + std::to_string(index) + "] + ";
+			if(tuples[tuple][index])
+			{
+				kernelMult += std::to_string(tuples[tuple][index]);
+				kernelMult += " * KernelStrides[" + std::to_string(index) + "] + ";
+			}
+			else
+			{
+				kernelMult += "0 + ";
+			}
 		}
 		kernelMult.erase(kernelMult.end() - 3, kernelMult.end()); // remove last " + "
 		kernelMult += "]";

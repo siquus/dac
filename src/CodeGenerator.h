@@ -131,6 +131,7 @@ class CodeGenerator {
 	bool VectorProjectionCode(const Node* node, FileWriter * file);
 	bool VectorJoinIndicesCode(const Node* node, FileWriter * file);
 	bool VectorCrossCorrelationCode(const Node* node, FileWriter * file);
+	bool VectorMaxPoolCode(const Node* node, FileWriter * file);
 
 	bool FetchVariables();
 	bool GetFirstNodesToExecute(std::set<Node::Id_t> * nodeSet);
