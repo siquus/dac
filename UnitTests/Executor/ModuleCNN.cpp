@@ -50,6 +50,36 @@ static void ccMaxPool(const float * data, size_t size)
 	ModuleCNNPt->CCMaxPool(data, size);
 }
 
+static void vectorSplit(const float * data, size_t size)
+{
+	if(NULL == ModuleCNNPt)
+	{
+		fatal("Nullpointer!");
+	}
+
+	ModuleCNNPt->VectorSplit(data, size);
+}
+
+void ModuleCNN::VectorSplit(const float * data, size_t size)
+{
+	const float expected[3 * 7] = {
+			1.000000, 2.000000, 3.000000, 4.000000, 5.000000, 6.000000, 7.00000,
+			2.000000, 3.000000, 4.000000, 5.000000, 6.000000, 7.000000, 8.000000,
+			3.000000, 4.000000, 5.000000, 6.000000, 7.000000, 8.000000, 9.000000};
+
+	if(sizeof(expected) != size)
+	{
+		Error("Size Mismatch! %lu vs %lu\n", sizeof(expected), size);
+	}
+	else if(memcmp(data, expected, sizeof(expected)))
+	{
+		Error("Unexpected result!\n");
+		PrintMatrix(stderr, data, size, 7);
+	}
+
+	called_[CALLED_VectorSplit] = true;
+}
+
 void ModuleCNN::CCMaxPool(const float * data, size_t size)
 {
 	const float expected[4 * 4] = {
@@ -101,6 +131,7 @@ ModuleCNN::ModuleCNN() {
 
 	DacModuleCNNOutputCallbackcc_Register(&cc);
 	DacModuleCNNOutputCallbackccMaxPool_Register(&ccMaxPool);
+	DacModuleCNNOutputCallbackvectorSplit_Register(&vectorSplit);
 }
 
 void ModuleCNN::Execute(size_t threadsNrOf)

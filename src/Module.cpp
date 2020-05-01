@@ -1353,6 +1353,9 @@ const VectorSpace::Vector* VectorSpace::Vector::CreateDerivative(const Vector* v
 	case Node::Type::VECTOR_PROJECTION:
 		return ProjectDerivative(vecValuedFct, arg);
 
+	case Node::Type::VECTOR_CROSS_CORRELATION:
+		return CrossCorrelationDerivative(vecValuedFct, arg);
+
 	default:
 		Error("Node Type %s does not support taking its derivative!\n", Node::getName(fctNode->type));
 		return nullptr;
@@ -1700,6 +1703,109 @@ const VectorSpace::Vector* VectorSpace::Vector::Permute(const std::vector<uint32
 	if(Node::ID_NONE == retVec->nodeId_)
 	{
 		Error("Could not add Node!\n");
+		return nullptr;
+	}
+
+	return retVec;
+}
+
+const VectorSpace::Vector * VectorSpace::Vector::IndexSplitSum(const std::vector<uint32_t> &splitPosition) const
+{
+	if(splitPosition.size() != __space_->factors_.size())
+	{
+		Error("splitPosition dimension does not match number of factors!\n");
+		return nullptr;
+	}
+
+	for(size_t factor = 0; factor < __space_->factors_.size(); factor++)
+	{
+		if(splitPosition[factor] >= __space_->factors_[factor].dim_ - 1)
+		{
+			Error("Can't split factor of dimension %u at position %u!\n",
+					__space_->factors_[factor].dim_, splitPosition[factor]);
+			return nullptr;
+		}
+	}
+
+	std::vector<simpleVs_t> retSimpleVs;
+	for(size_t factor = 0; factor < __space_->factors_.size(); factor++)
+	{
+		retSimpleVs.push_back(__space_->factors_[factor]);
+
+		if(splitPosition[factor])
+		{
+			dimension_t originalDim = (retSimpleVs.end() - 1)->dim_;
+			(retSimpleVs.end() - 1)->dim_ = splitPosition[factor];
+
+			retSimpleVs.push_back(__space_->factors_[factor]);
+			(retSimpleVs.end() - 1)->dim_ = originalDim - splitPosition[factor] + 1;
+		}
+	}
+
+	Vector* retVec = new Vector;
+	retVec->graph_ = graph_;
+	retVec->__space_ = new VectorSpace(retSimpleVs);
+
+	Node node;
+	node.parents.push_back(nodeId_);
+	node.type = Node::Type::VECTOR_INDEX_SPLIT_SUM;
+	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
+	node.object = retVec;
+
+	Node::splitSumIndicesParameters_t * opParameters = new Node::splitSumIndicesParameters_t;
+	opParameters->SplitPosition = splitPosition;
+
+	node.typeParameters = opParameters;
+
+	retVec->nodeId_ = graph_->AddNode(&node);
+
+	if(Node::ID_NONE == retVec->nodeId_)
+	{
+		Error("Could not add Node!\n");
+		return nullptr;
+	}
+
+	return retVec;
+}
+
+const VectorSpace::Vector* VectorSpace::Vector::CrossCorrelationDerivative(const Vector* vecValuedFct, const Vector* arg)
+{
+	const Node * fctNode = vecValuedFct->graph_->GetNode(vecValuedFct->nodeId_);
+	if(nullptr == fctNode)
+	{
+		Error("Could not find node!\n");
+		return nullptr;
+	}
+
+	bool argIsKernel = (arg->nodeId_ == fctNode->parents[1]);
+	if(!argIsKernel)
+	{
+		Error("Not implemented: Cross-correlations derivative w.r.t. input\n"); // TODO: Implement
+		return nullptr;
+	}
+
+	const Vector * kernelVector = arg; // for readability
+
+	const Node * inputNode = vecValuedFct->graph_->GetNode(fctNode->parents[0]);
+	if(nullptr == inputNode)
+	{
+		Error("Could not find node!\n");
+		return nullptr;
+	}
+
+	const Vector * inputVector = (const Vector *) inputNode->object;
+
+	// Derivative_klij = dOut(i,j) / dK(kl) = dI(i + m, j + n)K(m,n) / dK(kl) = I(i + k, j + l)
+	std::vector<uint32_t> splitPos(kernelVector->__space_->factors_.size());
+	for(size_t factor = 0; factor < splitPos.size(); factor++)
+	{
+		splitPos[factor] = kernelVector->__space_->factors_[factor].dim_;
+	}
+
+	const Vector * retVec = inputVector->IndexSplitSum(splitPos);
+	if(nullptr == retVec)
+	{
+		Error("Could not IndexSplitSum!\n");
 		return nullptr;
 	}
 

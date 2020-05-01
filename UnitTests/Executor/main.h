@@ -60,7 +60,7 @@ public:
 		{
 			for(size_t col = 0; col < nCol; col++)
 			{
-				fprintf(stream, "%f, ", (double) data[row * nRow + col]);
+				fprintf(stream, "%f, ", (double) data[row * nCol + col]);
 			}
 			fprintf(stream, "\n");
 		}

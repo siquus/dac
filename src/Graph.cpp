@@ -215,6 +215,9 @@ const char* Node::getName(Type type)
 	case Type::VECTOR_JOIN_INDICES:
 		return "VECTOR_JOIN_INDICES";
 
+	case Type::VECTOR_INDEX_SPLIT_SUM:
+		return "VECTOR_INDEX_SPLIT_SUM";
+
 	case Type::OUTPUT:
 		return "OUTPUT";
 
@@ -331,7 +334,6 @@ bool Node::sameTypeParameters(const Node &lNode, const Node &rNode)
 	case Type::VECTOR_COMPARISON_IS_SMALLER: // no break intended
 	case Type::OUTPUT: // no break intended
 	case Type::VECTOR_CROSS_CORRELATION: // no break intended
-	case Type::VECTOR_MAX_POOL: // no break intended
 	case Type::CONTROL_TRANSFER_WHILE:
 		Error("Error comparing node types!\n");
 		return false;
@@ -383,6 +385,30 @@ bool Node::sameTypeParameters(const Node &lNode, const Node &rNode)
 		auto rJoin = (const joinIndicesParameters_t*) rNode.typeParameters;
 
 		if(!std::equal(lJoin->Indices.begin(), lJoin->Indices.end(), rJoin->Indices.begin()))
+		{
+			return false;
+		}
+	}
+	break;
+
+	case Type::VECTOR_INDEX_SPLIT_SUM:
+	{
+		auto lSplit = (const splitSumIndicesParameters_t*) lNode.typeParameters;
+		auto rSplit= (const splitSumIndicesParameters_t*) rNode.typeParameters;
+
+		if(!std::equal(lSplit->SplitPosition.begin(), lSplit->SplitPosition.end(), rSplit->SplitPosition.begin()))
+		{
+			return false;
+		}
+	}
+	break;
+
+	case Type::VECTOR_MAX_POOL:
+	{
+		auto lPool = (const PoolParameters_t*) lNode.typeParameters;
+		auto rPool= (const PoolParameters_t*) rNode.typeParameters;
+
+		if(!std::equal(lPool->PoolSize.begin(), lPool->PoolSize.end(), rPool->PoolSize.begin()))
 		{
 			return false;
 		}

@@ -130,6 +130,7 @@ class CodeGenerator {
 	bool VectorPermutationCode(const Node* node, FileWriter * file);
 	bool VectorProjectionCode(const Node* node, FileWriter * file);
 	bool VectorJoinIndicesCode(const Node* node, FileWriter * file);
+	bool VectorIndexSplitSumCode(const Node* node, FileWriter * file);
 	bool VectorCrossCorrelationCode(const Node* node, FileWriter * file);
 	bool VectorMaxPoolCode(const Node* node, FileWriter * file);
 

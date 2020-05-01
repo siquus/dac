@@ -39,6 +39,14 @@ bool ModuleCNN::Generate(const std::string &path)
 	auto ccMaxPoolOutput = Interface::Output(&graph, "ccMaxPool");
 	ccMaxPoolOutput.Set(ccMaxPool);
 
+	auto vectorSpace = Algebra::Module::VectorSpace(Algebra::Ring::Float32, 9);
+	auto vectorInit = std::vector<float>{1, 2, 3, 4, 5, 6, 7, 8, 9};
+	auto vector = vectorSpace.Element(&graph, vectorInit);
+
+	auto vectorSplit = vector->IndexSplitSum(std::vector<uint32_t>{3});
+	auto vectorSplitOutput = Interface::Output(&graph, "vectorSplit");
+	vectorSplitOutput.Set(vectorSplit);
+
 	CodeGenerator codeGenerator(&path);
 	bool GenSuccess = codeGenerator.Generate(&graph);
 	if(!GenSuccess)

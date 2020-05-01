@@ -93,7 +93,9 @@ public:
 		const Vector* JoinIndices(std::vector<std::vector<uint32_t>> &indices) const; // B_ik = JoinIndices(A_ijk, {0, 1})= A_iik (no sum)
 
 		const Vector * CrossCorrelate(const Vector* Kernel) const; // TODO: Description. See "Deep learning", p.324
-		const Vector * MaxPool(const std::vector<uint32_t> &poolSize) const;
+		const Vector * MaxPool(const std::vector<uint32_t> &poolSize) const; // https://en.wikipedia.org/wiki/Convolutional_neural_network#Pooling_layer
+
+		const Vector * IndexSplitSum(const std::vector<uint32_t> &splitPosition) const; // IndexSplitSum(A_ij, {0, 3}) = B_ijk = A_i(j+k), where j = 0...2, k = 3..., i.e. splitPosition = 0 means this axis won't be split
 
 		const Vector* Derivative(const Vector* vec) const;
 
@@ -139,6 +141,7 @@ public:
 		static const Vector* MultiplyDerivative(const Vector* vecValuedFct, const Vector* arg);
 		static const Vector* PowerDerivative(const Vector* vecValuedFct, const Vector* arg);
 		static const Vector* ProjectDerivative(const Vector* vecValuedFct, const Vector* arg);
+		static const Vector* CrossCorrelationDerivative(const Vector* vecValuedFct, const Vector* arg);
 	};
 
 	template<typename T>

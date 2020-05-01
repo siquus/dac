@@ -33,6 +33,7 @@ public:
 
 	void CC(const float * data, size_t size);
 	void CCMaxPool(const float * data, size_t size);
+	void VectorSplit(const float * data, size_t size);
 
 private:
 	size_t ThreadsNrOf_ = 0;
@@ -40,6 +41,7 @@ private:
 	enum {
 		CALLED_CC,
 		CALLED_CCMaxPool,
+		CALLED_VectorSplit,
 		CALLED_NrOf,
 	};
 

@@ -43,6 +43,7 @@ public:
 		VECTOR_KRONECKER_DELTA_PRODUCT, // i.e. deta^i_j * delta^k_l * ...
 		VECTOR_PERMUTATION,
 		VECTOR_JOIN_INDICES,
+		VECTOR_INDEX_SPLIT_SUM,
 		VECTOR_PROJECTION,
 		VECTOR_CROSS_CORRELATION,
 		VECTOR_MAX_POOL,
@@ -66,6 +67,10 @@ public:
 	typedef struct {
 		std::vector<std::vector<uint32_t>> Indices; // sorted, small to large
 	} joinIndicesParameters_t;
+
+	typedef struct {
+		std::vector<uint32_t> SplitPosition;
+	} splitSumIndicesParameters_t;
 
 	typedef struct {
 		std::vector<uint32_t> DeltaPair; // I.e. for delta^i_j * delta^k_l * , ... position i will contain j and vice versa.

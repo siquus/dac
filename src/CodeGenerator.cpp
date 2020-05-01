@@ -534,6 +534,7 @@ bool CodeGenerator::GenerateInstructions()
 		case Node::Type::VECTOR_PERMUTATION: // no break intended
 		case Node::Type::VECTOR_PROJECTION: // no break intended
 		case Node::Type::VECTOR_JOIN_INDICES: // no break intended
+		case Node::Type::VECTOR_INDEX_SPLIT_SUM: // no break intended
 		case Node::Type::VECTOR_CROSS_CORRELATION: // no break intended
 		case Node::Type::VECTOR_MAX_POOL: // no break intended
 		case Node::Type::OUTPUT:
@@ -793,6 +794,11 @@ bool CodeGenerator::GenerateOperationCode(const Node* node, FileWriter * file)
 		retFalseOnFalse(VectorJoinIndicesCode(node, file),
 						"Could not generate Vector Join Indices Code!\n");
 		break;
+
+	case Node::Type::VECTOR_INDEX_SPLIT_SUM:
+			retFalseOnFalse(VectorIndexSplitSumCode(node, file),
+							"Could not generate Vector Split Sum Indices Code!\n");
+			break;
 
 	case Node::Type::VECTOR_COMPARISON_IS_SMALLER:
 		retFalseOnFalse(VectorComparisonIsSmallerCode(node, file),
@@ -2162,6 +2168,122 @@ bool CodeGenerator::VectorVectorProductCode(const Node* node, FileWriter * file,
 	file->PrintfLine(product.c_str());
 
 	file->PrintfLine("");
+
+	file->Outdent();
+	file->PrintfLine("}");
+
+	return true;
+}
+
+bool CodeGenerator::VectorIndexSplitSumCode(const Node* node, FileWriter * file)
+{
+	file->PrintfLine("// %s\n", __func__);
+
+	// TODO: This is horribly wasteful! The beauty of using code generation is that
+	// we know this is just a different way of addressing indices, so we could continue using
+	// the old vector but just generate code which accesses the indices in the correct manner!
+
+	auto nodes = graph_->GetNodes();
+
+	const Node::splitSumIndicesParameters_t * param = (Node::splitSumIndicesParameters_t *) node->typeParameters;
+
+	getVarRetFalseOnError(varOp, node->id);
+	getVarRetFalseOnError(varArg, node->parents[0]);
+
+	const auto argNode = nodes->find(node->parents[0]);
+	if(nodes->end() == argNode)
+	{
+		Error("Could not find Node for id %u\n", node->parents[0]);
+		return false;
+	}
+
+	const Algebra::Module::VectorSpace::Vector* vecArg = (const Algebra::Module::VectorSpace::Vector*) argNode->second.object;
+	const Algebra::Module::VectorSpace::Vector* vecOp = (const Algebra::Module::VectorSpace::Vector*) node->object;
+
+	std::vector<uint32_t> opStrides;
+	vecOp->__space_->GetStrides(&opStrides);
+	const char opstridesId[] = "opStrides";
+	file->PrintfLine("const uint32_t %s[] = {", opstridesId);
+	for(const uint32_t &stride: opStrides)
+	{
+		file->PrintfLine("\t %u,", stride);
+	}
+	file->PrintfLine("};\n");
+
+	std::vector<uint32_t> argStrides;
+	vecArg->__space_->GetStrides(&argStrides);
+	const char argstridesId[] = "argStrides";
+	file->PrintfLine("const uint32_t %s[] = {", argstridesId);
+	for(const uint32_t &stride: argStrides)
+	{
+		file->PrintfLine("\t %u,", stride);
+	}
+	file->PrintfLine("};\n");
+
+	file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
+			varOp->GetIdentifier()->c_str(), varOp->GetIdentifier()->c_str());
+	file->PrintfLine("{");
+	file->Indent();
+
+	std::string opIndexTuple = "const uint32_t opIndexTuple[] = {";
+	for(uint32_t stride = 0; stride < opStrides.size(); stride++)
+	{
+		if(0 == stride)
+		{
+			opIndexTuple += "opIndex / ";
+			opIndexTuple += opstridesId;
+			opIndexTuple += "[";
+			opIndexTuple += std::to_string(stride);
+			opIndexTuple += "]";
+			opIndexTuple += ", ";
+		}
+		else
+		{
+			opIndexTuple += "(opIndex % opStrides[";
+			opIndexTuple += std::to_string(stride - 1);
+			opIndexTuple += "]) / opStrides[";
+			opIndexTuple += std::to_string(stride);
+			opIndexTuple += "], ";
+		}
+	}
+	opIndexTuple.erase(opIndexTuple.end() - 2, opIndexTuple.end()); // remove last ", "
+	opIndexTuple += "};";
+
+	file->PrintfLine("%s", opIndexTuple.c_str());
+
+	std::string argIndexTuple = "const uint32_t argIndexTuple[] = {";
+
+	uint32_t opIndexPos = 0;
+	for(uint32_t stride = 0; stride < argStrides.size(); stride++)
+	{
+		argIndexTuple += "opIndexTuple[" + std::to_string(opIndexPos) + "]";
+
+		if(param->SplitPosition[stride])
+		{
+			opIndexPos++;
+			argIndexTuple += " + opIndexTuple[" + std::to_string(opIndexPos) + "]";
+		}
+
+		argIndexTuple += ", ";
+	}
+	argIndexTuple.erase(argIndexTuple.end() - 2, argIndexTuple.end()); // remove last ", "
+	argIndexTuple += "};\n";
+
+	file->PrintfLine("%s", argIndexTuple.c_str());
+
+	std::string equationStr = *varOp->GetIdentifier() + "[opIndex] = ";
+	equationStr += *varArg->GetIdentifier() + "[";
+
+	for(uint32_t argIndex = 0; argIndex < vecArg->__space_->factors_.size(); argIndex++)
+	{
+		equationStr += "argIndexTuple[" +
+				std::to_string(argIndex) + "] * "
+				+  argstridesId + "[" +  std::to_string(argIndex) + "] + ";
+	}
+	equationStr.erase(equationStr.end() - 3, equationStr.end()); // remove last " +"
+	equationStr += "];";
+
+	file->PrintfLine(equationStr.c_str());
 
 	file->Outdent();
 	file->PrintfLine("}");
