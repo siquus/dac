@@ -168,6 +168,37 @@ static void getAllTuples(std::vector<std::vector<uint32_t>> &tuples, const std::
 
 static const uint32_t NODE_T_MAX_EDGE_NUMBER = 42;
 
+static void appendIndexTuple(std::string * out, const Algebra::Module::VectorSpace * vspace, const std::string &arrayPos)
+{
+	std::vector<uint32_t> strides;
+	vspace->GetStrides(&strides);
+
+	*out += "{";
+	for(size_t stride = 0; stride < strides.size(); stride++)
+	{
+		if(0 == stride)
+		{
+			*out += arrayPos;
+		}
+		else
+		{
+			*out += "(" + arrayPos + " % " + std::to_string(strides[stride - 1]) + ")";
+		}
+
+		if(1 != strides[stride])
+		{
+			*out += " / " + std::to_string(strides[stride]);
+		}
+
+		if(strides.size() - 1 != stride)
+		{
+			*out += ", ";
+		}
+	}
+
+	*out += "}";
+}
+
 FileWriter::~FileWriter()
 {
 	if(nullptr != outfile_)
@@ -978,44 +1009,14 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 
 	if(resultIsArray)
 	{
-		std::vector<uint32_t> opStrides;
-		opVec->__space_->GetStrides(&opStrides);
-		const char opstridesId[] = "opStrides";
-		file->PrintfLine("const uint32_t %s[] = {", opstridesId);
-		for(const uint32_t &stride: opStrides)
-		{
-			file->PrintfLine("\t %u,", stride);
-		}
-		file->PrintfLine("};\n");
-
 		file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
 				varOpId, varOpId);
 		file->PrintfLine("{");
 		file->Indent();
 
-		std::string opIndexTuple = "const uint32_t opIndexTuple[] = {";
-		for(uint32_t stride = 0; stride < opStrides.size(); stride++)
-		{
-			if(0 == stride)
-			{
-				opIndexTuple += "opIndex / ";
-				opIndexTuple += opstridesId;
-				opIndexTuple += "[";
-				opIndexTuple += std::to_string(stride);
-				opIndexTuple += "]";
-				opIndexTuple += ", ";
-			}
-			else
-			{
-				opIndexTuple += "(opIndex % opStrides[";
-				opIndexTuple += std::to_string(stride - 1);
-				opIndexTuple += "]) / opStrides[";
-				opIndexTuple += std::to_string(stride);
-				opIndexTuple += "], ";
-			}
-		}
-		opIndexTuple.erase(opIndexTuple.end() - 2, opIndexTuple.end()); // remove last ", "
-		opIndexTuple += "};";
+		std::string opIndexTuple = "const uint32_t opIndexTuple[] = ";
+		appendIndexTuple(&opIndexTuple, opVec->__space_, std::string{"opIndex"});
+		opIndexTuple += ";";
 
 		file->PrintfLine("%s", opIndexTuple.c_str());
 	}
@@ -1188,29 +1189,9 @@ bool CodeGenerator::VectorPermutationCode(const Node* node, FileWriter * file)
 	file->PrintfLine("{");
 	file->Indent();
 
-	std::string opIndexTuple = "const uint32_t opIndexTuple[] = {";
-	for(uint32_t stride = 0; stride < strides.size(); stride++)
-	{
-		if(0 == stride)
-		{
-			opIndexTuple += "opIndex / ";
-			opIndexTuple += stridesId;
-			opIndexTuple += "[";
-			opIndexTuple += std::to_string(stride);
-			opIndexTuple += "]";
-			opIndexTuple += ", ";
-		}
-		else
-		{
-			opIndexTuple += "(opIndex % strides[";
-			opIndexTuple += std::to_string(stride - 1);
-			opIndexTuple += "]) / strides[";
-			opIndexTuple += std::to_string(stride);
-			opIndexTuple += "], ";
-		}
-	}
-	opIndexTuple.erase(opIndexTuple.end() - 2, opIndexTuple.end()); // remove last ", "
-	opIndexTuple += "};";
+	std::string opIndexTuple = "const uint32_t opIndexTuple[] = ";
+	appendIndexTuple(&opIndexTuple, vec->__space_, std::string{"opIndex"});
+	opIndexTuple += ";";
 
 	file->PrintfLine("%s", opIndexTuple.c_str());
 
@@ -1310,44 +1291,14 @@ bool CodeGenerator::VectorContractionCode(const Node* node, FileWriter * file)
 
 	if(resultIsArray)
 	{
-		std::vector<uint32_t> opStrides;
-		opVec->__space_->GetStrides(&opStrides);
-		const char opstridesId[] = "opStrides";
-		file->PrintfLine("const uint32_t %s[] = {", opstridesId);
-		for(const uint32_t &stride: opStrides)
-		{
-			file->PrintfLine("\t %u,", stride);
-		}
-		file->PrintfLine("};\n");
-
 		file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
 				varOpId, varOpId);
 		file->PrintfLine("{");
 		file->Indent();
 
-		std::string opIndexTuple = "const uint32_t opIndexTuple[] = {";
-		for(uint32_t stride = 0; stride < opStrides.size(); stride++)
-		{
-			if(0 == stride)
-			{
-				opIndexTuple += "opIndex / ";
-				opIndexTuple += opstridesId;
-				opIndexTuple += "[";
-				opIndexTuple += std::to_string(stride);
-				opIndexTuple += "]";
-				opIndexTuple += ", ";
-			}
-			else
-			{
-				opIndexTuple += "(opIndex % opStrides[";
-				opIndexTuple += std::to_string(stride - 1);
-				opIndexTuple += "]) / opStrides[";
-				opIndexTuple += std::to_string(stride);
-				opIndexTuple += "], ";
-			}
-		}
-		opIndexTuple.erase(opIndexTuple.end() - 2, opIndexTuple.end()); // remove last ", "
-		opIndexTuple += "};";
+		std::string opIndexTuple = "const uint32_t opIndexTuple[] = ";
+		appendIndexTuple(&opIndexTuple, opVec->__space_, std::string{"opIndex"});
+		opIndexTuple += ";";
 
 		file->PrintfLine("%s", opIndexTuple.c_str());
 	}
@@ -1726,16 +1677,6 @@ bool CodeGenerator::VectorScalarProductKroneckerDeltaCode(const Node* node, File
 	// TODO: This is a giant waste of resources: Every Node should have a "scaling" attached to it, so multiplication needs
 	// to only be performed on that.
 
-	std::vector<uint32_t> opStrides;
-	opVec->__space_->GetStrides(&opStrides);
-	const char opstridesId[] = "opStrides";
-	file->PrintfLine("const uint32_t %s[] = {", opstridesId);
-	for(const uint32_t &stride: opStrides)
-	{
-		file->PrintfLine("\t %u,", stride);
-	}
-	file->PrintfLine("};\n");
-
 	std::string deltaPairs = "const uint32_t deltaPairs[] = {";
 	for(size_t paramPos = 0; paramPos < kroneckerParam->DeltaPair.size(); paramPos++)
 	{
@@ -1751,30 +1692,9 @@ bool CodeGenerator::VectorScalarProductKroneckerDeltaCode(const Node* node, File
 	file->PrintfLine("{");
 	file->Indent();
 
-	std::string opIndexTuple = "const uint32_t opIndexTuple[] = {";
-	for(uint32_t stride = 0; stride < opStrides.size(); stride++)
-	{
-		if(0 == stride)
-		{
-			opIndexTuple += "opIndex / ";
-			opIndexTuple += opstridesId;
-			opIndexTuple += "[";
-			opIndexTuple += std::to_string(stride);
-			opIndexTuple += "]";
-			opIndexTuple += ", ";
-		}
-		else
-		{
-			opIndexTuple += "(opIndex % opStrides[";
-			opIndexTuple += std::to_string(stride - 1);
-			opIndexTuple += "]) / opStrides[";
-			opIndexTuple += std::to_string(stride);
-			opIndexTuple += "], ";
-		}
-	}
-	opIndexTuple.erase(opIndexTuple.end() - 2, opIndexTuple.end()); // remove last ", "
-
-	opIndexTuple += "};";
+	std::string opIndexTuple = "const uint32_t opIndexTuple[] = ";
+	appendIndexTuple(&opIndexTuple, opVec->__space_, std::string{"opIndex"});
+	opIndexTuple += ";";
 
 	file->PrintfLine("%s", opIndexTuple.c_str());
 
@@ -1880,16 +1800,6 @@ bool CodeGenerator::VectorVectorProductKroneckerDeltaCode(const Node* node, File
 	}
 	file->PrintfLine("};");
 
-	std::vector<uint32_t> opStrides;
-	opVec->__space_->GetStrides(&opStrides);
-	const char opstridesId[] = "opStrides";
-	file->PrintfLine("const uint32_t %s[] = {", opstridesId);
-	for(const uint32_t &stride: opStrides)
-	{
-		file->PrintfLine("\t %u,", stride);
-	}
-	file->PrintfLine("};\n");
-
 	std::string deltaPairs = "const uint32_t deltaPairs[] = {";
 	for(size_t paramPos = 0; paramPos < kroneckerParam->DeltaPair.size(); paramPos++)
 	{
@@ -1906,29 +1816,9 @@ bool CodeGenerator::VectorVectorProductKroneckerDeltaCode(const Node* node, File
 	file->PrintfLine("{");
 	file->Indent();
 
-	std::string opIndexTuple = "const uint32_t opIndexTuple[] = {";
-	for(uint32_t stride = 0; stride < opStrides.size(); stride++)
-	{
-		if(0 == stride)
-		{
-			opIndexTuple += "opIndex / ";
-			opIndexTuple += opstridesId;
-			opIndexTuple += "[";
-			opIndexTuple += std::to_string(stride);
-			opIndexTuple += "]";
-			opIndexTuple += ", ";
-		}
-		else
-		{
-			opIndexTuple += "(opIndex % opStrides[";
-			opIndexTuple += std::to_string(stride - 1);
-			opIndexTuple += "]) / opStrides[";
-			opIndexTuple += std::to_string(stride);
-			opIndexTuple += "], ";
-		}
-	}
-	opIndexTuple.erase(opIndexTuple.end() - 2, opIndexTuple.end()); // remove last ", "
-	opIndexTuple += "};";
+	std::string opIndexTuple = "const uint32_t opIndexTuple[] = ";
+	appendIndexTuple(&opIndexTuple, opVec->__space_, std::string{"opIndex"});
+	opIndexTuple += ";";
 
 	file->PrintfLine("%s", opIndexTuple.c_str());
 
@@ -2067,16 +1957,6 @@ bool CodeGenerator::VectorVectorProductCode(const Node* node, FileWriter * file,
 	}
 	file->PrintfLine("};");
 
-	std::vector<uint32_t> opStrides;
-	opVec->__space_->GetStrides(&opStrides);
-	const char opstridesId[] = "opStrides";
-	file->PrintfLine("const uint32_t %s[] = {", opstridesId);
-	for(const uint32_t &stride: opStrides)
-	{
-		file->PrintfLine("\t %u,", stride);
-	}
-	file->PrintfLine("};\n");
-
 	const char * varOpId = varOp->GetIdentifier()->c_str();
 
 	file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
@@ -2084,29 +1964,9 @@ bool CodeGenerator::VectorVectorProductCode(const Node* node, FileWriter * file,
 	file->PrintfLine("{");
 	file->Indent();
 
-	std::string opIndexTuple = "const uint32_t opIndexTuple[] = {";
-	for(uint32_t stride = 0; stride < opStrides.size(); stride++)
-	{
-		if(0 == stride)
-		{
-			opIndexTuple += "opIndex / ";
-			opIndexTuple += opstridesId;
-			opIndexTuple += "[";
-			opIndexTuple += std::to_string(stride);
-			opIndexTuple += "]";
-			opIndexTuple += ", ";
-		}
-		else
-		{
-			opIndexTuple += "(opIndex % opStrides[";
-			opIndexTuple += std::to_string(stride - 1);
-			opIndexTuple += "]) / opStrides[";
-			opIndexTuple += std::to_string(stride);
-			opIndexTuple += "], ";
-		}
-	}
-	opIndexTuple.erase(opIndexTuple.end() - 2, opIndexTuple.end()); // remove last ", "
-	opIndexTuple += "};";
+	std::string opIndexTuple = "const uint32_t opIndexTuple[] = ";
+	appendIndexTuple(&opIndexTuple, opVec->__space_, std::string{"opIndex"});
+	opIndexTuple += ";";
 
 	file->PrintfLine("%s", opIndexTuple.c_str());
 
@@ -2200,16 +2060,6 @@ bool CodeGenerator::VectorIndexSplitSumCode(const Node* node, FileWriter * file)
 	const Algebra::Module::VectorSpace::Vector* vecArg = (const Algebra::Module::VectorSpace::Vector*) argNode->second.object;
 	const Algebra::Module::VectorSpace::Vector* vecOp = (const Algebra::Module::VectorSpace::Vector*) node->object;
 
-	std::vector<uint32_t> opStrides;
-	vecOp->__space_->GetStrides(&opStrides);
-	const char opstridesId[] = "opStrides";
-	file->PrintfLine("const uint32_t %s[] = {", opstridesId);
-	for(const uint32_t &stride: opStrides)
-	{
-		file->PrintfLine("\t %u,", stride);
-	}
-	file->PrintfLine("};\n");
-
 	std::vector<uint32_t> argStrides;
 	vecArg->__space_->GetStrides(&argStrides);
 	const char argstridesId[] = "argStrides";
@@ -2225,29 +2075,9 @@ bool CodeGenerator::VectorIndexSplitSumCode(const Node* node, FileWriter * file)
 	file->PrintfLine("{");
 	file->Indent();
 
-	std::string opIndexTuple = "const uint32_t opIndexTuple[] = {";
-	for(uint32_t stride = 0; stride < opStrides.size(); stride++)
-	{
-		if(0 == stride)
-		{
-			opIndexTuple += "opIndex / ";
-			opIndexTuple += opstridesId;
-			opIndexTuple += "[";
-			opIndexTuple += std::to_string(stride);
-			opIndexTuple += "]";
-			opIndexTuple += ", ";
-		}
-		else
-		{
-			opIndexTuple += "(opIndex % opStrides[";
-			opIndexTuple += std::to_string(stride - 1);
-			opIndexTuple += "]) / opStrides[";
-			opIndexTuple += std::to_string(stride);
-			opIndexTuple += "], ";
-		}
-	}
-	opIndexTuple.erase(opIndexTuple.end() - 2, opIndexTuple.end()); // remove last ", "
-	opIndexTuple += "};";
+	std::string opIndexTuple = "const uint32_t opIndexTuple[] = ";
+	appendIndexTuple(&opIndexTuple, vecOp->__space_, std::string{"opIndex"});
+	opIndexTuple += ";";
 
 	file->PrintfLine("%s", opIndexTuple.c_str());
 
@@ -2312,16 +2142,6 @@ bool CodeGenerator::VectorJoinIndicesCode(const Node* node, FileWriter * file)
 	const Algebra::Module::VectorSpace::Vector* vecArg = (const Algebra::Module::VectorSpace::Vector*) argNode->second.object;
 	const Algebra::Module::VectorSpace::Vector* vecOp = (const Algebra::Module::VectorSpace::Vector*) node->object;
 
-	std::vector<uint32_t> opStrides;
-	vecOp->__space_->GetStrides(&opStrides);
-	const char opstridesId[] = "opStrides";
-	file->PrintfLine("const uint32_t %s[] = {", opstridesId);
-	for(const uint32_t &stride: opStrides)
-	{
-		file->PrintfLine("\t %u,", stride);
-	}
-	file->PrintfLine("};\n");
-
 	std::vector<uint32_t> argStrides;
 	vecArg->__space_->GetStrides(&argStrides);
 	const char argstridesId[] = "argStrides";
@@ -2337,29 +2157,9 @@ bool CodeGenerator::VectorJoinIndicesCode(const Node* node, FileWriter * file)
 	file->PrintfLine("{");
 	file->Indent();
 
-	std::string opIndexTuple = "const uint32_t opIndexTuple[] = {";
-	for(uint32_t stride = 0; stride < opStrides.size(); stride++)
-	{
-		if(0 == stride)
-		{
-			opIndexTuple += "opIndex / ";
-			opIndexTuple += opstridesId;
-			opIndexTuple += "[";
-			opIndexTuple += std::to_string(stride);
-			opIndexTuple += "]";
-			opIndexTuple += ", ";
-		}
-		else
-		{
-			opIndexTuple += "(opIndex % opStrides[";
-			opIndexTuple += std::to_string(stride - 1);
-			opIndexTuple += "]) / opStrides[";
-			opIndexTuple += std::to_string(stride);
-			opIndexTuple += "], ";
-		}
-	}
-	opIndexTuple.erase(opIndexTuple.end() - 2, opIndexTuple.end()); // remove last ", "
-	opIndexTuple += "};";
+	std::string opIndexTuple = "const uint32_t opIndexTuple[] = ";
+	appendIndexTuple(&opIndexTuple, vecOp->__space_, std::string{"opIndex"});
+	opIndexTuple += ";";
 
 	file->PrintfLine("%s", opIndexTuple.c_str());
 
@@ -2481,16 +2281,6 @@ bool CodeGenerator::VectorMaxPoolCode(const Node* node, FileWriter * file)
 	}
 	file->PrintfLine("};");
 
-	std::vector<uint32_t> opStrides;
-	opVec->__space_->GetStrides(&opStrides);
-	const char opstridesId[] = "opStrides";
-	file->PrintfLine("const uint32_t %s[] = {", opstridesId);
-	for(const uint32_t &stride: opStrides)
-	{
-		file->PrintfLine("\t %u,", stride);
-	}
-	file->PrintfLine("};\n");
-
 	// Generate all possible tuples
 	std::vector<std::pair<uint32_t, uint32_t>> ranges;
 	ranges.resize(inVec->__space_->factors_.size());
@@ -2510,38 +2300,18 @@ bool CodeGenerator::VectorMaxPoolCode(const Node* node, FileWriter * file)
 	file->PrintfLine("{");
 	file->Indent();
 
-	std::string opIndexTuple = "const uint32_t opIndexTuple[] = {";
-	for(uint32_t stride = 0; stride < opStrides.size(); stride++)
-	{
-		if(0 == stride)
-		{
-			opIndexTuple += "opIndex / ";
-			opIndexTuple += opstridesId;
-			opIndexTuple += "[";
-			opIndexTuple += std::to_string(stride);
-			opIndexTuple += "]";
-			opIndexTuple += ", ";
-		}
-		else
-		{
-			opIndexTuple += "(opIndex % opStrides[";
-			opIndexTuple += std::to_string(stride - 1);
-			opIndexTuple += "]) / opStrides[";
-			opIndexTuple += std::to_string(stride);
-			opIndexTuple += "], ";
-		}
-	}
-	opIndexTuple.erase(opIndexTuple.end() - 2, opIndexTuple.end()); // remove last ", "
-	opIndexTuple += "};";
+	std::string opIndexTuple = "const uint32_t opIndexTuple[] = ";
+	appendIndexTuple(&opIndexTuple, opVec->__space_, std::string{"opIndex"});
+	opIndexTuple += ";";
 
 	file->PrintfLine("%s", opIndexTuple.c_str());
 
 	std::string inPoolOrigin = "const uint32_t inPoolOrigin[] = {";
 
-	for(uint32_t stride = 0; stride < opStrides.size(); stride++)
+	for(size_t factor = 0; factor < opVec->__space_->factors_.size(); factor++)
 	{
-		inPoolOrigin += "opIndexTuple[" + std::to_string(stride) + "] ";
-		inPoolOrigin += "* " + std::to_string(param->PoolSize[stride]) + ", ";
+		inPoolOrigin += "opIndexTuple[" + std::to_string(factor) + "] ";
+		inPoolOrigin += "* " + std::to_string(param->PoolSize[factor]) + ", ";
 	}
 
 	inPoolOrigin.erase(inPoolOrigin.end() - 2, inPoolOrigin.end()); // remove last ", "
@@ -2661,16 +2431,6 @@ bool CodeGenerator::VectorCrossCorrelationCode(const Node* node, FileWriter * fi
 	}
 	file->PrintfLine("};");
 
-	std::vector<uint32_t> opStrides;
-	opVec->__space_->GetStrides(&opStrides);
-	const char opstridesId[] = "opStrides";
-	file->PrintfLine("const uint32_t %s[] = {", opstridesId);
-	for(const uint32_t &stride: opStrides)
-	{
-		file->PrintfLine("\t %u,", stride);
-	}
-	file->PrintfLine("};\n");
-
 	// Generate all possible tuples
 	std::vector<std::pair<uint32_t, uint32_t>> ranges;
 	ranges.resize(KernelVec->__space_->factors_.size());
@@ -2690,29 +2450,9 @@ bool CodeGenerator::VectorCrossCorrelationCode(const Node* node, FileWriter * fi
 	file->PrintfLine("{");
 	file->Indent();
 
-	std::string opIndexTuple = "const uint32_t opIndexTuple[] = {";
-	for(uint32_t stride = 0; stride < opStrides.size(); stride++)
-	{
-		if(0 == stride)
-		{
-			opIndexTuple += "opIndex / ";
-			opIndexTuple += opstridesId;
-			opIndexTuple += "[";
-			opIndexTuple += std::to_string(stride);
-			opIndexTuple += "]";
-			opIndexTuple += ", ";
-		}
-		else
-		{
-			opIndexTuple += "(opIndex % opStrides[";
-			opIndexTuple += std::to_string(stride - 1);
-			opIndexTuple += "]) / opStrides[";
-			opIndexTuple += std::to_string(stride);
-			opIndexTuple += "], ";
-		}
-	}
-	opIndexTuple.erase(opIndexTuple.end() - 2, opIndexTuple.end()); // remove last ", "
-	opIndexTuple += "};\n";
+	std::string opIndexTuple = "const uint32_t opIndexTuple[] = ";
+	appendIndexTuple(&opIndexTuple, opVec->__space_, std::string{"opIndex"});
+	opIndexTuple += ";";
 
 	file->PrintfLine("%s", opIndexTuple.c_str());
 
@@ -2803,16 +2543,6 @@ bool CodeGenerator::VectorProjectionCode(const Node* node, FileWriter * file)
 	const Algebra::Module::VectorSpace::Vector* vecArg = (const Algebra::Module::VectorSpace::Vector*) argNode->second.object;
 	const Algebra::Module::VectorSpace::Vector* vecOp = (const Algebra::Module::VectorSpace::Vector*) node->object;
 
-	std::vector<uint32_t> opStrides;
-	vecOp->__space_->GetStrides(&opStrides);
-	const char opstridesId[] = "opStrides";
-	file->PrintfLine("const uint32_t %s[] = {", opstridesId);
-	for(const uint32_t &stride: opStrides)
-	{
-		file->PrintfLine("\t %u,", stride);
-	}
-	file->PrintfLine("};\n");
-
 	std::vector<uint32_t> argStrides;
 	vecArg->__space_->GetStrides(&argStrides);
 	const char argstridesId[] = "argStrides";
@@ -2828,29 +2558,9 @@ bool CodeGenerator::VectorProjectionCode(const Node* node, FileWriter * file)
 	file->PrintfLine("{");
 	file->Indent();
 
-	std::string opIndexTuple = "const uint32_t opIndexTuple[] = {";
-	for(uint32_t stride = 0; stride < opStrides.size(); stride++)
-	{
-		if(0 == stride)
-		{
-			opIndexTuple += "opIndex / ";
-			opIndexTuple += opstridesId;
-			opIndexTuple += "[";
-			opIndexTuple += std::to_string(stride);
-			opIndexTuple += "]";
-			opIndexTuple += ", ";
-		}
-		else
-		{
-			opIndexTuple += "(opIndex % opStrides[";
-			opIndexTuple += std::to_string(stride - 1);
-			opIndexTuple += "]) / opStrides[";
-			opIndexTuple += std::to_string(stride);
-			opIndexTuple += "], ";
-		}
-	}
-	opIndexTuple.erase(opIndexTuple.end() - 2, opIndexTuple.end()); // remove last ", "
-	opIndexTuple += "};";
+	std::string opIndexTuple = "const uint32_t opIndexTuple[] = ";
+	appendIndexTuple(&opIndexTuple, vecOp->__space_, std::string{"opIndex"});
+	opIndexTuple += ";";
 
 	file->PrintfLine("%s", opIndexTuple.c_str());
 
