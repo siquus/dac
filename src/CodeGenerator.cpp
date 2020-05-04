@@ -646,11 +646,11 @@ bool CodeGenerator::GenerateCallbackPtCheck(FileWriter* file) const
 
 		file->PrintfLine("if(NULL == Dac%sOutputCallback%s)",
 				graph_->Name().c_str(),
-				output->GetOutputName()->c_str());
+				output->GetName()->c_str());
 		file->PrintfLine("{");
 		file->PrintfLine("\tfatal(\"Dac%sOutputCallback%s == NULL\");",
 				graph_->Name().c_str(),
-				output->GetOutputName()->c_str());
+				output->GetName()->c_str());
 		file->PrintfLine("}\n");
 	}
 
@@ -791,7 +791,7 @@ bool CodeGenerator::OutputCode(const Node* node, FileWriter * file)
 
 		file->PrintfLine("Dac%sOutputCallback%s(%s, sizeof(%s));\n",
 				graph_->Name().c_str(),
-				output->GetOutputName()->c_str(),
+				output->GetName()->c_str(),
 				NodeStr.c_str(),
 				varIdentifier->c_str());
 	}
@@ -2848,7 +2848,7 @@ bool CodeGenerator::GenerateOutputFunctions()
 		getVarRetFalseOnError(var, nodePair.second.parents[0]);
 
 		std::string fctPtTypeId = "Dac" + graph_->Name() + "OutputCallback";
-		fctPtTypeId += *(output->GetOutputName());
+		fctPtTypeId += *(output->GetName());
 
 		std::string callbackTypedef;
 		callbackTypedef += "typedef void (*";

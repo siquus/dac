@@ -89,7 +89,7 @@ bool Output::Set(const Algebra::Module::VectorSpace::Vector * vector)
 	return true;
 }
 
-const std::string * Output::GetOutputName() const
+const std::string * Output::GetName() const
 {
 	return &name_;
 }

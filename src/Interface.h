@@ -40,7 +40,7 @@ public:
 	Output(Graph* graph, const std::string* name);
 	Output(Graph* graph, const char * name);
 	bool Set(const Algebra::Module::VectorSpace::Vector * vector);
-	const std::string * GetOutputName() const;
+	const std::string * GetName() const;
 };
 
 }
