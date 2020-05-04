@@ -637,21 +637,23 @@ bool CodeGenerator::GenerateCallbackPtCheck(FileWriter* file) const
 	auto nodes = graph_->GetNodes();
 	for(const auto &nodePair: *nodes)
 	{
-		if(Node::Type::OUTPUT != nodePair.second.type)
+		switch(nodePair.second.type)
 		{
-			continue;
+		case Node::Type::OUTPUT:
+		{
+			auto output = (const Interface::Output*) nodePair.second.object;
+
+			file->PrintfLine("if(NULL == %s)", output->GetCallbackName()->c_str());
+			file->PrintfLine("{");
+			file->PrintfLine("\tfatal(\"%s == NULL\");", output->GetCallbackName()->c_str());
+			file->PrintfLine("}\n");
 		}
+		break;
 
-		auto output = (const Interface::Output*) nodePair.second.object;
-
-		file->PrintfLine("if(NULL == Dac%sOutputCallback%s)",
-				graph_->Name().c_str(),
-				output->GetName()->c_str());
-		file->PrintfLine("{");
-		file->PrintfLine("\tfatal(\"Dac%sOutputCallback%s == NULL\");",
-				graph_->Name().c_str(),
-				output->GetName()->c_str());
-		file->PrintfLine("}\n");
+		default:
+			// do nothing
+			break;
+		}
 	}
 
 	return true;
@@ -789,9 +791,8 @@ bool CodeGenerator::OutputCode(const Node* node, FileWriter * file)
 		}
 		NodeStr += *varIdentifier;
 
-		file->PrintfLine("Dac%sOutputCallback%s(%s, sizeof(%s));\n",
-				graph_->Name().c_str(),
-				output->GetName()->c_str(),
+		file->PrintfLine("%s(%s, sizeof(%s));\n",
+				output->GetCallbackName()->c_str(),
 				NodeStr.c_str(),
 				varIdentifier->c_str());
 	}
@@ -2847,12 +2848,9 @@ bool CodeGenerator::GenerateOutputFunctions()
 		// Get Variable attached to node
 		getVarRetFalseOnError(var, nodePair.second.parents[0]);
 
-		std::string fctPtTypeId = "Dac" + graph_->Name() + "OutputCallback";
-		fctPtTypeId += *(output->GetName());
-
 		std::string callbackTypedef;
 		callbackTypedef += "typedef void (*";
-		callbackTypedef += fctPtTypeId;
+		callbackTypedef += *output->GetCallbackName();
 		callbackTypedef += "_t)(";
 		callbackTypedef += "const ";
 		callbackTypedef += var->GetTypeString();
@@ -2861,27 +2859,27 @@ bool CodeGenerator::GenerateOutputFunctions()
 		// Export function prototype
 		fileDacH_.PrintfLine("%s", callbackTypedef.c_str());
 		fileDacH_.PrintfLine("extern void %s_Register(%s_t callback);",
-				fctPtTypeId.c_str(),
-				fctPtTypeId.c_str());
+				output->GetCallbackName()->c_str(),
+				output->GetCallbackName()->c_str());
 
 		// Declare Static Variables keeping the callback pointers
 		fileDacC_.PrintfLine("%s_t %s = NULL;",
-				fctPtTypeId.c_str(),
-				fctPtTypeId.c_str());
+				output->GetCallbackName()->c_str(),
+				output->GetCallbackName()->c_str());
 
 		fileInstructions_.PrintfLine("extern %s_t %s;",
-				fctPtTypeId.c_str(),
-				fctPtTypeId.c_str());
+				output->GetCallbackName()->c_str(),
+				output->GetCallbackName()->c_str());
 
 		// Define Function
 		char tmpBuff[200];
 		SNPRINTF(tmpBuff, sizeof(tmpBuff), "void %s_Register(%s_t callback)\n{\n",
-				fctPtTypeId.c_str(),
-				fctPtTypeId.c_str());
+				output->GetCallbackName()->c_str(),
+				output->GetCallbackName()->c_str());
 
 		fctDefinitions += tmpBuff;
 
-		SNPRINTF(tmpBuff, sizeof(tmpBuff), "\t %s = callback;\n", fctPtTypeId.c_str());
+		SNPRINTF(tmpBuff, sizeof(tmpBuff), "\t %s = callback;\n", output->GetCallbackName()->c_str());
 		fctDefinitions += tmpBuff;
 		fctDefinitions += "}\n\n";
 	}

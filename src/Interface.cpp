@@ -43,6 +43,7 @@ void Output::Init(Graph * graph, const char * name)
 	}
 
 	name_ = name;
+	callbackName_ = "Dac" + graph->Name() + "OutputCallback" + name_;
 
 	if(nullptr == graph)
 	{
@@ -92,4 +93,9 @@ bool Output::Set(const Algebra::Module::VectorSpace::Vector * vector)
 const std::string * Output::GetName() const
 {
 	return &name_;
+}
+
+const std::string * Output::GetCallbackName() const
+{
+	return &callbackName_;
 }

@@ -35,12 +35,14 @@ namespace Interface {
 class Output : public NodeRef {
 	void Init(Graph * graph, const char * name);
 	std::string name_;
+	std::string callbackName_;
 
 public:
 	Output(Graph* graph, const std::string* name);
 	Output(Graph* graph, const char * name);
 	bool Set(const Algebra::Module::VectorSpace::Vector * vector);
 	const std::string * GetName() const;
+	const std::string * GetCallbackName() const;
 };
 
 }
