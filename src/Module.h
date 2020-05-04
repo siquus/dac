@@ -54,7 +54,11 @@ public:
 
 	dimension_t GetDim() const;
 	Ring::type_t GetRing() const;
+
+	// Calculate Strides. // TODO: assumes Row-Major Layout
+	// https://en.wikipedia.org/wiki/Row-_and_column-major_order#Address_calculation_in_general
 	void GetStrides(std::vector<uint32_t> * strides) const;
+
 	static bool AreEqual(const VectorSpace * lVs, const VectorSpace * rVs);
 
 	class Vector : public NodeRef {

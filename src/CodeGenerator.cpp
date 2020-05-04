@@ -168,6 +168,29 @@ static void getAllTuples(std::vector<std::vector<uint32_t>> &tuples, const std::
 
 static const uint32_t NODE_T_MAX_EDGE_NUMBER = 42;
 
+static void appendArrayPosition(std::string * out, const Algebra::Module::VectorSpace * vspace, const std::string &indexTuple)
+{
+	std::vector<uint32_t> strides;
+	vspace->GetStrides(&strides);
+
+	*out += "[";
+	for(size_t stride = 0; stride < strides.size(); stride++)
+	{
+		*out += indexTuple + "[" + std::to_string(stride) + "]";
+
+		if(strides[stride])
+		{
+			*out += " * " + std::to_string(strides[stride]);
+		}
+
+		if(strides.size() - 1 != stride)
+		{
+			*out += " + ";
+		}
+	}
+	*out += "]";
+}
+
 static void appendIndexTuple(std::string * out, const Algebra::Module::VectorSpace * vspace, const std::string &arrayPos)
 {
 	std::vector<uint32_t> strides;
@@ -991,18 +1014,6 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 	deltaPairs += "};";
 	file->PrintfLine("%s", deltaPairs.c_str());
 
-	// Calculate Strides, assume Row-Major Layout
-	// https://en.wikipedia.org/wiki/Row-_and_column-major_order#Address_calculation_in_general
-	std::vector<uint32_t> argStrides;
-	argVec->__space_->GetStrides(&argStrides);
-	const char argStridesId[] = "argStrides";
-	file->PrintfLine("const uint32_t %s[] = {", argStridesId);
-	for(const uint32_t &stride: argStrides)
-	{
-		file->PrintfLine("\t %u,", stride);
-	}
-	file->PrintfLine("};");
-
 	const char * varOpId = varOp->GetIdentifier()->c_str();
 
 	bool resultIsArray = (1 < varOp->Length());
@@ -1106,15 +1117,10 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 	//			= B_ijnn d_kl
 
 	std::string sum = "sum += ";
-	sum += *(varArgVec->GetIdentifier()) + "[";
-	for(uint32_t argIndex = 0; argIndex < argVec->__space_->factors_.size(); argIndex++)
-	{
-		sum += "argIndexTuple[" +
-				std::to_string(argIndex) + "] * "
-				+  argStridesId + "[" +  std::to_string(argIndex) + "] + ";
-	}
-	sum.erase(sum.end() - 3, sum.end()); // remove last " +"
-	sum += "] *";
+	sum += *(varArgVec->GetIdentifier());
+	appendArrayPosition(&sum, argVec->__space_, std::string{"argIndexTuple"});
+
+	sum += " *";
 
 	for(size_t paramPos = 0; paramPos < kroneckerParam->DeltaPair.size(); paramPos++)
 	{
@@ -1174,16 +1180,6 @@ bool CodeGenerator::VectorPermutationCode(const Node* node, FileWriter * file)
 	const char * varOpId = varOp->GetIdentifier()->c_str();
 	const char * varArgId = varArg->GetIdentifier()->c_str();
 
-	std::vector<uint32_t> strides;
-	vec->__space_->GetStrides(&strides);
-	const char stridesId[] = "strides";
-	file->PrintfLine("const uint32_t %s[] = {", stridesId);
-	for(const uint32_t &stride: strides)
-	{
-		file->PrintfLine("\t %u,", stride);
-	}
-	file->PrintfLine("};\n");
-
 	file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
 			varOpId, varOpId);
 	file->PrintfLine("{");
@@ -1211,14 +1207,8 @@ bool CodeGenerator::VectorPermutationCode(const Node* node, FileWriter * file)
 	opValue += "[opIndex]";
 	opValue += " = ";
 	opValue += varArgId;
-	opValue += "[";
-
-	for(size_t argIndex = 0; argIndex < vec->__space_->factors_.size(); argIndex++)
-	{
-		opValue += "argIndexTuple[" + std::to_string(argIndex) + "] * " + stridesId + "[" + std::to_string(argIndex) + "] + ";
-	}
-	opValue.erase(opValue.end() - 3, opValue.end()); // remove last " + "
-	opValue += "];";
+	appendArrayPosition(&opValue, vec->__space_, std::string{"argIndexTuple"});
+	opValue += ";";
 
 	file->PrintfLine("%s", opValue.c_str());
 
@@ -1262,28 +1252,6 @@ bool CodeGenerator::VectorContractionCode(const Node* node, FileWriter * file)
 
 	const Algebra::Module::VectorSpace::Vector* opVec = (const Algebra::Module::VectorSpace::Vector*) node->object;
 	const Node::contractParameters_t * contractValue = (Node::contractParameters_t *) node->typeParameters;
-
-	// Calculate Strides, assume Row-Major Layout
-	// https://en.wikipedia.org/wiki/Row-_and_column-major_order#Address_calculation_in_general
-	std::vector<uint32_t> lStrides;
-	lVec->__space_->GetStrides(&lStrides);
-	const char lstridesId[] = "lStrides";
-	file->PrintfLine("const uint32_t %s[] = {", lstridesId);
-	for(const uint32_t &stride: lStrides)
-	{
-		file->PrintfLine("\t %u,", stride);
-	}
-	file->PrintfLine("};");
-
-	std::vector<uint32_t> rStrides;
-	rVec->__space_->GetStrides(&rStrides);
-	const char rstridesId[] = "rStrides";
-	file->PrintfLine("const uint32_t %s[] = {", rstridesId);
-	for(const uint32_t &stride: rStrides)
-	{
-		file->PrintfLine("\t %u,", stride);
-	}
-	file->PrintfLine("};");
 
 	const char * varOpId = varOp->GetIdentifier()->c_str();
 
@@ -1368,27 +1336,13 @@ bool CodeGenerator::VectorContractionCode(const Node* node, FileWriter * file)
 	file->PrintfLine(rIndexTuple.c_str());
 
 	std::string sum = "sum += ";
-	sum += *(varLVec->GetIdentifier()) + "[";
-	for(uint32_t lIndex = 0; lIndex < lVec->__space_->factors_.size(); lIndex++)
-	{
-		sum += "lIndexTuple[" +
-				std::to_string(lIndex) + "] * "
-				+  lstridesId + "[" +  std::to_string(lIndex) + "] + ";
-	}
-	sum.erase(sum.end() - 3, sum.end()); // remove last " +"
-	sum += "]";
-
+	sum += *(varLVec->GetIdentifier());
+	appendArrayPosition(&sum, lVec->__space_, std::string{"lIndexTuple"});
 	sum += " * ";
 
-	sum += *(varRVec->GetIdentifier()) + "[";
-	for(uint32_t rIndex = 0; rIndex < rVec->__space_->factors_.size(); rIndex++)
-	{
-		sum += "rIndexTuple[" +
-				std::to_string(rIndex) + "] * "
-				+  rstridesId + "[" +  std::to_string(rIndex) + "] + ";
-	}
-	sum.erase(sum.end() - 3, sum.end()); // remove last " +"
-	sum += "];";
+	sum += *(varRVec->GetIdentifier());
+	appendArrayPosition(&sum, rVec->__space_, std::string{"rIndexTuple"});
+	sum += ";";
 
 	file->PrintfLine(sum.c_str());
 
@@ -1788,18 +1742,6 @@ bool CodeGenerator::VectorVectorProductKroneckerDeltaCode(const Node* node, File
 
 	const Algebra::Module::VectorSpace::Vector* opVec = (const Algebra::Module::VectorSpace::Vector*) node->object;
 
-	// Calculate Strides, assume Row-Major Layout
-	// https://en.wikipedia.org/wiki/Row-_and_column-major_order#Address_calculation_in_general
-	std::vector<uint32_t> vecStrides;
-	vec->__space_->GetStrides(&vecStrides);
-	const char vecStridesId[] = "vecStrides";
-	file->PrintfLine("const uint32_t %s[] = {", vecStridesId);
-	for(const uint32_t &stride: vecStrides)
-	{
-		file->PrintfLine("\t %u,", stride);
-	}
-	file->PrintfLine("};");
-
 	std::string deltaPairs = "const uint32_t deltaPairs[] = {";
 	for(size_t paramPos = 0; paramPos < kroneckerParam->DeltaPair.size(); paramPos++)
 	{
@@ -1880,15 +1822,9 @@ bool CodeGenerator::VectorVectorProductKroneckerDeltaCode(const Node* node, File
 		product += " * ";
 	}
 
-	product += *(varVec->GetIdentifier()) + "[";
-	for(uint32_t lIndex = 0; lIndex < vec->__space_->factors_.size(); lIndex++)
-	{
-		product += "vecIndexTuple[" +
-				std::to_string(lIndex) + "] * "
-				+  vecStridesId + "[" +  std::to_string(lIndex) + "] + ";
-	}
-	product.erase(product.end() - 3, product.end()); // remove last " +"
-	product += "];";
+	product += *(varVec->GetIdentifier());
+	appendArrayPosition(&product, vec->__space_, std::string{"vecIndexTuple"});
+	product += ";";
 
 	file->PrintfLine(product.c_str());
 
@@ -1935,28 +1871,6 @@ bool CodeGenerator::VectorVectorProductCode(const Node* node, FileWriter * file,
 
 	const Algebra::Module::VectorSpace::Vector* opVec = (const Algebra::Module::VectorSpace::Vector*) node->object;
 
-	// Calculate Strides, assume Row-Major Layout
-	// https://en.wikipedia.org/wiki/Row-_and_column-major_order#Address_calculation_in_general
-	std::vector<uint32_t> lStrides;
-	lVec->__space_->GetStrides(&lStrides);
-	const char lstridesId[] = "lStrides";
-	file->PrintfLine("const uint32_t %s[] = {", lstridesId);
-	for(const uint32_t &stride: lStrides)
-	{
-		file->PrintfLine("\t %u,", stride);
-	}
-	file->PrintfLine("};");
-
-	std::vector<uint32_t> rStrides;
-	rVec->__space_->GetStrides(&rStrides);
-	const char rstridesId[] = "rStrides";
-	file->PrintfLine("const uint32_t %s[] = {", rstridesId);
-	for(const uint32_t &stride: rStrides)
-	{
-		file->PrintfLine("\t %u,", stride);
-	}
-	file->PrintfLine("};");
-
 	const char * varOpId = varOp->GetIdentifier()->c_str();
 
 	file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
@@ -1996,15 +1910,8 @@ bool CodeGenerator::VectorVectorProductCode(const Node* node, FileWriter * file,
 
 	std::string product = varOpId;
 	product += "[opIndex] = ";
-	product += *(varLVec->GetIdentifier()) + "[";
-	for(uint32_t lIndex = 0; lIndex < lVec->__space_->factors_.size(); lIndex++)
-	{
-		product += "lIndexTuple[" +
-				std::to_string(lIndex) + "] * "
-				+  lstridesId + "[" +  std::to_string(lIndex) + "] + ";
-	}
-	product.erase(product.end() - 3, product.end()); // remove last " +"
-	product += "]";
+	product += *(varLVec->GetIdentifier());
+	appendArrayPosition(&product, lVec->__space_, std::string{"lIndexTuple"});
 
 	if(divide)
 	{
@@ -2015,15 +1922,9 @@ bool CodeGenerator::VectorVectorProductCode(const Node* node, FileWriter * file,
 		product += " * ";
 	}
 
-	product += *(varRVec->GetIdentifier()) + "[";
-	for(uint32_t rIndex = 0; rIndex < rVec->__space_->factors_.size(); rIndex++)
-	{
-		product += "rIndexTuple[" +
-				std::to_string(rIndex) + "] * "
-				+  rstridesId + "[" +  std::to_string(rIndex) + "] + ";
-	}
-	product.erase(product.end() - 3, product.end()); // remove last " +"
-	product += "];";
+	product += *(varRVec->GetIdentifier());
+	appendArrayPosition(&product, rVec->__space_, std::string{"rIndexTuple"});
+	product += ";";
 
 	file->PrintfLine(product.c_str());
 
@@ -2060,16 +1961,6 @@ bool CodeGenerator::VectorIndexSplitSumCode(const Node* node, FileWriter * file)
 	const Algebra::Module::VectorSpace::Vector* vecArg = (const Algebra::Module::VectorSpace::Vector*) argNode->second.object;
 	const Algebra::Module::VectorSpace::Vector* vecOp = (const Algebra::Module::VectorSpace::Vector*) node->object;
 
-	std::vector<uint32_t> argStrides;
-	vecArg->__space_->GetStrides(&argStrides);
-	const char argstridesId[] = "argStrides";
-	file->PrintfLine("const uint32_t %s[] = {", argstridesId);
-	for(const uint32_t &stride: argStrides)
-	{
-		file->PrintfLine("\t %u,", stride);
-	}
-	file->PrintfLine("};\n");
-
 	file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
 			varOp->GetIdentifier()->c_str(), varOp->GetIdentifier()->c_str());
 	file->PrintfLine("{");
@@ -2084,11 +1975,11 @@ bool CodeGenerator::VectorIndexSplitSumCode(const Node* node, FileWriter * file)
 	std::string argIndexTuple = "const uint32_t argIndexTuple[] = {";
 
 	uint32_t opIndexPos = 0;
-	for(uint32_t stride = 0; stride < argStrides.size(); stride++)
+	for(size_t factor = 0; factor < param->SplitPosition.size(); factor++)
 	{
 		argIndexTuple += "opIndexTuple[" + std::to_string(opIndexPos) + "]";
 
-		if(param->SplitPosition[stride])
+		if(param->SplitPosition[factor])
 		{
 			opIndexPos++;
 			argIndexTuple += " + opIndexTuple[" + std::to_string(opIndexPos) + "]";
@@ -2102,16 +1993,9 @@ bool CodeGenerator::VectorIndexSplitSumCode(const Node* node, FileWriter * file)
 	file->PrintfLine("%s", argIndexTuple.c_str());
 
 	std::string equationStr = *varOp->GetIdentifier() + "[opIndex] = ";
-	equationStr += *varArg->GetIdentifier() + "[";
-
-	for(uint32_t argIndex = 0; argIndex < vecArg->__space_->factors_.size(); argIndex++)
-	{
-		equationStr += "argIndexTuple[" +
-				std::to_string(argIndex) + "] * "
-				+  argstridesId + "[" +  std::to_string(argIndex) + "] + ";
-	}
-	equationStr.erase(equationStr.end() - 3, equationStr.end()); // remove last " +"
-	equationStr += "];";
+	equationStr += *varArg->GetIdentifier();
+	appendArrayPosition(&equationStr, vecArg->__space_, std::string{"argIndexTuple"});
+	equationStr += ";";
 
 	file->PrintfLine(equationStr.c_str());
 
@@ -2141,16 +2025,6 @@ bool CodeGenerator::VectorJoinIndicesCode(const Node* node, FileWriter * file)
 
 	const Algebra::Module::VectorSpace::Vector* vecArg = (const Algebra::Module::VectorSpace::Vector*) argNode->second.object;
 	const Algebra::Module::VectorSpace::Vector* vecOp = (const Algebra::Module::VectorSpace::Vector*) node->object;
-
-	std::vector<uint32_t> argStrides;
-	vecArg->__space_->GetStrides(&argStrides);
-	const char argstridesId[] = "argStrides";
-	file->PrintfLine("const uint32_t %s[] = {", argstridesId);
-	for(const uint32_t &stride: argStrides)
-	{
-		file->PrintfLine("\t %u,", stride);
-	}
-	file->PrintfLine("};");
 
 	file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
 			varOp->GetIdentifier()->c_str(), varOp->GetIdentifier()->c_str());
@@ -2203,16 +2077,9 @@ bool CodeGenerator::VectorJoinIndicesCode(const Node* node, FileWriter * file)
 	file->PrintfLine(argIndexTuple.c_str());
 
 	std::string equationStr = *varOp->GetIdentifier() + "[opIndex] = ";
-	equationStr += *varArg->GetIdentifier() + "[";
-
-	for(uint32_t argIndex = 0; argIndex < vecArg->__space_->factors_.size(); argIndex++)
-	{
-		equationStr += "argIndexTuple[" +
-				std::to_string(argIndex) + "] * "
-				+  argstridesId + "[" +  std::to_string(argIndex) + "] + ";
-	}
-	equationStr.erase(equationStr.end() - 3, equationStr.end()); // remove last " +"
-	equationStr += "];";
+	equationStr += *varArg->GetIdentifier();
+	appendArrayPosition(&equationStr, vecArg->__space_, std::string{"argIndexTuple"});
+	equationStr += ";";
 
 	file->PrintfLine(equationStr.c_str());
 
@@ -2543,16 +2410,6 @@ bool CodeGenerator::VectorProjectionCode(const Node* node, FileWriter * file)
 	const Algebra::Module::VectorSpace::Vector* vecArg = (const Algebra::Module::VectorSpace::Vector*) argNode->second.object;
 	const Algebra::Module::VectorSpace::Vector* vecOp = (const Algebra::Module::VectorSpace::Vector*) node->object;
 
-	std::vector<uint32_t> argStrides;
-	vecArg->__space_->GetStrides(&argStrides);
-	const char argstridesId[] = "argStrides";
-	file->PrintfLine("const uint32_t %s[] = {", argstridesId);
-	for(const uint32_t &stride: argStrides)
-	{
-		file->PrintfLine("\t %u,", stride);
-	}
-	file->PrintfLine("};");
-
 	file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
 			varOp->GetIdentifier()->c_str(), varOp->GetIdentifier()->c_str());
 	file->PrintfLine("{");
@@ -2584,16 +2441,9 @@ bool CodeGenerator::VectorProjectionCode(const Node* node, FileWriter * file)
 	file->PrintfLine(argIndexTuple.c_str());
 
 	std::string equationStr = *varOp->GetIdentifier() + "[opIndex] = ";
-	equationStr += *varArg->GetIdentifier() + "[";
-
-	for(uint32_t argIndex = 0; argIndex < vecArg->__space_->factors_.size(); argIndex++)
-	{
-		equationStr += "argIndexTuple[" +
-				std::to_string(argIndex) + "] * "
-				+  argstridesId + "[" +  std::to_string(argIndex) + "] + ";
-	}
-	equationStr.erase(equationStr.end() - 3, equationStr.end()); // remove last " +"
-	equationStr += "];";
+	equationStr += *varArg->GetIdentifier();
+	appendArrayPosition(&equationStr, vecArg->__space_, std::string{"argIndexTuple"});
+	equationStr += ";";
 
 	file->PrintfLine(equationStr.c_str());
 
