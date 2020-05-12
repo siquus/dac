@@ -45,8 +45,7 @@ template const VectorSpace::Vector * VectorSpace::Element<float>(
 template const VectorSpace::Vector * VectorSpace::Element<float>(
 			Graph* graph,
 			const std::vector<float> &initializer,
-			const std::vector<Vector::Property> &properties,
-			const std::vector<const void *> &propertiesParameter) const;
+			const std::map<Vector::Property, const void *> &properties) const;
 
 template const VectorSpace::Vector * VectorSpace::Scalar<float>(Graph * graph, const float &initializer) const;
 template const VectorSpace::Vector * VectorSpace::Scalar<int32_t>(Graph * graph, const int32_t &initializer) const;
@@ -61,8 +60,7 @@ template const VectorSpace::Vector * VectorSpace::Homomorphism<float>(
 template const VectorSpace::Vector * VectorSpace::Homomorphism<float>(
 		Graph* graph,
 		const std::vector<float> &initializer,
-		const std::vector<Vector::Property> &properties,
-		const std::vector<const void *> &propertiesParameter) const;
+		const std::map<Vector::Property, const void *> &properties) const;
 
 template const VectorSpace::Vector* VectorSpace::Vector::Power<float>(float exp) const;
 template const VectorSpace::Vector* VectorSpace::Vector::Multiply<float>(float factor) const;
@@ -157,23 +155,13 @@ const VectorSpace::Vector * VectorSpace::Homomorphism(
 		return nullptr;
 	}
 
-	(void)(parameter);
-
 	// Handle properties, where no indices need to be specified
 	if((Vector::Property::Diagonal == property) && (1 == factors_.size()))
 	{
-		std::vector<Vector::Property> props;
-		props.push_back(property);
-
-		std::pair<uint32_t, uint32_t> param{0, 1};
-		std::vector<const void *> propParam;
-		propParam.push_back(&param);
-
 		return Homomorphism(
 				graph,
 				initializer,
-				props,
-				propParam);
+				std::map<Vector::Property, const void *>{{property, parameter}});
 	}
 
 	Error("Not implemented!\n");
@@ -184,8 +172,7 @@ template<typename inType>
 const VectorSpace::Vector * VectorSpace::Homomorphism(
 		Graph* graph,
 		const std::vector<inType> &initializer,
-		const std::vector<Vector::Property> &properties,
-		const std::vector<const void *> &propertiesParameter) const
+		const std::map<Vector::Property, const void *> &properties) const
 {
 	if(nullptr == graph)
 	{
@@ -195,15 +182,9 @@ const VectorSpace::Vector * VectorSpace::Homomorphism(
 
 	// TODO: Call VectorSpace::Element rather than reimplenting stuff here!
 
-	if(properties.size() != propertiesParameter.size())
-	{
-		Error("Properties and propertiesParameter need to have same size!\n");
-		return nullptr;
-	}
-
 	// TODO: Implement properties. For now this is just an interface to test usability in application
 	if((properties.size() != 1) ||
-			(Vector::Property::Diagonal != properties[0]) ||
+			(properties.end() == properties.find(Vector::Property::Diagonal)) ||
 			(factors_.size() != 1))
 	{
 		Error("Property not implemented yet!\n");
@@ -246,31 +227,14 @@ const VectorSpace::Vector * VectorSpace::Homomorphism(Graph* graph, const std::v
 		return nullptr;
 	}
 
-	Vector * retVec = new Vector;
+	VectorSpace * retSpace = new VectorSpace(*this, 2);
+
+	Vector * retVec = new Vector(graph, retSpace, initializer.data());
 	if(nullptr == retVec)
 	{
 		Error("Could not malloc Vec\n");
 		return nullptr;
 	}
-
-	Node node;
-	node.type = Node::Type::VECTOR;
-	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
-	node.object = retVec;
-
-	Node::Id_t nodeId = graph->AddNode(&node);
-	if(Node::ID_NONE == nodeId)
-	{
-		Error("Could not add node!\n");
-		return nullptr;
-	}
-
-	VectorSpace * retSpace = new VectorSpace(*this, 2);
-
-	retVec->__value_ = initializer.data();
-	retVec->__space_ = retSpace;
-	retVec->graph_ = graph;
-	retVec->nodeId_ = nodeId;
 
 	return retVec;
 }
@@ -290,33 +254,17 @@ const VectorSpace::Vector * VectorSpace::Scalar(Graph* graph, const inType &init
 		return nullptr;
 	}
 
-	Vector * retVec = new Vector;
+	auto retSpace = new VectorSpace(GetRing(), 1);
+
+	void * valuePt = malloc(sizeof(initializer));
+	memcpy(valuePt, &initializer, sizeof(initializer));
+
+	Vector * retVec = new Vector(graph, retSpace, valuePt);
 	if(nullptr == retVec)
 	{
 		Error("Could not malloc Vec\n");
 		return nullptr;
 	}
-
-	Node node;
-	node.type = Node::Type::VECTOR;
-	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
-	node.object = retVec;
-
-	Node::Id_t nodeId = graph->AddNode(&node);
-	if(Node::ID_NONE == nodeId)
-	{
-		Error("Could not add node!\n");
-		return nullptr;
-	}
-
-	retVec->__space_ = new VectorSpace(GetRing(), 1);
-
-	void * valuePt = malloc(sizeof(initializer));
-	memcpy(valuePt, &initializer, sizeof(initializer));
-
-	retVec->__value_ = valuePt;
-	retVec->graph_ = graph;
-	retVec->nodeId_ = nodeId;
 
 	return retVec;
 }
@@ -357,15 +305,13 @@ template<typename inType>
 const VectorSpace::Vector * VectorSpace::Element(
 			Graph* graph,
 			const std::vector<inType> &initializer,
-			const std::vector<Vector::Property> &properties,
-			const std::vector<const void *> &propertiesParameter) const
+			const std::map<Vector::Property, const void *> &properties) const
 {
 	// TODO: Implement properties. For now this is just an interface to test usability in application
-	(void)(propertiesParameter);
 
 	if((2 == properties.size()) &&
-			(properties[0] == Vector::Property::Sparse) &&
-			(properties[1] == Vector::Property::Antisymmetric))
+			(properties.end() != properties.find(Vector::Property::Sparse)) &&
+			(properties.end() != properties.find(Vector::Property::Antisymmetric)))
 	{
 		// Ignore properties
 		return Element(graph, initializer);
@@ -397,29 +343,12 @@ const VectorSpace::Vector * VectorSpace::Element(Graph * graph, const std::vecto
 		return nullptr;
 	}
 
-	Vector * retVec = new Vector;
+	Vector * retVec = new Vector(graph, this, initializer.data());
 	if(nullptr == retVec)
 	{
 		Error("Could not malloc Vec\n");
 		return nullptr;
 	}
-
-	Node node;
-	node.type = Node::Type::VECTOR;
-	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
-	node.object = retVec;
-
-	Node::Id_t nodeId = graph->AddNode(&node);
-	if(Node::ID_NONE == nodeId)
-	{
-		Error("Could not add node!\n");
-		return nullptr;
-	}
-
-	retVec->__value_ = initializer.data();
-	retVec->__space_ = this;
-	retVec->graph_ = graph;
-	retVec->nodeId_ = nodeId;
 
 	return retVec;
 }
@@ -439,34 +368,45 @@ const VectorSpace::Vector * VectorSpace::Element(Graph* graph, const std::vector
 		return nullptr;
 	}
 
-	Vector * retVec = new Vector;
+	Vector * retVec = new Vector(graph, this);
 	if(nullptr == retVec)
 	{
 		Error("Could not malloc Vec\n");
 		return nullptr;
 	}
 
-	Node node;
-	node.type = Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT;
-	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
-
 	Node::KroneckerDeltaParameters_t * param = new Node::KroneckerDeltaParameters_t;
 	param->DeltaPair = DeltaPairs;
 	param->Scaling = Scaling;
 
-	node.typeParameters = param;
-	node.object = retVec;
+	retVec->SetType(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT, param);
 
-	Node::Id_t nodeId = graph->AddNode(&node);
-	if(Node::ID_NONE == nodeId)
+	return retVec;
+}
+
+const VectorSpace::Vector * VectorSpace::Element(Graph* graph, const std::map<Vector::Property, const void *> &properties) const
+{
+	if(nullptr == graph)
 	{
-		Error("Could not add node!\n");
+		Error("nullptr\n");
 		return nullptr;
 	}
 
-	retVec->__space_ = this;
-	retVec->graph_ = graph;
-	retVec->nodeId_ = nodeId;
+	const auto externalInput = properties.find(Vector::Property::ExternalInput);
+	if(properties.end() == externalInput)
+	{
+		Error("This overloaded Element call requires Property::ExternalInput!");
+	}
+
+	Vector * retVec = new Vector(graph, this, properties);
+	if(nullptr == retVec)
+	{
+		Error("Could not malloc Vec\n");
+		return nullptr;
+	}
+
+	auto externalInputPt = (const Vector::propertyExternalInput_t *) externalInput->second;
+	retVec->PushParent(externalInputPt->InputNode);
 
 	return retVec;
 }
@@ -542,6 +482,59 @@ void VectorSpace::Vector::PrintInfo() const {
 	printf("\n");
 }
 
+bool VectorSpace::Vector::Init(Graph* graph, const VectorSpace * vSpace, const void * value, const std::map<Property, const void *> &properties)
+{
+	__space_ = vSpace;
+	__value_ = value;
+	graph_ = graph;
+
+	Properties_ = properties;
+
+	Node node;
+	node.type = Node::Type::VECTOR;
+	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
+	node.object = this;
+
+	nodeId_ = graph->AddNode(&node);
+	if(Node::ID_NONE == nodeId_)
+	{
+		Error("Could not add node!\n");
+		return false;
+	}
+
+	return true;
+}
+
+VectorSpace::Vector::Vector(Graph* graph, const VectorSpace * vSpace)
+{
+	bool success = Init(graph, vSpace, nullptr);
+
+	if(!success)
+	{
+		Error("Couldn't init vector!\n");
+	}
+}
+
+VectorSpace::Vector::Vector(Graph* graph, const VectorSpace * vSpace, const std::map<Property, const void *> &properties)
+{
+	bool success = Init(graph, vSpace, nullptr, properties);
+
+	if(!success)
+	{
+		Error("Couldn't init vector!\n");
+	}
+}
+
+VectorSpace::Vector::Vector(Graph* graph, const VectorSpace * vSpace, const void * value, const std::map<Vector::Property, const void *> &properties)
+{
+	bool success = Init(graph, vSpace, value, properties);
+
+	if(!success)
+	{
+		Error("Couldn't init vector!\n");
+	}
+}
+
 const VectorSpace::Vector* VectorSpace::Vector::Power(const Vector* vec, const std::vector<uint32_t> &lfactors, const std::vector<uint32_t> &rfactors) const
 {
 	// TODO: Catch exponent of 0?
@@ -600,10 +593,7 @@ const VectorSpace::Vector* VectorSpace::Vector::Power(const Vector* vec, const s
 	}
 
 
-	Vector* retVec = new Vector;
-	retVec->graph_ = graph_;
-
-	retVec->__space_ = __space_;
+	Vector* retVec = new Vector(graph_, __space_);
 
 	Node node;
 	node.parents.push_back(nodeId_);
@@ -646,25 +636,11 @@ const VectorSpace::Vector* VectorSpace::Vector::Power(const Vector* vec) const
 		return nullptr;
 	}
 
-	Vector* retVec = new Vector;
-	retVec->graph_ = graph_;
+	Vector* retVec = new Vector(graph_, __space_);
 
-	retVec->__space_ = __space_;
-
-	Node node;
-	node.parents.push_back(nodeId_);
-	node.parents.push_back(vec->nodeId_);
-	node.type = Node::Type::VECTOR_POWER;
-	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
-	node.object = retVec;
-
-	retVec->nodeId_ = graph_->AddNode(&node);
-
-	if(Node::ID_NONE == retVec->nodeId_)
-	{
-		Error("Could not add Node!\n");
-		return nullptr;
-	}
+	retVec->SetType(Node::Type::VECTOR_POWER);
+	retVec->PushParent(nodeId_);
+	retVec->PushParent(vec->nodeId_);
 
 	return retVec;
 }
@@ -719,10 +695,6 @@ const VectorSpace::Vector* VectorSpace::Vector::Multiply(const Vector* vec) cons
 	if(lArgScalar || rArgScalar)
 	{
 		// Infer space
-
-		Vector* retVec = new Vector;
-		retVec->graph_ = graph_;
-
 		const VectorSpace * retSpace = nullptr;
 
 		if(lArgScalar && rArgScalar)
@@ -751,29 +723,13 @@ const VectorSpace::Vector* VectorSpace::Vector::Multiply(const Vector* vec) cons
 			return nullptr;
 		}
 
-		retVec->__space_ = retSpace;
-
-		Node node;
-		node.parents.push_back(nodeId_);
-		node.parents.push_back(vec->nodeId_);
-
-		node.type = Node::Type::VECTOR_SCALAR_PRODUCT;
-		node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
-		node.object = retVec;
-
-		retVec->nodeId_ = graph_->AddNode(&node);
-
-		if(Node::ID_NONE == retVec->nodeId_)
-		{
-			Error("Could not add Node!\n");
-			return nullptr;
-		}
+		Vector* retVec = new Vector(graph_, retSpace);
+		retVec->SetType(Node::Type::VECTOR_SCALAR_PRODUCT);
+		retVec->PushParent(nodeId_);
+		retVec->PushParent(vec->nodeId_);
 
 		return retVec;
 	}
-
-	Vector* retVec = new Vector;
-	retVec->graph_ = graph_;
 
 	VectorSpace * retSpace = nullptr;
 	retSpace = new VectorSpace(std::initializer_list<const VectorSpace*>{__space_, vec->__space_});
@@ -784,22 +740,10 @@ const VectorSpace::Vector* VectorSpace::Vector::Multiply(const Vector* vec) cons
 		return nullptr;
 	}
 
-	retVec->__space_ = retSpace;
-
-	Node node;
-	node.parents.push_back(nodeId_);
-	node.parents.push_back(vec->nodeId_);
-	node.type = Node::Type::VECTOR_VECTOR_PRODUCT;
-	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
-	node.object = retVec;
-
-	retVec->nodeId_ = graph_->AddNode(&node);
-
-	if(Node::ID_NONE == retVec->nodeId_)
-	{
-		Error("Could not add Node!\n");
-		return nullptr;
-	}
+	Vector* retVec = new Vector(graph_, retSpace);
+	retVec->SetType(Node::Type::VECTOR_VECTOR_PRODUCT);
+	retVec->PushParent(nodeId_);
+	retVec->PushParent(vec->nodeId_);
 
 	return retVec;
 }
@@ -875,29 +819,13 @@ const VectorSpace::Vector* VectorSpace::Vector::JoinIndices(std::vector<std::vec
 
 	VectorSpace * retSpace = new VectorSpace(vsFactors);
 
-	Vector* retVec = new Vector;
-	retVec->graph_ = graph_;
-	retVec->__space_ = retSpace;
-
-	Node node;
-	node.parents.push_back(nodeId_);
-	node.type = Node::Type::VECTOR_JOIN_INDICES;
-	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
-	node.object = retVec;
-
 	Node::joinIndicesParameters_t * param = new Node::joinIndicesParameters_t;
 	param->Indices = indices;
 	std::sort(param->Indices.begin(), param->Indices.end());
 
-	node.typeParameters = param;
-
-	retVec->nodeId_ = graph_->AddNode(&node);
-
-	if(Node::ID_NONE == retVec->nodeId_)
-	{
-		Error("Could not add Node!\n");
-		return nullptr;
-	}
+	Vector* retVec = new Vector(graph_, retSpace);
+	retVec->SetType(Node::Type::VECTOR_JOIN_INDICES, param);
+	retVec->PushParent(nodeId_);
 
 	return retVec;
 }
@@ -916,24 +844,10 @@ const VectorSpace::Vector* VectorSpace::Vector::IsSmaller(const Vector* vec) con
 		return nullptr;
 	}
 
-	Vector* retVec = new Vector;
-	retVec->graph_ = graph_;
-	retVec->__space_ = new VectorSpace(Ring::Int32, 1);
-
-	Node node;
-	node.parents.push_back(nodeId_);
-	node.parents.push_back(vec->nodeId_);
-	node.type = Node::Type::VECTOR_COMPARISON_IS_SMALLER;
-	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
-	node.object = retVec;
-
-	retVec->nodeId_ = graph_->AddNode(&node);
-
-	if(Node::ID_NONE == retVec->nodeId_)
-	{
-		Error("Could not add Node!\n");
-		return nullptr;
-	}
+	Vector* retVec = new Vector(graph_,new VectorSpace(Ring::Int32, 1));
+	retVec->SetType(Node::Type::VECTOR_COMPARISON_IS_SMALLER);
+	retVec->PushParent(nodeId_);
+	retVec->PushParent(vec->nodeId_);
 
 	return retVec;
 }
@@ -975,28 +889,12 @@ const VectorSpace::Vector * VectorSpace::Vector::MaxPool(const std::vector<uint3
 	auto param = new Node::PoolParameters_t;
 	param->PoolSize = poolSize;
 
-	Vector* retVec = new Vector;
-	retVec->graph_ = graph_;
-	retVec->__space_ = retSpace;
-
-	Node node;
-	node.parents.push_back(nodeId_);
-	node.type = Node::Type::VECTOR_MAX_POOL;
-	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
-	node.object = retVec;
-	node.typeParameters = param;
-
-	retVec->nodeId_ = graph_->AddNode(&node);
-
-	if(Node::ID_NONE == retVec->nodeId_)
-	{
-		Error("Could not add Node!\n");
-		return nullptr;
-	}
+	Vector* retVec = new Vector(graph_, retSpace);
+	retVec->SetType(Node::Type::VECTOR_MAX_POOL, param);
+	retVec->PushParent(nodeId_);
 
 	return retVec;
 }
-
 
 const VectorSpace::Vector * VectorSpace::Vector::CrossCorrelate(const Vector* Kernel) const
 {
@@ -1042,26 +940,17 @@ const VectorSpace::Vector * VectorSpace::Vector::CrossCorrelate(const Vector* Ke
 		retSpace->factors_[factor].dim_ -= Kernel->__space_->factors_[factor].dim_ - 1;
 	}
 
-	Vector* retVec = new Vector;
-	retVec->graph_ = graph_;
-	retVec->__space_ = retSpace;
-
-	Node node;
-	node.parents.push_back(nodeId_);
-	node.parents.push_back(Kernel->nodeId_);
-	node.type = Node::Type::VECTOR_CROSS_CORRELATION;
-	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
-	node.object = retVec;
-
-	retVec->nodeId_ = graph_->AddNode(&node);
-
-	if(Node::ID_NONE == retVec->nodeId_)
-	{
-		Error("Could not add Node!\n");
-		return nullptr;
-	}
+	Vector* retVec = new Vector(graph_, retSpace);
+	retVec->SetType(Node::Type::VECTOR_CROSS_CORRELATION);
+	retVec->PushParent(nodeId_);
+	retVec->PushParent(Kernel->nodeId_);
 
 	return retVec;
+}
+
+const std::map<VectorSpace::Vector::Property, const void *> * VectorSpace::Vector::Properties() const
+{
+	return &Properties_;
 }
 
 bool VectorSpace::Vector::AreCompatible(const Vector* vec1, const Vector* vec2)
@@ -1457,14 +1346,11 @@ const VectorSpace::Vector* VectorSpace::Vector::Contract(const Vector* vec, cons
 		return nullptr;
 	}
 
-	Vector* retVec = new Vector;
-	retVec->graph_ = graph_;
-	retVec->__space_ = retSpace;
+	Vector* retVec = new Vector(graph_, retSpace);
 
 	const Node * thisNode = graph_->GetNode(nodeId_);
 	const Node * vecNode = graph_->GetNode(vec->nodeId_);
 
-	Node node;
 	if((Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == thisNode->type) &&
 			(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == vecNode->type))
 	{
@@ -1553,8 +1439,7 @@ const VectorSpace::Vector* VectorSpace::Vector::Contract(const Vector* vec, cons
 			opKronParam->Scaling *= __space_->factors_[lfactors[contrFactor]].dim_;
 		}
 
-		node.type = Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT;
-		node.typeParameters = opKronParam;
+		retVec->SetType(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT, opKronParam);
 	}
 	else
 	{
@@ -1562,21 +1447,10 @@ const VectorSpace::Vector* VectorSpace::Vector::Contract(const Vector* vec, cons
 		opParameters->lfactors = lfactors;
 		opParameters->rfactors = rfactors;
 
-		node.parents.push_back(nodeId_);
-		node.parents.push_back(vec->nodeId_);
-		node.type = Node::Type::VECTOR_CONTRACTION;
-		node.typeParameters = opParameters;
-	}
+		retVec->SetType(Node::Type::VECTOR_CONTRACTION, opParameters);
 
-	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
-	node.object = retVec;
-
-	retVec->nodeId_ = graph_->AddNode(&node);
-
-	if(Node::ID_NONE == retVec->nodeId_)
-	{
-		Error("Could not add Node!\n");
-		return nullptr;
+		retVec->PushParent(nodeId_);
+		retVec->PushParent(vec->nodeId_);
 	}
 
 	return retVec;
@@ -1628,9 +1502,6 @@ const VectorSpace::Vector* VectorSpace::Vector::Project(const std::vector<std::p
 		}
 	}
 
-	Vector* retVec = new Vector;
-	retVec->graph_ = graph_;
-
 	std::vector<simpleVs_t> newFactors = __space_->factors_;
 	for(size_t factor = 0; factor < newFactors.size(); factor++)
 	{
@@ -1638,26 +1509,14 @@ const VectorSpace::Vector* VectorSpace::Vector::Project(const std::vector<std::p
 	}
 
 	VectorSpace * retSpace = new VectorSpace(newFactors);
-	retVec->__space_ = retSpace;
 
-	Node node;
-	node.parents.push_back(nodeId_);
-	node.type = Node::Type::VECTOR_PROJECTION;
-	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
-	node.object = retVec;
+	Vector* retVec = new Vector(graph_, retSpace);
 
 	Node::projectParameters_t * opParameters = new Node::projectParameters_t;
 	opParameters->range = range;
+	retVec->SetType(Node::Type::VECTOR_PROJECTION, opParameters);
 
-	node.typeParameters = opParameters;
-
-	retVec->nodeId_ = graph_->AddNode(&node);
-
-	if(Node::ID_NONE == retVec->nodeId_)
-	{
-		Error("Could not add Node!\n");
-		return nullptr;
-	}
+	retVec->PushParent(nodeId_);
 
 	return retVec;
 }
@@ -1683,28 +1542,13 @@ const VectorSpace::Vector* VectorSpace::Vector::Permute(const std::vector<uint32
 		Error("Number of permutation indices does not match number of factors!\n");
 	}
 
-	Vector* retVec = new Vector;
-	retVec->graph_ = graph_;
-	retVec->__space_ = __space_;
-
-	Node node;
-	node.parents.push_back(nodeId_);
-	node.type = Node::Type::VECTOR_PERMUTATION;
-	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
-	node.object = retVec;
+	Vector* retVec = new Vector(graph_, __space_);
 
 	Node::permuteParameters_t * opParameters = new Node::permuteParameters_t;
 	opParameters->indices = indices;
+	retVec->SetType(Node::Type::VECTOR_PERMUTATION, opParameters);
 
-	node.typeParameters = opParameters;
-
-	retVec->nodeId_ = graph_->AddNode(&node);
-
-	if(Node::ID_NONE == retVec->nodeId_)
-	{
-		Error("Could not add Node!\n");
-		return nullptr;
-	}
+	retVec->PushParent(nodeId_);
 
 	return retVec;
 }
@@ -1742,28 +1586,13 @@ const VectorSpace::Vector * VectorSpace::Vector::IndexSplitSum(const std::vector
 		}
 	}
 
-	Vector* retVec = new Vector;
-	retVec->graph_ = graph_;
-	retVec->__space_ = new VectorSpace(retSimpleVs);
-
-	Node node;
-	node.parents.push_back(nodeId_);
-	node.type = Node::Type::VECTOR_INDEX_SPLIT_SUM;
-	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
-	node.object = retVec;
+	Vector* retVec = new Vector(graph_, new VectorSpace(retSimpleVs));
 
 	Node::splitSumIndicesParameters_t * opParameters = new Node::splitSumIndicesParameters_t;
 	opParameters->SplitPosition = splitPosition;
+	retVec->SetType(Node::Type::VECTOR_INDEX_SPLIT_SUM, opParameters);
 
-	node.typeParameters = opParameters;
-
-	retVec->nodeId_ = graph_->AddNode(&node);
-
-	if(Node::ID_NONE == retVec->nodeId_)
-	{
-		Error("Could not add Node!\n");
-		return nullptr;
-	}
+	retVec->PushParent(nodeId_);
 
 	return retVec;
 }
@@ -2221,9 +2050,6 @@ const VectorSpace::Vector* VectorSpace::Vector::ContractDerivative(const Vector*
 
 const VectorSpace::Vector* VectorSpace::Vector::AddDerivative(const Vector* vecValuedFct, const Vector* arg)
 {
-	Vector* retVec = new Vector;
-	retVec->graph_ = vecValuedFct->graph_;
-
 	// The new vector will be of tensor product vector space type.
 	// The derivative vector's VS will come first (as in differential forms)
 	std::vector<simpleVs_t> factors;
@@ -2243,11 +2069,9 @@ const VectorSpace::Vector* VectorSpace::Vector::AddDerivative(const Vector* vecV
 		return vecValuedFct->__space_->Scalar(vecValuedFct->graph_, 1.0f); // TODO: Only works for float
 	}
 
-	retVec->__space_ = new VectorSpace(factors);
-
 	// General derivative of Add is easy: Just the product of Kronecker Deltas
-	Node node;
-	node.type = Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT;
+	Vector* retVec = new Vector(vecValuedFct->graph_, new VectorSpace(factors));
+
 	Node::KroneckerDeltaParameters_t * opParameters = new Node::KroneckerDeltaParameters_t;
 	opParameters->DeltaPair.resize(factors.size());
 	for(size_t factor = 0; factor < opParameters->DeltaPair.size() / 2; factor++)
@@ -2259,19 +2083,7 @@ const VectorSpace::Vector* VectorSpace::Vector::AddDerivative(const Vector* vecV
 	{
 		opParameters->DeltaPair[factor] = factor - opParameters->DeltaPair.size() / 2;
 	}
-
-	node.typeParameters = opParameters;
-	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
-	node.object = retVec;
-	node.noStorage_ = true;
-
-	retVec->nodeId_ = vecValuedFct->graph_->AddNode(&node);
-
-	if(Node::ID_NONE == retVec->nodeId_)
-	{
-		Error("Could not add Node!\n");
-		return nullptr;
-	}
+	retVec->SetType(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT, opParameters);
 
 	return retVec;
 }
@@ -2324,32 +2136,21 @@ const VectorSpace::Vector* VectorSpace::Vector::Add(const Vector* vec) const
 		return nullptr;
 	}
 
-	Vector* retVec = new Vector;
-	retVec->graph_ = graph_;
-
+	const VectorSpace * retSpace;
 	if(inferredRing == __space_->GetRing())
 	{
-		retVec->__space_ = __space_;
+		retSpace = __space_;
 	}
 	else
 	{
-		retVec->__space_ = vec->__space_;
+		retSpace = vec->__space_;
 	}
 
-	Node node;
-	node.parents.push_back(nodeId_);
-	node.parents.push_back(vec->nodeId_);
-	node.type = Node::Type::VECTOR_ADDITION;
-	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
-	node.object = retVec;
+	Vector* retVec = new Vector(graph_, retSpace);
+	retVec->SetType(Node::Type::VECTOR_ADDITION);
 
-	retVec->nodeId_ = graph_->AddNode(&node);
-
-	if(Node::ID_NONE == retVec->nodeId_)
-	{
-		Error("Could not add Node!\n");
-		return nullptr;
-	}
+	retVec->PushParent(nodeId_);
+	retVec->PushParent(vec->nodeId_);
 
 	return retVec;
 }

@@ -34,6 +34,10 @@ public:
 	void CC(const float * data, size_t size);
 	void CCMaxPool(const float * data, size_t size);
 	void VectorSplit(const float * data, size_t size);
+	void Vector21(const float * data, size_t size);
+	void Vector42(const float * data, size_t size);
+
+	const float * VectorInput(size_t identifier, size_t size);
 
 private:
 	size_t ThreadsNrOf_ = 0;
@@ -42,6 +46,8 @@ private:
 		CALLED_CC,
 		CALLED_CCMaxPool,
 		CALLED_VectorSplit,
+		CALLED_Vector21,
+		CALLED_Vector42,
 		CALLED_NrOf,
 	};
 

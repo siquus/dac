@@ -47,12 +47,23 @@ bool ModuleCNN::Generate(const std::string &path)
 	auto vectorSplitOutput = Interface::Output(&graph, "vectorSplit");
 	vectorSplitOutput.Set(vectorSplit);
 
+	auto vectorInput = Interface::Input(&graph, "vector", Algebra::Ring::Float32);
+
+	auto inVector21 = vectorInput.Get(&vectorSpace, 21);
+	auto inVector42 = vectorInput.Get(&vectorSpace, 42);
+
+	auto vector21Output = Interface::Output(&graph, "vector21");
+	vector21Output.Set(inVector21);
+
+	auto vector42Output = Interface::Output(&graph, "vector42");
+	vector42Output.Set(inVector42);
+
 	CodeGenerator codeGenerator(&path);
 	bool GenSuccess = codeGenerator.Generate(&graph);
 	if(!GenSuccess)
 	{
 		printf("Could not generate Code\n");
-		return 1;
+		return false;
 	}
 
 	return true;

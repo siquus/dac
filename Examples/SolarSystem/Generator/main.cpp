@@ -261,20 +261,22 @@ static const Algebra::Module::VectorSpace::Vector * SymplecticMatrix(
 		}
 	}
 
-	std::vector<Algebra::Module::VectorSpace::Vector::Property> properties;
-	std::vector<const void *> propertiesParam;
+	std::map<Algebra::Module::VectorSpace::Vector::Property, const void *> properties;
 
 	// Set sparse property
-	properties.push_back(Algebra::Module::VectorSpace::Vector::Property::Sparse);
+	auto paramSparse = new Algebra::Module::VectorSpace::Vector::propertyParameterSparse_t;
+	paramSparse->Initializer = paramSparse->DENSE;
 
-	Algebra::Module::VectorSpace::Vector::propertyParameterSparse_t paramSparse;
-	paramSparse.Initializer = paramSparse.DENSE;
-
-	propertiesParam.push_back(&paramSparse);
+	properties.insert({
+		Algebra::Module::VectorSpace::Vector::Property::Sparse,
+		paramSparse
+	});
 
 	// Set antisymmetric
-	properties.push_back(Algebra::Module::VectorSpace::Vector::Property::Antisymmetric);
-	propertiesParam.push_back(nullptr);
+	properties.insert({
+			Algebra::Module::VectorSpace::Vector::Property::Antisymmetric,
+			nullptr
+		});
 
 	auto space = new Algebra::Module::VectorSpace(
 			Algebra::Ring::Float32,
@@ -283,8 +285,7 @@ static const Algebra::Module::VectorSpace::Vector * SymplecticMatrix(
 	return space->Element(
 			graph,
 			*matrixValue,
-			properties,
-			propertiesParam);
+			properties);
 }
 
 static void printHelp()

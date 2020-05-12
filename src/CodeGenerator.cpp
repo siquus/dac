@@ -384,7 +384,7 @@ bool CodeGenerator::Generate(const Graph* graph)
 	fileDacH_.PrintfLine("extern \"C\" {");
 	fileDacH_.PrintfLine("#endif // __cplusplus\n");
 	fileDacH_.PrintfLine("#include <stddef.h>\n");
-	retFalseOnFalse(GenerateOutputFunctions(), "Could not generate Output Functions\n!");
+	retFalseOnFalse(GenerateInterfaceFunctions(), "Could not generate interface Functions\n!");
 	fileInstructions_.PrintfLine("");
 
 	// Generate Variables
@@ -428,17 +428,68 @@ bool CodeGenerator::GenerateNodesArray()
 				const auto &arrayPos = nodeArrayPos_.find(parent);
 				if(nodeArrayPos_.end() == arrayPos)
 				{
-					Error("Couldn't find array position");
+					Error("Couldn't find array position for node %u\n", parent);
 					return false;
 				}
 
 				parentsArrayPosition.push_back(arrayPos->second);
 			}
+			else // Maybe the parent is just a intermediate variable for e.g. an input
+			{
+				const Node * parentNode = graph_->GetNode(parent);
+				for(const Node::Id_t &grandParent: parentNode->parents)
+				{
+					if(nodesInstructionMap_.end() != nodesInstructionMap_.find(grandParent))
+					{
+						const auto &arrayPos = nodeArrayPos_.find(grandParent);
+						if(nodeArrayPos_.end() == arrayPos)
+						{
+							Error("Couldn't find array position for node %u\n", grandParent);
+							return false;
+						}
+
+						parentsArrayPosition.push_back(arrayPos->second);
+					}
+				}
+			}
 		}
 
 		std::vector<uint32_t> childrenArrayPosition;
-		if(nodePair.second->type != Node::Type::CONTROL_TRANSFER_WHILE) // Control Transfers don't have children
+		switch(nodePair.second->type)
 		{
+		case Node::Type::CONTROL_TRANSFER_WHILE:
+			// Control Transfers don't have children
+			break;
+
+		case Node::Type::INPUT:
+		{
+			// Add children of child
+			Node::Id_t childId = *(nodePair.second->children.begin());
+			const Node * childNode = graph_->GetNode(childId);
+			if(nullptr == childNode)
+			{
+				Error("Could not get node!\n");
+				return false;
+			}
+
+			for(const Node::Id_t &child: childNode->children)
+			{
+				if(nodesInstructionMap_.end() != nodesInstructionMap_.find(child))
+				{
+					const auto &arrayPos = nodeArrayPos_.find(child);
+					if(nodeArrayPos_.end() == arrayPos)
+					{
+						Error("Couldn't find array position for node %u\n", child);
+						return false;
+					}
+
+					childrenArrayPosition.push_back(arrayPos->second);
+				}
+			}
+		}
+		break;
+
+		default:
 			for(const Node::Id_t &child: nodePair.second->children)
 			{
 				if(nodesInstructionMap_.end() != nodesInstructionMap_.find(child))
@@ -446,13 +497,14 @@ bool CodeGenerator::GenerateNodesArray()
 					const auto &arrayPos = nodeArrayPos_.find(child);
 					if(nodeArrayPos_.end() == arrayPos)
 					{
-						Error("Couldn't find array position");
+						Error("Couldn't find array position for node %u\n", child);
 						return false;
 					}
 
 					childrenArrayPosition.push_back(arrayPos->second);
 				}
 			}
+			break;
 		}
 
 		retFalseOnFalse(
@@ -477,7 +529,7 @@ bool CodeGenerator::GenerateNodesArray()
 		const auto &arrayPos = nodeArrayPos_.find(node);
 		if(nodeArrayPos_.end() == arrayPos)
 		{
-			Error("Couldn't find array position\n");
+			Error("Couldn't find array position for node %u\n", node);
 			return false;
 		}
 
@@ -518,9 +570,19 @@ bool CodeGenerator::GetFirstNodesToExecute(std::set<Node::Id_t> * nodeSet)
 		if(0 == nodePair.second.parents.size())
 		{
 			roots.insert(nodePair.second.id);
-			std::copy(
-					nodePair.second.children.begin(), nodePair.second.children.end(),
-					std::inserter(*nodeSet, nodeSet->end()));
+
+			bool nodeIsInstruction = (nodesInstructionMap_.find(nodePair.second.id) != nodesInstructionMap_.end());
+
+			if(nodeIsInstruction)
+			{
+				nodeSet->insert(nodePair.second.id);
+			}
+			else
+			{
+				std::copy(
+						nodePair.second.children.begin(), nodePair.second.children.end(),
+						std::inserter(*nodeSet, nodeSet->end()));
+			}
 		}
 	}
 
@@ -591,7 +653,8 @@ bool CodeGenerator::GenerateInstructions()
 		case Node::Type::VECTOR_INDEX_SPLIT_SUM: // no break intended
 		case Node::Type::VECTOR_CROSS_CORRELATION: // no break intended
 		case Node::Type::VECTOR_MAX_POOL: // no break intended
-		case Node::Type::OUTPUT:
+		case Node::Type::OUTPUT: // no break intended
+		case Node::Type::INPUT:
 			break; // create instruction
 		}
 
@@ -634,6 +697,8 @@ bool CodeGenerator::GenerateInstructions()
 
 bool CodeGenerator::GenerateCallbackPtCheck(FileWriter* file) const
 {
+	std::set<const void *> inputCheckCreated;
+
 	auto nodes = graph_->GetNodes();
 	for(const auto &nodePair: *nodes)
 	{
@@ -646,6 +711,24 @@ bool CodeGenerator::GenerateCallbackPtCheck(FileWriter* file) const
 			file->PrintfLine("if(NULL == %s)", output->GetCallbackName()->c_str());
 			file->PrintfLine("{");
 			file->PrintfLine("\tfatal(\"%s == NULL\");", output->GetCallbackName()->c_str());
+			file->PrintfLine("}\n");
+		}
+		break;
+
+		case Node::Type::INPUT:
+		{
+			auto insert = inputCheckCreated.insert(nodePair.second.object);
+			if(!insert.second)
+			{
+				// Pointer check for this input already created
+				continue;
+			}
+
+			auto input = (const Interface::Input*) nodePair.second.object;
+
+			file->PrintfLine("if(NULL == %s)", input->GetCallbackName()->c_str());
+			file->PrintfLine("{");
+			file->PrintfLine("\tfatal(\"%s == NULL\");", input->GetCallbackName()->c_str());
 			file->PrintfLine("}\n");
 		}
 		break;
@@ -765,6 +848,34 @@ bool CodeGenerator::GenerateRunFunction()
 	return true;
 }
 
+bool CodeGenerator::InputCode(const Node* node, FileWriter * file)
+{
+	file->PrintfLine("// %s\n", __func__);
+
+	auto input = (const Interface::Input* ) node->object;
+
+	// What is the identifier?
+	size_t identifier = input->GetIdentifier(node->id);
+	if(SIZE_MAX == identifier)
+	{
+		Error("Could not get identifier!\n");
+		return false;
+	}
+
+	// For which node do we set the input?
+	Node::Id_t targetNodeId = *(node->children.begin());
+	getVarRetFalseOnError(targetVar, targetNodeId);
+
+	file->PrintfLine("%s = %s(%lu, %lu * sizeof(%s));",
+			targetVar->GetIdentifier()->c_str(),
+			input->GetCallbackName()->c_str(),
+			identifier,
+			targetVar->Length(),
+			targetVar->GetTypeString());
+
+	return true;
+}
+
 bool CodeGenerator::OutputCode(const Node* node, FileWriter * file)
 {
 	file->PrintfLine("// %s\n", __func__);
@@ -791,10 +902,11 @@ bool CodeGenerator::OutputCode(const Node* node, FileWriter * file)
 		}
 		NodeStr += *varIdentifier;
 
-		file->PrintfLine("%s(%s, sizeof(%s));\n",
+		file->PrintfLine("%s(%s, %lu * sizeof(%s));\n",
 				output->GetCallbackName()->c_str(),
 				NodeStr.c_str(),
-				varIdentifier->c_str());
+				var->Length(),
+				var->GetTypeString());
 	}
 
 	file->PrintfLine("");
@@ -863,6 +975,11 @@ bool CodeGenerator::GenerateOperationCode(const Node* node, FileWriter * file)
 	case Node::Type::OUTPUT:
 		retFalseOnFalse(OutputCode(node, file),
 				"Could not generate Output Code!\n");
+		break;
+
+	case Node::Type::INPUT:
+		retFalseOnFalse(InputCode(node, file),
+				"Could not generate Input Code!\n");
 		break;
 
 	case Node::Type::VECTOR:
@@ -2735,6 +2852,12 @@ bool CodeGenerator::FetchVariables()
 			}
 
 			auto vector = (const Algebra::Module::VectorSpace::Vector*) nodePair.second.object;
+			auto vecProperties = vector->Properties();
+
+			if(vecProperties->end() != vecProperties->find(vector->Property::ExternalInput))
+			{
+				properties = (Variable::properties_t) (properties | Variable::PROPERTY_POINTER | Variable::PROPERTY_CONST);
+			}
 
 			value = vector->__value_;
 			length = vector->__space_->GetDim();
@@ -2766,18 +2889,13 @@ bool CodeGenerator::FetchVariables()
 		break;
 
 		case Node::ObjectType::NONE: // no break intended
-		case Node::ObjectType::INTERFACE_OUTPUT: // no break intended
+		case Node::ObjectType::INTERFACE_OUTPUT:
+		case Node::ObjectType::INTERFACE_INPUT:
 			// No variable to create.
 			continue;
 
 		default:
 			Error("Unknown ObjectType!\n");
-			return false;
-		}
-
-		if(variables_.end() != variables_.find(nodePair.second.id))
-		{
-			Error("Variable already exists!\n");
 			return false;
 		}
 
@@ -2787,35 +2905,45 @@ bool CodeGenerator::FetchVariables()
 					properties & ~Variable::PROPERTY_CONST);
 		}
 
-		variables_.insert(
+		auto insertRet = variables_.insert(
 				std::make_pair(
 						nodePair.second.id,
 						Variable(&identifier, properties, type, length, value)));
+
+		if(!insertRet.second)
+		{
+			Error("Variable already exists!\n");
+			return false;
+		}
 	}
 
-	// Identify Outputs and mark output variables as such
+	// Identify interfaces and mark their variables as such
 	for(const auto &nodePair: *nodes)
 	{
-		if(Node::Type::OUTPUT != nodePair.second.type)
+		switch(nodePair.second.type)
 		{
-			continue;
-		}
-
-		// Find all variables of the output's parents, i.e. the nodes that
-		// shall be output
-		for(const auto &potparnodePair: *nodes)
-		{
-			for(const Node::Id_t &parentNodeId: potparnodePair.second.parents)
+		case Node::Type::OUTPUT: // no break intended
+			// Find all variables of the output's parents, i.e. the nodes that
+			// shall be output
+			for(const auto &potparnodePair: *nodes)
 			{
-				if(parentNodeId != potparnodePair.second.id)
+				for(const Node::Id_t &parentNodeId: potparnodePair.second.parents)
 				{
-					continue;
-				}
+					if(parentNodeId != potparnodePair.second.id)
+					{
+						continue;
+					}
 
-				getVarRetFalseOnError(var, parentNodeId);
-				var->AddProperty(Variable::PROPERTY_GLOBAL);
-				var->AddProperty(Variable::PROPERTY_STATIC);
+					getVarRetFalseOnError(var, parentNodeId);
+					var->AddProperty(Variable::PROPERTY_GLOBAL);
+					var->AddProperty(Variable::PROPERTY_STATIC);
+				}
 			}
+			break;
+
+		default:
+			// do nothing
+			break;
 		}
 	}
 
@@ -2831,57 +2959,116 @@ bool CodeGenerator::FetchVariables()
 	return true;
 }
 
-bool CodeGenerator::GenerateOutputFunctions()
+bool CodeGenerator::GenerateInterfaceFunctions()
 {
 	std::string fctDefinitions;
+
+	std::set<const void *> inputCreated;
 
 	auto nodes = graph_->GetNodes();
 	for(const auto &nodePair: *nodes)
 	{
-		if(Node::Type::OUTPUT != nodePair.second.type)
+		switch(nodePair.second.type)
 		{
-			continue;
+		case Node::Type::OUTPUT:
+		{
+			auto * output = (const Interface::Output* ) nodePair.second.object;
+
+			// Get Variable attached to node
+			getVarRetFalseOnError(var, nodePair.second.parents[0]);
+
+			std::string callbackTypedef;
+			callbackTypedef += "typedef void (*";
+			callbackTypedef += *output->GetCallbackName();
+			callbackTypedef += "_t)(";
+			callbackTypedef += "const ";
+			callbackTypedef += var->GetTypeString();
+			callbackTypedef += "* pt, size_t size);";
+
+			// Export function prototype
+			fileDacH_.PrintfLine("%s", callbackTypedef.c_str());
+			fileDacH_.PrintfLine("extern void %s_Register(%s_t callback);",
+					output->GetCallbackName()->c_str(),
+					output->GetCallbackName()->c_str());
+
+			// Declare Static Variables keeping the callback pointers
+			fileDacC_.PrintfLine("%s_t %s = NULL;",
+					output->GetCallbackName()->c_str(),
+					output->GetCallbackName()->c_str());
+
+			fileInstructions_.PrintfLine("extern %s_t %s;",
+					output->GetCallbackName()->c_str(),
+					output->GetCallbackName()->c_str());
+
+			// Define Function
+			char tmpBuff[200];
+			SNPRINTF(tmpBuff, sizeof(tmpBuff), "void %s_Register(%s_t callback)\n{\n",
+					output->GetCallbackName()->c_str(),
+					output->GetCallbackName()->c_str());
+
+			fctDefinitions += tmpBuff;
+
+			SNPRINTF(tmpBuff, sizeof(tmpBuff), "\t %s = callback;\n", output->GetCallbackName()->c_str());
+			fctDefinitions += tmpBuff;
+			fctDefinitions += "}\n\n";
 		}
+		break;
 
-		auto * output = (const Interface::Output* ) nodePair.second.object;
+		case Node::Type::INPUT:
+		{
+			auto insert = inputCreated.insert(nodePair.second.object);
+			if(!insert.second)
+			{
+				// Input was created already
+				continue;
+			}
 
-		// Get Variable attached to node
-		getVarRetFalseOnError(var, nodePair.second.parents[0]);
+			auto * input = (const Interface::Input* ) nodePair.second.object;
 
-		std::string callbackTypedef;
-		callbackTypedef += "typedef void (*";
-		callbackTypedef += *output->GetCallbackName();
-		callbackTypedef += "_t)(";
-		callbackTypedef += "const ";
-		callbackTypedef += var->GetTypeString();
-		callbackTypedef += "* pt, size_t size);";
+			// Get Variable attached to node
+			Node::Id_t childNodeId = *(nodePair.second.children.begin());
+			getVarRetFalseOnError(var, childNodeId);
 
-		// Export function prototype
-		fileDacH_.PrintfLine("%s", callbackTypedef.c_str());
-		fileDacH_.PrintfLine("extern void %s_Register(%s_t callback);",
-				output->GetCallbackName()->c_str(),
-				output->GetCallbackName()->c_str());
+			std::string callbackTypedef;
+			callbackTypedef += "typedef const ";
+			callbackTypedef += var->GetTypeString();
+			callbackTypedef += " * (*";
+			callbackTypedef += *input->GetCallbackName();
+			callbackTypedef += "_t)(size_t identifier, size_t size);";
 
-		// Declare Static Variables keeping the callback pointers
-		fileDacC_.PrintfLine("%s_t %s = NULL;",
-				output->GetCallbackName()->c_str(),
-				output->GetCallbackName()->c_str());
+			// Export function prototype
+			fileDacH_.PrintfLine("%s", callbackTypedef.c_str());
+			fileDacH_.PrintfLine("extern void %s_Register(%s_t callback);",
+					input->GetCallbackName()->c_str(),
+					input->GetCallbackName()->c_str());
 
-		fileInstructions_.PrintfLine("extern %s_t %s;",
-				output->GetCallbackName()->c_str(),
-				output->GetCallbackName()->c_str());
+			// Declare Static Variables keeping the callback pointers
+			fileDacC_.PrintfLine("%s_t %s = NULL;",
+					input->GetCallbackName()->c_str(),
+					input->GetCallbackName()->c_str());
 
-		// Define Function
-		char tmpBuff[200];
-		SNPRINTF(tmpBuff, sizeof(tmpBuff), "void %s_Register(%s_t callback)\n{\n",
-				output->GetCallbackName()->c_str(),
-				output->GetCallbackName()->c_str());
+			fileInstructions_.PrintfLine("extern %s_t %s;",
+					input->GetCallbackName()->c_str(),
+					input->GetCallbackName()->c_str());
 
-		fctDefinitions += tmpBuff;
+			// Define Function
+			char tmpBuff[200];
+			SNPRINTF(tmpBuff, sizeof(tmpBuff), "void %s_Register(%s_t callback)\n{\n",
+					input->GetCallbackName()->c_str(),
+					input->GetCallbackName()->c_str());
 
-		SNPRINTF(tmpBuff, sizeof(tmpBuff), "\t %s = callback;\n", output->GetCallbackName()->c_str());
-		fctDefinitions += tmpBuff;
-		fctDefinitions += "}\n\n";
+			fctDefinitions += tmpBuff;
+
+			SNPRINTF(tmpBuff, sizeof(tmpBuff), "\t %s = callback;\n", input->GetCallbackName()->c_str());
+			fctDefinitions += tmpBuff;
+			fctDefinitions += "}\n\n";
+		}
+		break;
+
+		default:
+			// do nothing
+			break;
+		}
 	}
 
 	fileDacC_.PrintfLine("");
@@ -3044,6 +3231,11 @@ bool Variable::GetDeclaration(std::string* decl) const
 	decl->append(typeStr);
 	decl->append(" ");
 
+	if(properties_ & PROPERTY_POINTER)
+	{
+		decl->append("* ");
+	}
+
 	if(0 == identifier_.length())
 	{
 		Error("Identifier not set!\n");
@@ -3052,19 +3244,22 @@ bool Variable::GetDeclaration(std::string* decl) const
 
 	decl->append(identifier_);
 
-	if(1 < length_) // this is an array
+	if(!(properties_ & PROPERTY_POINTER))
 	{
-		char tmpBuff[40];
-		SNPRINTF(tmpBuff, sizeof(tmpBuff), "[%lu]", length_);
-		decl->append(tmpBuff);
+		if(1 < length_) // this is an array
+		{
+			char tmpBuff[40];
+			SNPRINTF(tmpBuff, sizeof(tmpBuff), "[%lu]", length_);
+			decl->append(tmpBuff);
+		}
 	}
 
 	// Any initializer supplied?
-	if(properties_ & PROPERTY_CONST)
+	if((properties_ & PROPERTY_CONST) && (0 ==(properties_ & PROPERTY_POINTER)))
 	{
 		if(nullptr == value_)
 		{
-			Error("Const variable requires initializer!");
+			Error("Const variable requires initializer!\n");
 			return false;
 		}
 	}

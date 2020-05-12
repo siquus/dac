@@ -48,6 +48,7 @@ public:
 		VECTOR_CROSS_CORRELATION,
 		VECTOR_MAX_POOL,
 		OUTPUT,
+		INPUT,
 		CONTROL_TRANSFER_WHILE,
 	};
 
@@ -94,7 +95,8 @@ public:
 	enum class ObjectType {
 		NONE,
 		MODULE_VECTORSPACE_VECTOR,
-		INTERFACE_OUTPUT
+		INTERFACE_OUTPUT,
+		INTERFACE_INPUT,
 	};
 
 	typedef uint32_t Id_t;
@@ -149,6 +151,9 @@ private:
 class NodeRef {
 public:
 	bool StoreIn(const NodeRef* nodeRef) const;
+
+	void SetType(Node::Type type, const void * param = nullptr);
+	void PushParent(Node::Id_t parent);
 
 	Node::Id_t nodeId_ = Node::ID_NONE;
 	Graph* graph_ = nullptr;

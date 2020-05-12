@@ -25,6 +25,7 @@
 
 #include "Module.h"
 #include "ControlTransfer.h"
+#include "Interface.h"
 
 class Hash {
 	// TODO: The following hash function was the first one to be found online.
@@ -76,17 +77,6 @@ Node::Id_t Graph::AddNode(Node * node)
 	nodes_.insert(std::pair<Node::Id_t, Node>{node->id, *node});
 
 	nextNodeId_++;
-
-	// Let parents know of its existence
-	for(Node::Id_t &parent: node->parents)
-	{
-		bool success = AddChild(parent, node->id);
-		if(!success)
-		{
-			Error("Could not AddChild to Parents\n");
-			return Node::ID_NONE;
-		}
-	}
 
 	return node->id ;
 }
@@ -221,6 +211,9 @@ const char* Node::getName(Type type)
 	case Type::OUTPUT:
 		return "OUTPUT";
 
+	case Type::INPUT:
+		return "INPUT";
+
 	case Type::CONTROL_TRANSFER_WHILE:
 		return "CONTROL_TRANSFER_WHILE";
 
@@ -296,9 +289,21 @@ bool Node::sameObject(const Node &lNode, const Node &rNode)
 		break;
 
 	case ObjectType::INTERFACE_OUTPUT:
-		// TODO: currently, outputs objects only contain the output name
+		// TODO: currently, interface objects only contain the name
 		// so technically they are the same with different names.
 		// with this code we are simply replacing one of them, which might be unexpected.
+		break;
+
+	case ObjectType::INTERFACE_INPUT:
+	{
+		auto lIn = (const Interface::Input *) lNode.object;
+		auto rIn = (const Interface::Input *) rNode.object;
+
+		if(!lIn->AreEqual(lIn, rIn))
+		{
+			return false;
+		}
+	}
 		break;
 	}
 
@@ -333,6 +338,7 @@ bool Node::sameTypeParameters(const Node &lNode, const Node &rNode)
 	case Type::VECTOR_POWER: // no break intended
 	case Type::VECTOR_COMPARISON_IS_SMALLER: // no break intended
 	case Type::OUTPUT: // no break intended
+	case Type::INPUT: // no break intended
 	case Type::VECTOR_CROSS_CORRELATION: // no break intended
 	case Type::CONTROL_TRANSFER_WHILE:
 		Error("Error comparing node types!\n");
@@ -673,4 +679,41 @@ bool NodeRef::StoreIn(const NodeRef* nodeRef) const
 	storageNode->usedAsStorageBy_.insert(nodeId_);
 
 	return true;
+}
+
+void NodeRef::SetType(Node::Type type, const void * param)
+{
+	Node * thisNode = graph_->GetNodeModifyable(nodeId_);
+
+	if(nullptr == thisNode)
+	{
+		Error("Could not get Node!\n");
+		return;
+	}
+
+	thisNode->type = type;
+	thisNode->typeParameters = param;
+
+	// TODO: Check that param != nullptr when it is needed!
+
+	switch(type)
+	{
+	case Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT:
+		thisNode->noStorage_ = true;
+		break;
+
+	default:
+		// nothing;
+		break;
+	}
+}
+
+void NodeRef::PushParent(Node::Id_t parent)
+{
+	bool success = graph_->AddParent(parent, nodeId_);
+
+	if(!success)
+	{
+		Error("Could not push parent!\n");
+	}
 }

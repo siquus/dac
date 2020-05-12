@@ -28,7 +28,20 @@
 
 #include "ModuleCNN.h"
 
+static const float input21[] = {0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0};
+static const float input42[] = {0.0, 2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0};
+
 static ModuleCNN * ModuleCNNPt = nullptr;
+
+static const float * vectorInput(size_t identifier, size_t size)
+{
+	if(NULL == ModuleCNNPt)
+	{
+		fatal("Nullpointer!");
+	}
+
+	return ModuleCNNPt->VectorInput(identifier, size);
+}
 
 static void cc(const float * data, size_t size)
 {
@@ -58,6 +71,56 @@ static void vectorSplit(const float * data, size_t size)
 	}
 
 	ModuleCNNPt->VectorSplit(data, size);
+}
+
+static void vector21(const float * data, size_t size)
+{
+	if(NULL == ModuleCNNPt)
+	{
+		fatal("Nullpointer!");
+	}
+
+	ModuleCNNPt->Vector21(data, size);
+}
+
+static void vector42(const float * data, size_t size)
+{
+	if(NULL == ModuleCNNPt)
+	{
+		fatal("Nullpointer!");
+	}
+
+	ModuleCNNPt->Vector42(data, size);
+}
+
+void ModuleCNN::Vector21(const float * data, size_t size)
+{
+	if(sizeof(input21) != size)
+		{
+			Error("Size Mismatch! %lu vs %lu\n", sizeof(input21), size);
+		}
+		else if(memcmp(data, input21, sizeof(input21)))
+		{
+			Error("Unexpected result!\n");
+			PrintMatrix(stderr, data, size, 9);
+		}
+
+		called_[CALLED_Vector21] = true;
+}
+
+void ModuleCNN::Vector42(const float * data, size_t size)
+{
+	if(sizeof(input42) != size)
+		{
+			Error("Size Mismatch! %lu vs %lu\n", sizeof(input42), size);
+		}
+		else if(memcmp(data, input42, sizeof(input42)))
+		{
+			Error("Unexpected result!\n");
+			PrintMatrix(stderr, data, size, 9);
+		}
+
+		called_[CALLED_Vector42] = true;
 }
 
 void ModuleCNN::VectorSplit(const float * data, size_t size)
@@ -101,6 +164,40 @@ void ModuleCNN::CCMaxPool(const float * data, size_t size)
 	called_[CALLED_CCMaxPool] = true;
 }
 
+const float * ModuleCNN::VectorInput(size_t identifier, size_t size)
+{
+	switch(identifier)
+	{
+	case 21:
+		if(sizeof(input21) != size)
+		{
+			Error("Unexpected size!\n");
+		}
+		else
+		{
+			return input21;
+		}
+		break;
+
+	case 42:
+		if(sizeof(input42) != size)
+		{
+			Error("Unexpected size!\n");
+		}
+		else
+		{
+			return input42;
+		}
+		break;
+
+	default:
+		Error("Unexpected identifier %lu!\n", identifier);
+		break;
+	}
+
+	return nullptr; // should not be reached
+}
+
 void ModuleCNN::CC(const float * data, size_t size)
 {
 	const float expected[8 * 8] = {
@@ -132,6 +229,10 @@ ModuleCNN::ModuleCNN() {
 	DacModuleCNNOutputCallbackcc_Register(&cc);
 	DacModuleCNNOutputCallbackccMaxPool_Register(&ccMaxPool);
 	DacModuleCNNOutputCallbackvectorSplit_Register(&vectorSplit);
+	DacModuleCNNOutputCallbackvector21_Register(&vector21);
+	DacModuleCNNOutputCallbackvector42_Register(&vector42);
+
+	DacModuleCNNInputCallbackvector_Register(&vectorInput);
 }
 
 void ModuleCNN::Execute(size_t threadsNrOf)

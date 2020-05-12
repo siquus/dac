@@ -66,16 +66,6 @@ bool While::Set(
 	}
 
 	Node node;
-	node.parents.push_back(condition->nodeId_);
-
-	for(const NodeRef * nodeRef: parents)
-	{
-		if(nodeRef != condition) // Make sure condition is not added twice
-		{
-			node.parents.push_back(nodeRef->nodeId_);
-		}
-	}
-
 	node.type = Node::Type::CONTROL_TRANSFER_WHILE;
 
 	if(nullptr != falseNode)
@@ -88,12 +78,22 @@ bool While::Set(
 		node.branchTrue = trueNode->nodeId_;
 	}
 
-	Node::Id_t nodeId = graph_->AddNode(&node);
+	nodeId_ = graph_->AddNode(&node);
 
-	if(Node::ID_NONE == nodeId)
+	if(Node::ID_NONE == nodeId_)
 	{
 		Error("Could not add Node!\n");
 		return false;
+	}
+
+	PushParent(condition->nodeId_);
+
+	for(const NodeRef * nodeRef: parents)
+	{
+		if(nodeRef != condition) // Make sure condition is not added twice
+		{
+			PushParent(nodeRef->nodeId_);
+		}
 	}
 
 	return true;

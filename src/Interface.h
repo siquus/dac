@@ -45,5 +45,24 @@ public:
 	const std::string * GetCallbackName() const;
 };
 
+class Input {
+	std::string name_;
+	std::string callbackName_;
+	Graph * graph_;
+	Algebra::Ring::type_t Ring_;
+
+	std::map<Node::Id_t, size_t> inputs_; // map key is the input node
+
+public:
+	Input(Graph* graph, const char * name, Algebra::Ring::type_t ring);
+	const Algebra::Module::VectorSpace::Vector * Get(const Algebra::Module::VectorSpace * vspace, size_t identifier);
+
+	const std::string * GetName() const;
+	const std::string * GetCallbackName() const;
+	size_t GetIdentifier(const Node::Id_t &NodeId) const;
+
+	static bool AreEqual(const Input * lIn, const Input * rIn);
+};
+
 }
 #endif /* SRC_INTERFACE_H_ */

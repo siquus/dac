@@ -32,7 +32,6 @@
 #include "Graph.h"
 #include "Ring.h"
 
-
 namespace Algebra {
 namespace Module {
 
@@ -121,14 +120,26 @@ public:
 			std::pair<uint32_t, uint32_t> Pairs; // declaring which two indices have this property. If size == 0, then all.
 		} propertyParameterDiagonal_t;
 
+		typedef struct {
+			Node::Id_t InputNode;
+		} propertyExternalInput_t;
+
 		enum class Property {
 			Diagonal, // propertyParameterDiagonal_t
 			Symmetric, // propertyParameterSymmetric_t
 			Antisymmetric, // propertyParameterSymmetric_t
 			Sparse, // propertyParameterSparse_t
+			ExternalInput, // propertyExternalInput_t
 		};
 
+		Vector(Graph* graph, const VectorSpace * vSpace);
+		Vector(Graph* graph, const VectorSpace * vSpace, const std::map<Property, const void *> &properties);
+		Vector(Graph* graph, const VectorSpace * vSpace, const void * value, const std::map<Property, const void *> &properties = std::map<Property, const void *>{});
+
+		const std::map<Property, const void *> * Properties() const;
+
 	private:
+		bool Init(Graph* graph, const VectorSpace * vSpace, const void * value, const std::map<Property, const void *> &properties = std::map<Property, const void *>{});
 		static bool AreCompatible(const Vector* vec1, const Vector* vec2);
 
 		typedef struct depNode_s {
@@ -146,7 +157,11 @@ public:
 		static const Vector* PowerDerivative(const Vector* vecValuedFct, const Vector* arg);
 		static const Vector* ProjectDerivative(const Vector* vecValuedFct, const Vector* arg);
 		static const Vector* CrossCorrelationDerivative(const Vector* vecValuedFct, const Vector* arg);
+
+		std::map<Property, const void *> Properties_;
 	};
+
+	const Vector * Element(Graph* graph, const std::map<Vector::Property, const void *> &properties) const;
 
 	template<typename T>
 	const Vector * Element(Graph* graph, const std::vector<T> &initializer) const; // initializer Pointer is taken
@@ -162,8 +177,7 @@ public:
 	const Vector * Element(
 			Graph* graph,
 			const std::vector<T> &initializer,
-			const std::vector<Vector::Property> &properties,
-			const std::vector<const void *> &propertiesParameter) const;  // initializer Pointer is taken
+			const std::map<Vector::Property, const void *> &properties) const;  // initializer Pointer is taken
 
 	const Vector * Element(Graph* graph, const std::vector<uint32_t> &DeltaPairs, float Scaling = 1.f) const;
 
@@ -184,8 +198,7 @@ public:
 	const Vector * Homomorphism(
 			Graph* graph,
 			const std::vector<T> &initializer,
-			const std::vector<Vector::Property> &properties,
-			const std::vector<const void *> &propertiesParameter) const;  // initializer Pointer is taken
+			const std::map<Vector::Property, const void *> &properties) const;  // initializer Pointer is taken
 };
 }
 }

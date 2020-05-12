@@ -99,3 +99,104 @@ const std::string * Output::GetCallbackName() const
 {
 	return &callbackName_;
 }
+
+const std::string * Input::GetName() const
+{
+	return &name_;
+}
+
+Input::Input(Graph * graph, const char * name, Algebra::Ring::type_t ring)
+{
+	if((nullptr == graph) || (nullptr == name))
+	{
+		Error("nullptr\n");
+		return;
+	}
+
+	graph_ = graph;
+	Ring_ = ring;
+
+	name_ = name;
+	callbackName_ = "Dac" + graph->Name() + "InputCallback" + name_;
+}
+
+const std::string * Input::GetCallbackName() const
+{
+	return &callbackName_;
+}
+
+bool Input::AreEqual(const Input * lIn, const Input * rIn)
+{
+	const std::string * lName = lIn->GetCallbackName();
+	const std::string * rName = rIn->GetCallbackName();
+
+	if(lName->size() != rName->size())
+	{
+		return false;
+	}
+
+	if(!std::equal(lName->begin(), lName->end(), rName->begin()))
+	{
+		return false;
+	}
+
+	if(lIn->inputs_.size() != rIn->inputs_.size())
+	{
+		return false;
+	}
+
+	if(!std::equal(lIn->inputs_.begin(), lIn->inputs_.end(), rIn->inputs_.begin()))
+	{
+		return false;
+	}
+
+	return true;
+}
+
+size_t Input::GetIdentifier(const Node::Id_t &NodeId) const
+{
+	auto identifier = inputs_.find(NodeId);
+	if(inputs_.end() == identifier)
+	{
+		Error("Could not find NodeId!\n");
+		return SIZE_MAX;
+	}
+
+	return identifier->second;
+}
+
+const Algebra::Module::VectorSpace::Vector * Input::Get(const Algebra::Module::VectorSpace * vspace, size_t identifier)
+{
+	if(Ring_ != vspace->GetRing())
+	{
+		Error("Input may only return vectors over %s!\n", Algebra::Ring::GetTypeString(Ring_));
+		return nullptr;
+	}
+
+	Node node;
+	node.type = Node::Type::INPUT;
+	node.objectType = Node::ObjectType::INTERFACE_INPUT;
+	node.object = this;
+
+	Node::Id_t inNodeId = graph_->AddNode(&node);
+	if(Node::ID_NONE == inNodeId)
+	{
+		Error("Could not add node!\n");
+		return nullptr;
+	}
+
+	inputs_.insert({inNodeId, identifier});
+
+	Algebra::Module::VectorSpace::Vector::propertyExternalInput_t extInput = {.InputNode = inNodeId};
+
+	auto vector = vspace->Element(graph_,
+			std::map<Algebra::Module::VectorSpace::Vector::Property, const void *>{
+		{Algebra::Module::VectorSpace::Vector::Property::ExternalInput, &extInput}});
+
+	if(nullptr == vector)
+	{
+		Error("Could not create vector!\n");
+	}
+
+	return vector;
+}
