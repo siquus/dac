@@ -94,23 +94,23 @@ static void printVector(const std::vector<uint32_t> &vec)
 
 VectorSpace::VectorSpace(Ring::type_t ring, dimension_t dim)
 {
-	factors_.push_back(simpleVs_t{ring, dim});
+	Factors_.push_back(simpleVs_t{ring, dim});
 }
 
 VectorSpace::VectorSpace(Ring::type_t ring, const std::vector<dimension_t> &dimensions)
 {
 	for(size_t dim = 0; dim < dimensions.size(); dim++)
 	{
-		factors_.push_back(simpleVs_t{ring, dimensions[dim]});
+		Factors_.push_back(simpleVs_t{ring, dimensions[dim]});
 	}
 }
 
 dimension_t VectorSpace::GetDim() const
 {
 	dimension_t retDim = 1;
-	for(const simpleVs_t &factor: factors_)
+	for(const simpleVs_t &factor: Factors_)
 	{
-		retDim *= factor.dim_;
+		retDim *= factor.Dim;
 	}
 
 	return retDim;
@@ -119,9 +119,9 @@ dimension_t VectorSpace::GetDim() const
 Ring::type_t VectorSpace::GetRing() const
 {
 	Ring::type_t retRing = Ring::None;
-	for(const simpleVs_t &factor: factors_)
+	for(const simpleVs_t &factor: Factors_)
 	{
-		retRing = Ring::GetSuperiorRing(retRing, factor.ring_);
+		retRing = Ring::GetSuperiorRing(retRing, factor.Ring);
 	}
 
 	return retRing;
@@ -129,13 +129,13 @@ Ring::type_t VectorSpace::GetRing() const
 
 void VectorSpace::GetStrides(std::vector<uint32_t> * strides) const
 {
-	strides->resize(factors_.size());
-	for(size_t fac = 0; fac < factors_.size(); fac++)
+	strides->resize(Factors_.size());
+	for(size_t fac = 0; fac < Factors_.size(); fac++)
 	{
 		uint32_t stride = 1;
-		for(size_t prodFac = fac + 1; prodFac < factors_.size(); prodFac++)
+		for(size_t prodFac = fac + 1; prodFac < Factors_.size(); prodFac++)
 		{
-			stride *= factors_[prodFac].dim_;
+			stride *= Factors_[prodFac].Dim;
 		}
 
 		strides->at(fac) = stride;
@@ -156,7 +156,7 @@ const VectorSpace::Vector * VectorSpace::Homomorphism(
 	}
 
 	// Handle properties, where no indices need to be specified
-	if((Vector::Property::Diagonal == property) && (1 == factors_.size()))
+	if((Vector::Property::Diagonal == property) && (1 == Factors_.size()))
 	{
 		return Homomorphism(
 				graph,
@@ -185,7 +185,7 @@ const VectorSpace::Vector * VectorSpace::Homomorphism(
 	// TODO: Implement properties. For now this is just an interface to test usability in application
 	if((properties.size() != 1) ||
 			(properties.end() == properties.find(Vector::Property::Diagonal)) ||
-			(factors_.size() != 1))
+			(Factors_.size() != 1))
 	{
 		Error("Property not implemented yet!\n");
 		return nullptr;
@@ -361,10 +361,10 @@ const VectorSpace::Vector * VectorSpace::Element(Graph* graph, const std::vector
 		return nullptr;
 	}
 
-	if(DeltaPairs.size() != factors_.size())
+	if(DeltaPairs.size() != Factors_.size())
 	{
 		Error("Initializer dimensions do not match (%lu vs %lu)!\n",
-				DeltaPairs.size(), factors_.size());
+				DeltaPairs.size(), Factors_.size());
 		return nullptr;
 	}
 
@@ -413,14 +413,14 @@ const VectorSpace::Vector * VectorSpace::Element(Graph* graph, const std::map<Ve
 
 bool VectorSpace::AreEqual(const VectorSpace * lVs, const VectorSpace * rVs)
 {
-	if(lVs->factors_.size() != rVs->factors_.size())
+	if(lVs->Factors_.size() != rVs->Factors_.size())
 	{
 		return false;
 	}
 
-	for(size_t factor = 0; factor < lVs->factors_.size(); factor++)
+	for(size_t factor = 0; factor < lVs->Factors_.size(); factor++)
 	{
-		if(memcmp(&lVs->factors_[factor], &rVs->factors_[factor], sizeof(lVs->factors_[factor])))
+		if(memcmp(&lVs->Factors_[factor], &rVs->Factors_[factor], sizeof(lVs->Factors_[factor])))
 		{
 			return false;
 		}
@@ -448,9 +448,9 @@ bool VectorSpace::Vector::SameValue(const Vector * lVec, const Vector * rVec)
 	}
 
 	size_t cmpSize = 0;
-	for(const auto &factor: lVec->Space_->factors_)
+	for(const auto &factor: lVec->Space_->Factors_)
 	{
-		cmpSize += factor.dim_ * Ring::GetElementSize(factor.ring_);
+		cmpSize += factor.Dim * Ring::GetElementSize(factor.Ring);
 	}
 
 	if(memcmp(lVec->Value_, rVec->Value_, cmpSize))
@@ -473,9 +473,9 @@ void VectorSpace::Vector::PrintInfo() const {
 			nodeId_,
 			thisNode->getName()	);
 
-	for(size_t factor = 0; factor < Space_->factors_.size(); factor++)
+	for(size_t factor = 0; factor < Space_->Factors_.size(); factor++)
 	{
-		printf("%u ", Space_->factors_[factor].dim_);
+		printf("%u ", Space_->Factors_[factor].Dim);
 	}
 	printf(")");
 
@@ -569,7 +569,7 @@ const VectorSpace::Vector* VectorSpace::Vector::Power(const Vector* vec, const s
 
 	// The contraction needs to return the same tensor again, otherwise the contraction can't be repeated!
 	// I.e. 1/2 * (nr of factors) == (nr of contractions)
-	if(Space_->factors_.size() != 2 * lfactors.size())
+	if(Space_->Factors_.size() != 2 * lfactors.size())
 	{
 		Error("Can only take the power, if half of the indices are contracted!\n");
 		return nullptr;
@@ -578,18 +578,18 @@ const VectorSpace::Vector* VectorSpace::Vector::Power(const Vector* vec, const s
 	// Check if indices are inside allowed range
 	for(size_t index = 0; index < lfactors.size(); index++)
 	{
-		if((Space_->factors_.size() <= lfactors[index]) || (Space_->factors_.size() <= rfactors[index]))
+		if((Space_->Factors_.size() <= lfactors[index]) || (Space_->Factors_.size() <= rfactors[index]))
 		{
 			Error("At least one given contraction factor is larger than number of factors!\n");
 			return nullptr;
 		}
 
-		if(Space_->factors_[lfactors[index]].dim_ != Space_->factors_[rfactors[index]].dim_)
+		if(Space_->Factors_[lfactors[index]].Dim != Space_->Factors_[rfactors[index]].Dim)
 		{
 			Error("At least one contraction index-pair has different dimension! Factor %u with %u, |lFactor| = %u, |rFactor| = %u\n",
 					lfactors[index], rfactors[index],
-					Space_->factors_[lfactors[index]].dim_,
-					vec->Space_->factors_[rfactors[index]].dim_);
+					Space_->Factors_[lfactors[index]].Dim,
+					vec->Space_->Factors_[rfactors[index]].Dim);
 
 			return nullptr;
 		}
@@ -765,7 +765,7 @@ const VectorSpace::Vector* VectorSpace::Vector::JoinIndices(std::vector<std::vec
 	{
 		for(const uint32_t &index: joinedIndices)
 		{
-			if(Space_->factors_.size() <= index)
+			if(Space_->Factors_.size() <= index)
 			{
 				Error("Supplied index is larger than available factors!\n");
 				return nullptr;
@@ -784,10 +784,10 @@ const VectorSpace::Vector* VectorSpace::Vector::JoinIndices(std::vector<std::vec
 	// Check that all joined indices have same dimension
 	for(const auto &joinedIndices: indices)
 	{
-		const uint32_t indexDim = Space_->factors_[joinedIndices[0]].dim_;
+		const uint32_t indexDim = Space_->Factors_[joinedIndices[0]].Dim;
 		for(const uint32_t &index: joinedIndices)
 		{
-			if(indexDim != Space_->factors_[index].dim_)
+			if(indexDim != Space_->Factors_[index].Dim)
 			{
 				Error("Not all specified indices have same dimension!\n");
 				return nullptr;
@@ -802,7 +802,7 @@ const VectorSpace::Vector* VectorSpace::Vector::JoinIndices(std::vector<std::vec
 	}
 
 	std::vector<simpleVs_t> vsFactors;
-	for(size_t factor = 0; factor < Space_->factors_.size(); factor++)
+	for(size_t factor = 0; factor < Space_->Factors_.size(); factor++)
 	{
 		// Check if the factor is joined
 		bool addFactor = true;
@@ -823,7 +823,7 @@ const VectorSpace::Vector* VectorSpace::Vector::JoinIndices(std::vector<std::vec
 
 		if(addFactor)
 		{
-			vsFactors.push_back(Space_->factors_[factor]);
+			vsFactors.push_back(Space_->Factors_[factor]);
 		}
 	}
 
@@ -864,36 +864,36 @@ const VectorSpace::Vector* VectorSpace::Vector::IsSmaller(const Vector* vec) con
 
 const VectorSpace::Vector * VectorSpace::Vector::MaxPool(const std::vector<uint32_t> &poolSize) const
 {
-	if(poolSize.size() != Space_->factors_.size())
+	if(poolSize.size() != Space_->Factors_.size())
 	{
 		Error("Number of pool dimensions does not match number of argument factors!\n");
 		return nullptr;
 	}
 
-	for(size_t factor = 0; factor < Space_->factors_.size(); factor++)
+	for(size_t factor = 0; factor < Space_->Factors_.size(); factor++)
 	{
-		if(poolSize[factor] > Space_->factors_[factor].dim_)
+		if(poolSize[factor] > Space_->Factors_[factor].Dim)
 		{
 			Error("Pool dimension is larger than dimension of vector!\n");
 			return nullptr;
 		}
 
-		if(Space_->factors_[factor].dim_ % poolSize[factor])
+		if(Space_->Factors_[factor].Dim % poolSize[factor])
 		{
 			Error("Pool factor %lu does not divide factor %lu: %u vs. %u!\n",
 					factor, factor,
 					poolSize[factor],
-					Space_->factors_[factor].dim_);
+					Space_->Factors_[factor].Dim);
 			return nullptr;
 		}
 	}
 
-	VectorSpace * retSpace = new VectorSpace(Space_->factors_);
+	VectorSpace * retSpace = new VectorSpace(Space_->Factors_);
 
 	// Pooling reduces the dimensions
-	for(size_t factor = 0; factor < retSpace->factors_.size(); factor++)
+	for(size_t factor = 0; factor < retSpace->Factors_.size(); factor++)
 	{
-		retSpace->factors_[factor].dim_ /= poolSize[factor];
+		retSpace->Factors_[factor].Dim /= poolSize[factor];
 	}
 
 	auto param = new Node::PoolParameters_t;
@@ -914,24 +914,24 @@ const VectorSpace::Vector * VectorSpace::Vector::CrossCorrelate(const Vector* Ke
 		return nullptr;
 	}
 
-	if(Space_->factors_.size() != Kernel->Space_->factors_.size())
+	if(Space_->Factors_.size() != Kernel->Space_->Factors_.size())
 	{
 		Error("Different number of factors!\n");
 		return nullptr;
 	}
 
-	for(size_t factor = 0; factor < Space_->factors_.size(); factor++)
+	for(size_t factor = 0; factor < Space_->Factors_.size(); factor++)
 	{
-		if(Space_->factors_[factor].dim_ < Kernel->Space_->factors_[factor].dim_)
+		if(Space_->Factors_[factor].Dim < Kernel->Space_->Factors_[factor].Dim)
 		{
 			Error("Can't cross-correlate w.r.t. kernel-factor of smaller dimension than input!\n");
 			return nullptr;
 		}
 	}
 
-	for(const simpleVs_t &simpleVs: Kernel->Space_->factors_)
+	for(const simpleVs_t &simpleVs: Kernel->Space_->Factors_)
 	{
-		if(2 > simpleVs.dim_)
+		if(2 > simpleVs.Dim)
 		{
 			Error("Can't cross-correlate w.r.t. kernel-factor of dimension less than 2!\n");
 			return nullptr;
@@ -944,10 +944,10 @@ const VectorSpace::Vector * VectorSpace::Vector::CrossCorrelate(const Vector* Ke
 	// - "Deep Learning", Goodfellow et al.
 	// This means if the Input (kernel) has dimension I (K), then the Output has dimension
 	// O = I - (K - 1)
-	VectorSpace * retSpace = new VectorSpace(Space_->factors_);
-	for(size_t factor = 0; factor < retSpace->factors_.size(); factor++)
+	VectorSpace * retSpace = new VectorSpace(Space_->Factors_);
+	for(size_t factor = 0; factor < retSpace->Factors_.size(); factor++)
 	{
-		retSpace->factors_[factor].dim_ -= Kernel->Space_->factors_[factor].dim_ - 1;
+		retSpace->Factors_[factor].Dim -= Kernel->Space_->Factors_[factor].Dim - 1;
 	}
 
 	Vector* retVec = new Vector(graph_, retSpace);
@@ -971,22 +971,22 @@ bool VectorSpace::Vector::AreCompatible(const Vector* vec1, const Vector* vec2)
 		return false;
 	}
 
-	if(vec1->Space_->factors_.size() != vec2->Space_->factors_.size())
+	if(vec1->Space_->Factors_.size() != vec2->Space_->Factors_.size())
 	{
 		Error("Product Space has different number of factors, %lu vs %lu!\n",
-				vec1->Space_->factors_.size(), vec2->Space_->factors_.size());
+				vec1->Space_->Factors_.size(), vec2->Space_->Factors_.size());
 		return false;
 	}
 
-	for(size_t factor = 0; factor < vec1->Space_->factors_.size(); factor++)
+	for(size_t factor = 0; factor < vec1->Space_->Factors_.size(); factor++)
 	{
-		if(vec1->Space_->factors_[factor].dim_ != vec2->Space_->factors_[factor].dim_)
+		if(vec1->Space_->Factors_[factor].Dim != vec2->Space_->Factors_[factor].Dim)
 		{
 			Error("Factor %lu is of different dimension!\n", factor);
 			return false;
 		}
 
-		if(vec1->Space_->factors_[factor].ring_ != vec2->Space_->factors_[factor].ring_)
+		if(vec1->Space_->Factors_[factor].Ring != vec2->Space_->Factors_[factor].Ring)
 		{
 			Error("Factor %lu has a different ring!\n", factor);
 			return false;
@@ -1168,11 +1168,11 @@ const VectorSpace::Vector* VectorSpace::Vector::CreateDerivative(std::map<Node::
 
 			if(1 != derivativeVec->Space_->GetDim()) // i.e. if a scalar function is derived w.r.t. vector argument
 			{
-				std::vector<uint32_t> lfactors(parentVec->Space_->factors_.size());
+				std::vector<uint32_t> lfactors(parentVec->Space_->Factors_.size());
 				std::iota(lfactors.begin(), lfactors.end(),
-						innerDerivative->Space_->factors_.size() - parentVec->Space_->factors_.size());
+						innerDerivative->Space_->Factors_.size() - parentVec->Space_->Factors_.size());
 
-				std::vector<uint32_t> rfactors(parentVec->Space_->factors_.size());
+				std::vector<uint32_t> rfactors(parentVec->Space_->Factors_.size());
 				std::iota(rfactors.begin(), rfactors.end(), 0);
 
 				printf("Contracting ");
@@ -1287,18 +1287,18 @@ const VectorSpace::Vector* VectorSpace::Vector::Contract(const Vector* vec, cons
 	// Check if indices are inside allowed range
 	for(size_t index = 0; index < lfactors.size(); index++)
 	{
-		if((Space_->factors_.size() <= lfactors[index]) || (vec->Space_->factors_.size() <= rfactors[index]))
+		if((Space_->Factors_.size() <= lfactors[index]) || (vec->Space_->Factors_.size() <= rfactors[index]))
 		{
 			Error("At least one given contraction factor is larger than number of factors!\n");
 			return nullptr;
 		}
 
-		if(Space_->factors_[lfactors[index]].dim_ != vec->Space_->factors_[rfactors[index]].dim_)
+		if(Space_->Factors_[lfactors[index]].Dim != vec->Space_->Factors_[rfactors[index]].Dim)
 		{
 			Error("At least one contraction index-pair has different dimension! Factor %u with %u, |lFactor| = %u, |rFactor| = %u\n",
 					lfactors[index], rfactors[index],
-					Space_->factors_[lfactors[index]].dim_,
-					vec->Space_->factors_[rfactors[index]].dim_);
+					Space_->Factors_[lfactors[index]].Dim,
+					vec->Space_->Factors_[rfactors[index]].Dim);
 
 			return nullptr;
 		}
@@ -1317,7 +1317,7 @@ const VectorSpace::Vector* VectorSpace::Vector::Contract(const Vector* vec, cons
 	std::vector<uint32_t> lfactorsSorted = lfactors;
 	std::sort(lfactorsSorted.begin(), lfactorsSorted.end());
 
-	std::vector<simpleVs_t> lResidualFactors = Space_->factors_;
+	std::vector<simpleVs_t> lResidualFactors = Space_->Factors_;
 	for(int factor = lfactorsSorted.size() - 1; factor >= 0; factor--)
 	{
 		lResidualFactors.erase(lResidualFactors.begin() + lfactorsSorted[factor]);
@@ -1327,7 +1327,7 @@ const VectorSpace::Vector* VectorSpace::Vector::Contract(const Vector* vec, cons
 	std::vector<uint32_t> rfactorsSorted = rfactors;
 	std::sort(rfactorsSorted.begin(), rfactorsSorted.end());
 
-	std::vector<simpleVs_t> rResidualFactors = vec->Space_->factors_;
+	std::vector<simpleVs_t> rResidualFactors = vec->Space_->Factors_;
 	for(int factor = rfactorsSorted.size() - 1; factor >= 0; factor--)
 	{
 		rResidualFactors.erase(rResidualFactors.begin() + rfactorsSorted[factor]);
@@ -1342,8 +1342,8 @@ const VectorSpace::Vector* VectorSpace::Vector::Contract(const Vector* vec, cons
 	{
 		// TODO: Should get superior ring across all factors. Then again: How could they not all be the same?
 		Ring::type_t superiorRing = Ring::GetSuperiorRing(
-				Space_->factors_[0].ring_,
-				vec->Space_->factors_[0].ring_);
+				Space_->Factors_[0].Ring,
+				vec->Space_->Factors_[0].Ring);
 
 		factorsVec.push_back(simpleVs_t{superiorRing, 1});
 	}
@@ -1446,7 +1446,7 @@ const VectorSpace::Vector* VectorSpace::Vector::Contract(const Vector* vec, cons
 			}
 
 
-			opKronParam->Scaling *= Space_->factors_[lfactors[contrFactor]].dim_;
+			opKronParam->Scaling *= Space_->Factors_[lfactors[contrFactor]].Dim;
 		}
 
 		retVec->SetType(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT, opKronParam);
@@ -1476,7 +1476,7 @@ const VectorSpace::Vector* VectorSpace::Vector::Contract(const Vector* vec, uint
 
 const VectorSpace::Vector* VectorSpace::Vector::Project(const std::pair<uint32_t, uint32_t> &range) const
 {
-	if(1 != Space_->factors_.size())
+	if(1 != Space_->Factors_.size())
 	{
 		Error("Specify range for each factor!\n");
 		return nullptr;
@@ -1490,7 +1490,7 @@ const VectorSpace::Vector* VectorSpace::Vector::Project(const std::pair<uint32_t
 
 const VectorSpace::Vector* VectorSpace::Vector::Project(const std::vector<std::pair<uint32_t, uint32_t>> &range) const
 {
-	if(range.size() != Space_->factors_.size())
+	if(range.size() != Space_->Factors_.size())
 	{
 		Error("Specify range for each factor!\n");
 		return nullptr;
@@ -1498,8 +1498,8 @@ const VectorSpace::Vector* VectorSpace::Vector::Project(const std::vector<std::p
 
 	for(size_t factorRange = 0; factorRange < range.size(); factorRange++)
 	{
-		if((Space_->factors_[factorRange].dim_ < range[factorRange].first) ||
-				(Space_->factors_[factorRange].dim_ < range[factorRange].second))
+		if((Space_->Factors_[factorRange].Dim < range[factorRange].first) ||
+				(Space_->Factors_[factorRange].Dim < range[factorRange].second))
 		{
 			Error("Factor range is larger than factor dimension!\n");
 			return nullptr;
@@ -1512,10 +1512,10 @@ const VectorSpace::Vector* VectorSpace::Vector::Project(const std::vector<std::p
 		}
 	}
 
-	std::vector<simpleVs_t> newFactors = Space_->factors_;
+	std::vector<simpleVs_t> newFactors = Space_->Factors_;
 	for(size_t factor = 0; factor < newFactors.size(); factor++)
 	{
-		newFactors[factor].dim_ = range[factor].second - range[factor].first;
+		newFactors[factor].Dim = range[factor].second - range[factor].first;
 	}
 
 	VectorSpace * retSpace = new VectorSpace(newFactors);
@@ -1541,13 +1541,13 @@ const VectorSpace::Vector* VectorSpace::Vector::Permute(const std::vector<uint32
 
 	for(const auto &index: indices)
 	{
-		if(index >= Space_->factors_.size())
+		if(index >= Space_->Factors_.size())
 		{
 			Error("Index is larger than number of factors!\n");
 		}
 	}
 
-	if(indices.size() != Space_->factors_.size())
+	if(indices.size() != Space_->Factors_.size())
 	{
 		Error("Number of permutation indices does not match number of factors!\n");
 	}
@@ -1565,34 +1565,34 @@ const VectorSpace::Vector* VectorSpace::Vector::Permute(const std::vector<uint32
 
 const VectorSpace::Vector * VectorSpace::Vector::IndexSplitSum(const std::vector<uint32_t> &splitPosition) const
 {
-	if(splitPosition.size() != Space_->factors_.size())
+	if(splitPosition.size() != Space_->Factors_.size())
 	{
 		Error("splitPosition dimension does not match number of factors!\n");
 		return nullptr;
 	}
 
-	for(size_t factor = 0; factor < Space_->factors_.size(); factor++)
+	for(size_t factor = 0; factor < Space_->Factors_.size(); factor++)
 	{
-		if(splitPosition[factor] >= Space_->factors_[factor].dim_ - 1)
+		if(splitPosition[factor] >= Space_->Factors_[factor].Dim - 1)
 		{
 			Error("Can't split factor of dimension %u at position %u!\n",
-					Space_->factors_[factor].dim_, splitPosition[factor]);
+					Space_->Factors_[factor].Dim, splitPosition[factor]);
 			return nullptr;
 		}
 	}
 
 	std::vector<simpleVs_t> retSimpleVs;
-	for(size_t factor = 0; factor < Space_->factors_.size(); factor++)
+	for(size_t factor = 0; factor < Space_->Factors_.size(); factor++)
 	{
-		retSimpleVs.push_back(Space_->factors_[factor]);
+		retSimpleVs.push_back(Space_->Factors_[factor]);
 
 		if(splitPosition[factor])
 		{
-			dimension_t originalDim = (retSimpleVs.end() - 1)->dim_;
-			(retSimpleVs.end() - 1)->dim_ = splitPosition[factor];
+			dimension_t originalDim = (retSimpleVs.end() - 1)->Dim;
+			(retSimpleVs.end() - 1)->Dim = splitPosition[factor];
 
-			retSimpleVs.push_back(Space_->factors_[factor]);
-			(retSimpleVs.end() - 1)->dim_ = originalDim - splitPosition[factor] + 1;
+			retSimpleVs.push_back(Space_->Factors_[factor]);
+			(retSimpleVs.end() - 1)->Dim = originalDim - splitPosition[factor] + 1;
 		}
 	}
 
@@ -1635,10 +1635,10 @@ const VectorSpace::Vector* VectorSpace::Vector::CrossCorrelationDerivative(const
 	const Vector * inputVector = (const Vector *) inputNode->object;
 
 	// Derivative_klij = dOut(i,j) / dK(kl) = dI(i + m, j + n)K(m,n) / dK(kl) = I(i + k, j + l)
-	std::vector<uint32_t> splitPos(kernelVector->Space_->factors_.size());
+	std::vector<uint32_t> splitPos(kernelVector->Space_->Factors_.size());
 	for(size_t factor = 0; factor < splitPos.size(); factor++)
 	{
-		splitPos[factor] = kernelVector->Space_->factors_[factor].dim_;
+		splitPos[factor] = kernelVector->Space_->Factors_[factor].Dim;
 	}
 
 	const Vector * retVec = inputVector->IndexSplitSum(splitPos);
@@ -1682,10 +1682,10 @@ const VectorSpace::Vector* VectorSpace::Vector::ProjectDerivative(const Vector* 
 
 	for(size_t index = 0; index < initializer->size(); index++)
 	{
-		std::vector<uint32_t> coord(retSpace->factors_.size());
+		std::vector<uint32_t> coord(retSpace->Factors_.size());
 		coord[0] = index / strides[0];
 
-		for(size_t factor = 1; factor < retSpace->factors_.size(); factor++)
+		for(size_t factor = 1; factor < retSpace->Factors_.size(); factor++)
 		{
 			coord[factor] = (index % strides[factor - 1]) / strides[factor];
 		}
@@ -1808,7 +1808,7 @@ const VectorSpace::Vector* VectorSpace::Vector::PowerDerivative(const Vector* ve
 
 	// d(a_ijk^2) / d(a_lmn) = 2 * delta_li * delta_mj * delta_nk * a_ijk (no sum)
 	// Multiply with Kronecker
-	std::vector<uint32_t> deltaPairs(2 * arg->Space_->factors_.size());
+	std::vector<uint32_t> deltaPairs(2 * arg->Space_->Factors_.size());
 	for(size_t deltaFactor = 0; deltaFactor < deltaPairs.size() / 2; deltaFactor++)
 	{
 		deltaPairs[deltaFactor] = deltaFactor + deltaPairs.size() / 2;
@@ -1833,12 +1833,12 @@ const VectorSpace::Vector* VectorSpace::Vector::PowerDerivative(const Vector* ve
 
 	// The second half of the Kronecker indices join the function indices in the back
 	std::vector<std::vector<uint32_t>> indicesToJoin;
-	for(size_t FacToJoin = 0; FacToJoin < arg->Space_->factors_.size(); FacToJoin++)
+	for(size_t FacToJoin = 0; FacToJoin < arg->Space_->Factors_.size(); FacToJoin++)
 	{
 		indicesToJoin.push_back(
 				std::vector<uint32_t>{
-					(uint32_t) (arg->Space_->factors_.size() + FacToJoin),
-					(uint32_t) (2 * arg->Space_->factors_.size() + FacToJoin)});
+					(uint32_t) (arg->Space_->Factors_.size() + FacToJoin),
+					(uint32_t) (2 * arg->Space_->Factors_.size() + FacToJoin)});
 	}
 
 
@@ -1889,7 +1889,7 @@ const VectorSpace::Vector* VectorSpace::Vector::MultiplyDerivative(const Vector*
 		return otherVec;
 	}
 
-	std::vector<uint32_t> deltaPairs(2 * arg->Space_->factors_.size());
+	std::vector<uint32_t> deltaPairs(2 * arg->Space_->Factors_.size());
 	for(size_t deltaFactor = 0; deltaFactor < deltaPairs.size() / 2; deltaFactor++)
 	{
 		deltaPairs[deltaFactor] = deltaFactor + deltaPairs.size() / 2;
@@ -1921,19 +1921,19 @@ const VectorSpace::Vector* VectorSpace::Vector::MultiplyDerivative(const Vector*
 	// Now we just have to reorder the indices..
 
 	// Create Permutation:
-	std::vector<uint32_t> permutation(Product->Space_->factors_.size());
+	std::vector<uint32_t> permutation(Product->Space_->Factors_.size());
 	std::iota(permutation.begin(), permutation.end(), 0);
 
 	// Move other factors to the left
-	for(uint32_t otherFactor = 0; otherFactor < otherVec->Space_->factors_.size(); otherFactor++)
+	for(uint32_t otherFactor = 0; otherFactor < otherVec->Space_->Factors_.size(); otherFactor++)
 	{
-		permutation[arg->Space_->factors_.size() + otherFactor] = arg->Space_->factors_.size() + otherFactor + arg->Space_->factors_.size();
+		permutation[arg->Space_->Factors_.size() + otherFactor] = arg->Space_->Factors_.size() + otherFactor + arg->Space_->Factors_.size();
 	}
 
 	// Move Arg factors to the right
-	for(uint32_t argFactor = 0; argFactor < arg->Space_->factors_.size(); argFactor++)
+	for(uint32_t argFactor = 0; argFactor < arg->Space_->Factors_.size(); argFactor++)
 	{
-		permutation[arg->Space_->factors_.size() + otherVec->Space_->factors_.size() + argFactor] = arg->Space_->factors_.size() + argFactor;
+		permutation[arg->Space_->Factors_.size() + otherVec->Space_->Factors_.size() + argFactor] = arg->Space_->Factors_.size() + argFactor;
 	}
 
 	return Product->Permute(permutation);
@@ -1951,7 +1951,7 @@ const VectorSpace::Vector* VectorSpace::Vector::PermuteDerivative(const Vector* 
 	const Node::permuteParameters_t * permutation = (const Node::permuteParameters_t *) fctNode->typeParameters;
 
 	// The result will just be a Kronecker product
-	std::vector<uint32_t> deltaPairs(2 * arg->Space_->factors_.size());
+	std::vector<uint32_t> deltaPairs(2 * arg->Space_->Factors_.size());
 	for(size_t deltaFactor = 0; deltaFactor < deltaPairs.size() / 2; deltaFactor++)
 	{
 		deltaPairs[deltaFactor] = permutation->indices[deltaFactor] + deltaPairs.size() / 2;
@@ -2012,7 +2012,7 @@ const VectorSpace::Vector* VectorSpace::Vector::ContractDerivative(const Vector*
 
 	// Create the Kronecker the otherVec (i.e. non-arg factor of contraction) will be contracted with
 	// d/dB_lmn (A_opqr B_ops) = d(l,o) d(m,p) d(n,s) A_opqr
-	std::vector<uint32_t> deltaPairs(2 * arg->Space_->factors_.size());
+	std::vector<uint32_t> deltaPairs(2 * arg->Space_->Factors_.size());
 	for(size_t deltaFactor = 0; deltaFactor < deltaPairs.size() / 2; deltaFactor++)
 	{
 		deltaPairs[deltaFactor] = deltaFactor + deltaPairs.size() / 2;
@@ -2027,7 +2027,7 @@ const VectorSpace::Vector* VectorSpace::Vector::ContractDerivative(const Vector*
 
 	for(size_t factor = 0; factor < lFactors.size(); factor++)
 	{
-		lFactors[factor] = argContrFactors->at(factor) + arg->Space_->factors_.size();
+		lFactors[factor] = argContrFactors->at(factor) + arg->Space_->Factors_.size();
 	}
 
 	const Vector* returnVec = kronVec->Contract(otherVec, lFactors, *otherContrFactors);
@@ -2040,16 +2040,16 @@ const VectorSpace::Vector* VectorSpace::Vector::ContractDerivative(const Vector*
 	{
 		// All of arg's non-contracted indices need to be moved to the right
 		// But since we know the position in the contraction result above, we only need to know how many there are
-		uint32_t nrOfUncontractedArgFactors = arg->Space_->factors_.size() - argContrFactors->size();
+		uint32_t nrOfUncontractedArgFactors = arg->Space_->Factors_.size() - argContrFactors->size();
 
 		// Create Permutation:
-		std::vector<uint32_t> permutation(returnVec->Space_->factors_.size());
+		std::vector<uint32_t> permutation(returnVec->Space_->Factors_.size());
 		std::iota(permutation.begin(), permutation.end(), 0);
 
 		for(uint32_t uncontracted = 0; uncontracted < nrOfUncontractedArgFactors; uncontracted++)
 		{
-			permutation[arg->Space_->factors_.size() + uncontracted] = permutation.size() - nrOfUncontractedArgFactors + uncontracted;
-			permutation[permutation.size() - nrOfUncontractedArgFactors + uncontracted] = arg->Space_->factors_.size() + uncontracted;
+			permutation[arg->Space_->Factors_.size() + uncontracted] = permutation.size() - nrOfUncontractedArgFactors + uncontracted;
+			permutation[permutation.size() - nrOfUncontractedArgFactors + uncontracted] = arg->Space_->Factors_.size() + uncontracted;
 		}
 
 		returnVec = returnVec->Permute(permutation);
@@ -2063,10 +2063,10 @@ const VectorSpace::Vector* VectorSpace::Vector::AddDerivative(const Vector* vecV
 	// The new vector will be of tensor product vector space type.
 	// The derivative vector's VS will come first (as in differential forms)
 	std::vector<simpleVs_t> factors;
-	factors.insert(factors.begin(), arg->Space_->factors_.begin(), arg->Space_->factors_.end());
-	factors.insert(factors.end(), vecValuedFct->Space_->factors_.begin(), vecValuedFct->Space_->factors_.end());
+	factors.insert(factors.begin(), arg->Space_->Factors_.begin(), arg->Space_->Factors_.end());
+	factors.insert(factors.end(), vecValuedFct->Space_->Factors_.begin(), vecValuedFct->Space_->Factors_.end());
 
-	if(arg->Space_->factors_.size() != vecValuedFct->Space_->factors_.size())
+	if(arg->Space_->Factors_.size() != vecValuedFct->Space_->Factors_.size())
 	{
 		Error("For addition the resulting tensor should have same dimensions as arguments!\n");
 		return nullptr;
@@ -2165,16 +2165,21 @@ const VectorSpace::Vector* VectorSpace::Vector::Add(const Vector* vec) const
 	return retVec;
 }
 
+const std::vector<VectorSpace::simpleVs_t> * VectorSpace::Factors() const
+{
+	return &Factors_;
+}
+
 VectorSpace::VectorSpace(const std::vector<simpleVs_t> &factors)
 {
-	factors_ = factors;
+	Factors_ = factors;
 }
 
 VectorSpace::VectorSpace(std::vector<const VectorSpace*> vSpaces)
 {
 	for(const VectorSpace * vSpace: vSpaces)
 	{
-		factors_.insert(factors_.end(), vSpace->factors_.begin(), vSpace->factors_.end());
+		Factors_.insert(Factors_.end(), vSpace->Factors_.begin(), vSpace->Factors_.end());
 	}
 }
 
@@ -2182,7 +2187,7 @@ VectorSpace::VectorSpace(const VectorSpace &vSpace, size_t nTimes)
 {
 	while(nTimes--)
 	{
-		factors_.insert(factors_.end(), vSpace.factors_.begin(), vSpace.factors_.end());
+		Factors_.insert(Factors_.end(), vSpace.Factors_.begin(), vSpace.Factors_.end());
 	}
 }
 

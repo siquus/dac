@@ -38,8 +38,8 @@ namespace Module {
 class VectorSpace {
 public:
 	typedef struct {
-		Ring::type_t ring_; // TODO: Do we really want to implement different rings in one vector?
-		dimension_t dim_;
+		Ring::type_t Ring; // TODO: Do we really want to implement different rings in one vector?
+		dimension_t Dim;
 	} simpleVs_t;
 
 	VectorSpace(Ring::type_t ring, dimension_t dim);
@@ -48,15 +48,13 @@ public:
 	VectorSpace(std::vector<const VectorSpace*> vSpaces);
 	VectorSpace(const VectorSpace &vSpace, size_t nTimes);
 
-	// Vector space created by the tensor product of given factors
-	std::vector<simpleVs_t> factors_; // TODO: Currently not allowed to take the product of product spaces
-
 	dimension_t GetDim() const;
 	Ring::type_t GetRing() const;
 
 	// Calculate Strides. // TODO: assumes Row-Major Layout
 	// https://en.wikipedia.org/wiki/Row-_and_column-major_order#Address_calculation_in_general
 	void GetStrides(std::vector<uint32_t> * strides) const;
+	const std::vector<simpleVs_t> * Factors() const;
 
 	static bool AreEqual(const VectorSpace * lVs, const VectorSpace * rVs);
 
@@ -200,6 +198,11 @@ public:
 			Graph* graph,
 			const std::vector<T> &initializer,
 			const std::map<Vector::Property, const void *> &properties) const;  // initializer Pointer is taken
+
+	private:
+	// Vector space created by the tensor product of given factors
+	std::vector<simpleVs_t> Factors_; // TODO: Currently not allowed to take the product of product spaces
+
 };
 }
 }
