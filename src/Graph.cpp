@@ -276,7 +276,7 @@ bool Node::sameObject(const Node &lNode, const Node &rNode)
 			auto lVec = (const Algebra::Module::VectorSpace::Vector *) lNode.object;
 			auto rVec = (const Algebra::Module::VectorSpace::Vector *) rNode.object;
 
-			if(!Algebra::Module::VectorSpace::AreEqual(lVec->__space_, rVec->__space_))
+			if(!Algebra::Module::VectorSpace::AreEqual(lVec->Space(), rVec->Space()))
 			{
 				return false;
 			}

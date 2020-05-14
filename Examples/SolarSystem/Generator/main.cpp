@@ -440,7 +440,7 @@ int main(int argc, char* argv[])
 		}
 	}
 
-	auto massDiag = momentumState->__space_->Homomorphism(
+	auto massDiag = momentumState->Space()->Homomorphism(
 			&graph,
 			diagMasses,
 			Algebra::Module::VectorSpace::Vector::Property::Diagonal);
@@ -463,7 +463,7 @@ int main(int argc, char* argv[])
 	// Create ((q1_1 - q2_1)^2 + (q1_2 - q2_2)^2 + (q1_3 - q2_3)^2, ..)
 	auto partialSumMatrix = PartialVectorSumMatrix(
 			&graph,
-			qDiffsSquared->__space_->GetDim(),
+			qDiffsSquared->Space()->GetDim(),
 			DIMENSIONS);
 
 	auto qDiffsSquaredSummed = partialSumMatrix->Contract(qDiffsSquared, 1, 0);
@@ -489,13 +489,13 @@ int main(int argc, char* argv[])
 	// Calculate the Hamiltonian vector field X_H = J * dH, where J is the symplectic matrix
 	auto symplecticMatrix = SymplecticMatrix(
 			&graph,
-			state->__space_->GetDim());
+			state->Space()->GetDim());
 
 	auto dH = hamiltonian->Derivative(state);
 
 	auto X_H = symplecticMatrix->Contract(dH, 1, 0);
 
-	auto timeIncrement = X_H->__space_->Scalar(&graph, cmdLineArgs.Stepsize);
+	auto timeIncrement = X_H->Space()->Scalar(&graph, cmdLineArgs.Stepsize);
 	auto step = X_H->Multiply(timeIncrement);
 
 	auto newState = state->Add(step);

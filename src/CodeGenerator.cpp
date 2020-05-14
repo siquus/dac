@@ -1029,12 +1029,12 @@ bool CodeGenerator::VectorAdditionCode(const Node* node, FileWriter * file)
 
 	auto vecOp = (const Algebra::Module::VectorSpace::Vector*) node->object;
 
-	bool resultIsArray = (1 < vecOp->__space_->GetDim());
+	bool resultIsArray = (1 < vecOp->Space()->GetDim());
 
 	if(resultIsArray)
 	{
 		file->PrintfLine("for(uint32_t dim = 0; dim < %u; dim++)",
-				vecOp->__space_->GetDim());
+				vecOp->Space()->GetDim());
 
 		file->PrintfLine("{");
 
@@ -1144,7 +1144,7 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 		file->Indent();
 
 		std::string opIndexTuple = "const uint32_t opIndexTuple[] = ";
-		appendIndexTuple(&opIndexTuple, opVec->__space_, std::string{"opIndex"});
+		appendIndexTuple(&opIndexTuple, opVec->Space(), std::string{"opIndex"});
 		opIndexTuple += ";";
 
 		file->PrintfLine("%s", opIndexTuple.c_str());
@@ -1155,7 +1155,7 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 	{
 		file->PrintfLine("for(int dim%u = 0; dim%u < %u; dim%u++)",
 				factorIndex, factorIndex,
-				argVec->__space_->factors_[argContractFactors->at(factorIndex)].dim_,
+				argVec->Space()->factors_[argContractFactors->at(factorIndex)].dim_,
 				factorIndex);
 		file->PrintfLine("{");
 		file->Indent();
@@ -1164,11 +1164,11 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 	uint32_t opIndex = 0;
 	if(!argVecIsLeftArg)
 	{
-		opIndex = opVec->__space_->factors_.size() - (argVec->__space_->factors_.size() - argContractFactors->size());
+		opIndex = opVec->Space()->factors_.size() - (argVec->Space()->factors_.size() - argContractFactors->size());
 	}
 
 	std::string argIndexTuple = "const uint32_t argIndexTuple[] = {";
-	for(uint32_t lDim = 0; lDim < argVec->__space_->factors_.size(); lDim++)
+	for(uint32_t lDim = 0; lDim < argVec->Space()->factors_.size(); lDim++)
 	{
 		auto it = std::find(
 				argContractFactors->begin(),
@@ -1199,7 +1199,7 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 	}
 
 	std::string kronIndexTuple = "const uint32_t kronIndexTuple[] = {";
-	for(uint32_t rDim = 0; rDim < kronVec->__space_->factors_.size(); rDim++)
+	for(uint32_t rDim = 0; rDim < kronVec->Space()->factors_.size(); rDim++)
 	{
 		auto it = std::find(
 				kronContractFactors->begin(),
@@ -1236,7 +1236,7 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 
 	std::string sum = "sum += ";
 	sum += *(varArgVec->GetIdentifier());
-	appendArrayPosition(&sum, argVec->__space_, std::string{"argIndexTuple"});
+	appendArrayPosition(&sum, argVec->Space(), std::string{"argIndexTuple"});
 
 	sum += " *";
 
@@ -1304,7 +1304,7 @@ bool CodeGenerator::VectorPermutationCode(const Node* node, FileWriter * file)
 	file->Indent();
 
 	std::string opIndexTuple = "const uint32_t opIndexTuple[] = ";
-	appendIndexTuple(&opIndexTuple, vec->__space_, std::string{"opIndex"});
+	appendIndexTuple(&opIndexTuple, vec->Space(), std::string{"opIndex"});
 	opIndexTuple += ";";
 
 	file->PrintfLine("%s", opIndexTuple.c_str());
@@ -1325,7 +1325,7 @@ bool CodeGenerator::VectorPermutationCode(const Node* node, FileWriter * file)
 	opValue += "[opIndex]";
 	opValue += " = ";
 	opValue += varArgId;
-	appendArrayPosition(&opValue, vec->__space_, std::string{"argIndexTuple"});
+	appendArrayPosition(&opValue, vec->Space(), std::string{"argIndexTuple"});
 	opValue += ";";
 
 	file->PrintfLine("%s", opValue.c_str());
@@ -1383,7 +1383,7 @@ bool CodeGenerator::VectorContractionCode(const Node* node, FileWriter * file)
 		file->Indent();
 
 		std::string opIndexTuple = "const uint32_t opIndexTuple[] = ";
-		appendIndexTuple(&opIndexTuple, opVec->__space_, std::string{"opIndex"});
+		appendIndexTuple(&opIndexTuple, opVec->Space(), std::string{"opIndex"});
 		opIndexTuple += ";";
 
 		file->PrintfLine("%s", opIndexTuple.c_str());
@@ -1394,7 +1394,7 @@ bool CodeGenerator::VectorContractionCode(const Node* node, FileWriter * file)
 	{
 		file->PrintfLine("for(int dim%u = 0; dim%u < %u; dim%u++)",
 				factorIndex, factorIndex,
-				lVec->__space_->factors_[contractValue->lfactors[factorIndex]].dim_,
+				lVec->Space()->factors_[contractValue->lfactors[factorIndex]].dim_,
 				factorIndex);
 		file->PrintfLine("{");
 		file->Indent();
@@ -1402,7 +1402,7 @@ bool CodeGenerator::VectorContractionCode(const Node* node, FileWriter * file)
 
 	uint32_t opIndex = 0;
 	std::string lIndexTuple = "const uint32_t lIndexTuple[] = {";
-	for(uint32_t lDim = 0; lDim < lVec->__space_->factors_.size(); lDim++)
+	for(uint32_t lDim = 0; lDim < lVec->Space()->factors_.size(); lDim++)
 	{
 		auto it = std::find(
 				contractValue->lfactors.begin(),
@@ -1428,7 +1428,7 @@ bool CodeGenerator::VectorContractionCode(const Node* node, FileWriter * file)
 	file->PrintfLine(lIndexTuple.c_str());
 
 	std::string rIndexTuple = "const uint32_t rIndexTuple[] = {";
-	for(uint32_t rDim = 0; rDim < rVec->__space_->factors_.size(); rDim++)
+	for(uint32_t rDim = 0; rDim < rVec->Space()->factors_.size(); rDim++)
 	{
 		auto it = std::find(
 				contractValue->rfactors.begin(),
@@ -1455,11 +1455,11 @@ bool CodeGenerator::VectorContractionCode(const Node* node, FileWriter * file)
 
 	std::string sum = "sum += ";
 	sum += *(varLVec->GetIdentifier());
-	appendArrayPosition(&sum, lVec->__space_, std::string{"lIndexTuple"});
+	appendArrayPosition(&sum, lVec->Space(), std::string{"lIndexTuple"});
 	sum += " * ";
 
 	sum += *(varRVec->GetIdentifier());
-	appendArrayPosition(&sum, rVec->__space_, std::string{"rIndexTuple"});
+	appendArrayPosition(&sum, rVec->Space(), std::string{"rIndexTuple"});
 	sum += ";";
 
 	file->PrintfLine(sum.c_str());
@@ -1759,13 +1759,13 @@ bool CodeGenerator::VectorScalarProductKroneckerDeltaCode(const Node* node, File
 	file->PrintfLine("%s", deltaPairs.c_str());
 
 	file->PrintfLine("for(uint32_t opIndex = 0; opIndex < %u; opIndex++)",
-			opVec->__space_->GetDim());
+			opVec->Space()->GetDim());
 
 	file->PrintfLine("{");
 	file->Indent();
 
 	std::string opIndexTuple = "const uint32_t opIndexTuple[] = ";
-	appendIndexTuple(&opIndexTuple, opVec->__space_, std::string{"opIndex"});
+	appendIndexTuple(&opIndexTuple, opVec->Space(), std::string{"opIndex"});
 	opIndexTuple += ";";
 
 	file->PrintfLine("%s", opIndexTuple.c_str());
@@ -1877,7 +1877,7 @@ bool CodeGenerator::VectorVectorProductKroneckerDeltaCode(const Node* node, File
 	file->Indent();
 
 	std::string opIndexTuple = "const uint32_t opIndexTuple[] = ";
-	appendIndexTuple(&opIndexTuple, opVec->__space_, std::string{"opIndex"});
+	appendIndexTuple(&opIndexTuple, opVec->Space(), std::string{"opIndex"});
 	opIndexTuple += ";";
 
 	file->PrintfLine("%s", opIndexTuple.c_str());
@@ -1885,11 +1885,11 @@ bool CodeGenerator::VectorVectorProductKroneckerDeltaCode(const Node* node, File
 	uint32_t vecIndexOffset = 0;
 	if(lNodeIsKron)
 	{
-		vecIndexOffset = kronVec->__space_->factors_.size();
+		vecIndexOffset = kronVec->Space()->factors_.size();
 	}
 
 	std::string vecIndexTuple = "const uint32_t vecIndexTuple[] = {";
-	for(uint32_t lDim = 0; lDim < vec->__space_->factors_.size(); lDim++)
+	for(uint32_t lDim = 0; lDim < vec->Space()->factors_.size(); lDim++)
 	{
 		vecIndexTuple += "opIndexTuple[";
 		vecIndexTuple += std::to_string(lDim + vecIndexOffset);
@@ -1900,14 +1900,14 @@ bool CodeGenerator::VectorVectorProductKroneckerDeltaCode(const Node* node, File
 	vecIndexTuple += "};";
 	file->PrintfLine(vecIndexTuple.c_str());
 
-	uint32_t kronIndexOffset = vec->__space_->factors_.size();
+	uint32_t kronIndexOffset = vec->Space()->factors_.size();
 	if(lNodeIsKron)
 	{
 		kronIndexOffset = 0;
 	}
 
 	std::string kronIndexTuple = "const uint32_t kronIndexTuple[] = {";
-	for(uint32_t rDim = 0; rDim < kronVec->__space_->factors_.size(); rDim++)
+	for(uint32_t rDim = 0; rDim < kronVec->Space()->factors_.size(); rDim++)
 	{
 		kronIndexTuple += "opIndexTuple[";
 		kronIndexTuple += std::to_string(rDim + kronIndexOffset);
@@ -1941,7 +1941,7 @@ bool CodeGenerator::VectorVectorProductKroneckerDeltaCode(const Node* node, File
 	}
 
 	product += *(varVec->GetIdentifier());
-	appendArrayPosition(&product, vec->__space_, std::string{"vecIndexTuple"});
+	appendArrayPosition(&product, vec->Space(), std::string{"vecIndexTuple"});
 	product += ";";
 
 	file->PrintfLine(product.c_str());
@@ -1997,13 +1997,13 @@ bool CodeGenerator::VectorVectorProductCode(const Node* node, FileWriter * file,
 	file->Indent();
 
 	std::string opIndexTuple = "const uint32_t opIndexTuple[] = ";
-	appendIndexTuple(&opIndexTuple, opVec->__space_, std::string{"opIndex"});
+	appendIndexTuple(&opIndexTuple, opVec->Space(), std::string{"opIndex"});
 	opIndexTuple += ";";
 
 	file->PrintfLine("%s", opIndexTuple.c_str());
 
 	std::string lIndexTuple = "const uint32_t lIndexTuple[] = {";
-	for(uint32_t lDim = 0; lDim < lVec->__space_->factors_.size(); lDim++)
+	for(uint32_t lDim = 0; lDim < lVec->Space()->factors_.size(); lDim++)
 	{
 		lIndexTuple += "opIndexTuple[";
 		lIndexTuple += std::to_string(lDim);
@@ -2015,10 +2015,10 @@ bool CodeGenerator::VectorVectorProductCode(const Node* node, FileWriter * file,
 	file->PrintfLine(lIndexTuple.c_str());
 
 	std::string rIndexTuple = "const uint32_t rIndexTuple[] = {";
-	for(uint32_t rDim = 0; rDim < rVec->__space_->factors_.size(); rDim++)
+	for(uint32_t rDim = 0; rDim < rVec->Space()->factors_.size(); rDim++)
 	{
 		rIndexTuple += "opIndexTuple[";
-		rIndexTuple += std::to_string(rDim + lVec->__space_->factors_.size());
+		rIndexTuple += std::to_string(rDim + lVec->Space()->factors_.size());
 		rIndexTuple += "], ";
 	}
 
@@ -2029,7 +2029,7 @@ bool CodeGenerator::VectorVectorProductCode(const Node* node, FileWriter * file,
 	std::string product = varOpId;
 	product += "[opIndex] = ";
 	product += *(varLVec->GetIdentifier());
-	appendArrayPosition(&product, lVec->__space_, std::string{"lIndexTuple"});
+	appendArrayPosition(&product, lVec->Space(), std::string{"lIndexTuple"});
 
 	if(divide)
 	{
@@ -2041,7 +2041,7 @@ bool CodeGenerator::VectorVectorProductCode(const Node* node, FileWriter * file,
 	}
 
 	product += *(varRVec->GetIdentifier());
-	appendArrayPosition(&product, rVec->__space_, std::string{"rIndexTuple"});
+	appendArrayPosition(&product, rVec->Space(), std::string{"rIndexTuple"});
 	product += ";";
 
 	file->PrintfLine(product.c_str());
@@ -2085,7 +2085,7 @@ bool CodeGenerator::VectorIndexSplitSumCode(const Node* node, FileWriter * file)
 	file->Indent();
 
 	std::string opIndexTuple = "const uint32_t opIndexTuple[] = ";
-	appendIndexTuple(&opIndexTuple, vecOp->__space_, std::string{"opIndex"});
+	appendIndexTuple(&opIndexTuple, vecOp->Space(), std::string{"opIndex"});
 	opIndexTuple += ";";
 
 	file->PrintfLine("%s", opIndexTuple.c_str());
@@ -2112,7 +2112,7 @@ bool CodeGenerator::VectorIndexSplitSumCode(const Node* node, FileWriter * file)
 
 	std::string equationStr = *varOp->GetIdentifier() + "[opIndex] = ";
 	equationStr += *varArg->GetIdentifier();
-	appendArrayPosition(&equationStr, vecArg->__space_, std::string{"argIndexTuple"});
+	appendArrayPosition(&equationStr, vecArg->Space(), std::string{"argIndexTuple"});
 	equationStr += ";";
 
 	file->PrintfLine(equationStr.c_str());
@@ -2150,14 +2150,14 @@ bool CodeGenerator::VectorJoinIndicesCode(const Node* node, FileWriter * file)
 	file->Indent();
 
 	std::string opIndexTuple = "const uint32_t opIndexTuple[] = ";
-	appendIndexTuple(&opIndexTuple, vecOp->__space_, std::string{"opIndex"});
+	appendIndexTuple(&opIndexTuple, vecOp->Space(), std::string{"opIndex"});
 	opIndexTuple += ";";
 
 	file->PrintfLine("%s", opIndexTuple.c_str());
 
 	std::vector<uint32_t> opIndexPos(param->Indices.size(), UINT32_MAX);
 	std::string argIndexTuple = "const uint32_t argIndexTuple[] = {";
-	for(uint32_t dim = 0; dim < vecArg->__space_->factors_.size(); dim++)
+	for(uint32_t dim = 0; dim < vecArg->Space()->factors_.size(); dim++)
 	{
 		argIndexTuple += "opIndexTuple[";
 
@@ -2196,7 +2196,7 @@ bool CodeGenerator::VectorJoinIndicesCode(const Node* node, FileWriter * file)
 
 	std::string equationStr = *varOp->GetIdentifier() + "[opIndex] = ";
 	equationStr += *varArg->GetIdentifier();
-	appendArrayPosition(&equationStr, vecArg->__space_, std::string{"argIndexTuple"});
+	appendArrayPosition(&equationStr, vecArg->Space(), std::string{"argIndexTuple"});
 	equationStr += ";";
 
 	file->PrintfLine(equationStr.c_str());
@@ -2257,7 +2257,7 @@ bool CodeGenerator::VectorMaxPoolCode(const Node* node, FileWriter * file)
 
 	// Get strides
 	std::vector<uint32_t> InStrides;
-	inVec->__space_->GetStrides(&InStrides);
+	inVec->Space()->GetStrides(&InStrides);
 	const char inStridesId[] = "InStrides";
 	file->PrintfLine("const uint32_t %s[] = {", inStridesId);
 	for(const uint32_t &stride: InStrides)
@@ -2268,7 +2268,7 @@ bool CodeGenerator::VectorMaxPoolCode(const Node* node, FileWriter * file)
 
 	// Generate all possible tuples
 	std::vector<std::pair<uint32_t, uint32_t>> ranges;
-	ranges.resize(inVec->__space_->factors_.size());
+	ranges.resize(inVec->Space()->factors_.size());
 
 	for(size_t range = 0; range < ranges.size(); range++)
 	{
@@ -2286,14 +2286,14 @@ bool CodeGenerator::VectorMaxPoolCode(const Node* node, FileWriter * file)
 	file->Indent();
 
 	std::string opIndexTuple = "const uint32_t opIndexTuple[] = ";
-	appendIndexTuple(&opIndexTuple, opVec->__space_, std::string{"opIndex"});
+	appendIndexTuple(&opIndexTuple, opVec->Space(), std::string{"opIndex"});
 	opIndexTuple += ";";
 
 	file->PrintfLine("%s", opIndexTuple.c_str());
 
 	std::string inPoolOrigin = "const uint32_t inPoolOrigin[] = {";
 
-	for(size_t factor = 0; factor < opVec->__space_->factors_.size(); factor++)
+	for(size_t factor = 0; factor < opVec->Space()->factors_.size(); factor++)
 	{
 		inPoolOrigin += "opIndexTuple[" + std::to_string(factor) + "] ";
 		inPoolOrigin += "* " + std::to_string(param->PoolSize[factor]) + ", ";
@@ -2320,7 +2320,7 @@ bool CodeGenerator::VectorMaxPoolCode(const Node* node, FileWriter * file)
 		value += varInId;
 		value += "[";
 
-		for(size_t factor = 0; factor < inVec->__space_->factors_.size(); factor++)
+		for(size_t factor = 0; factor < inVec->Space()->factors_.size(); factor++)
 		{
 			if(tuples[tuple][factor])
 			{
@@ -2397,7 +2397,7 @@ bool CodeGenerator::VectorCrossCorrelationCode(const Node* node, FileWriter * fi
 
 	// Get strides
 	std::vector<uint32_t> InStrides;
-	inVec->__space_->GetStrides(&InStrides);
+	inVec->Space()->GetStrides(&InStrides);
 	const char inStridesId[] = "InStrides";
 	file->PrintfLine("const uint32_t %s[] = {", inStridesId);
 	for(const uint32_t &stride: InStrides)
@@ -2407,7 +2407,7 @@ bool CodeGenerator::VectorCrossCorrelationCode(const Node* node, FileWriter * fi
 	file->PrintfLine("};");
 
 	std::vector<uint32_t> KernelStrides;
-	KernelVec->__space_->GetStrides(&KernelStrides);
+	KernelVec->Space()->GetStrides(&KernelStrides);
 	const char kernelStridesId[] = "KernelStrides";
 	file->PrintfLine("const uint32_t %s[] = {", kernelStridesId);
 	for(const uint32_t &stride: KernelStrides)
@@ -2418,12 +2418,12 @@ bool CodeGenerator::VectorCrossCorrelationCode(const Node* node, FileWriter * fi
 
 	// Generate all possible tuples
 	std::vector<std::pair<uint32_t, uint32_t>> ranges;
-	ranges.resize(KernelVec->__space_->factors_.size());
+	ranges.resize(KernelVec->Space()->factors_.size());
 
 	for(size_t range = 0; range < ranges.size(); range++)
 	{
 		ranges[range].first = 0;
-		ranges[range].second = KernelVec->__space_->factors_[range].dim_;
+		ranges[range].second = KernelVec->Space()->factors_[range].dim_;
 	}
 
 	std::vector<std::vector<uint32_t>> tuples;
@@ -2436,7 +2436,7 @@ bool CodeGenerator::VectorCrossCorrelationCode(const Node* node, FileWriter * fi
 	file->Indent();
 
 	std::string opIndexTuple = "const uint32_t opIndexTuple[] = ";
-	appendIndexTuple(&opIndexTuple, opVec->__space_, std::string{"opIndex"});
+	appendIndexTuple(&opIndexTuple, opVec->Space(), std::string{"opIndex"});
 	opIndexTuple += ";";
 
 	file->PrintfLine("%s", opIndexTuple.c_str());
@@ -2534,13 +2534,13 @@ bool CodeGenerator::VectorProjectionCode(const Node* node, FileWriter * file)
 	file->Indent();
 
 	std::string opIndexTuple = "const uint32_t opIndexTuple[] = ";
-	appendIndexTuple(&opIndexTuple, vecOp->__space_, std::string{"opIndex"});
+	appendIndexTuple(&opIndexTuple, vecOp->Space(), std::string{"opIndex"});
 	opIndexTuple += ";";
 
 	file->PrintfLine("%s", opIndexTuple.c_str());
 
 	std::string argIndexTuple = "const uint32_t argIndexTuple[] = {";
-	for(uint32_t dim = 0; dim < vecArg->__space_->factors_.size(); dim++)
+	for(uint32_t dim = 0; dim < vecArg->Space()->factors_.size(); dim++)
 	{
 		argIndexTuple += "opIndexTuple[";
 		argIndexTuple += std::to_string(dim);
@@ -2560,7 +2560,7 @@ bool CodeGenerator::VectorProjectionCode(const Node* node, FileWriter * file)
 
 	std::string equationStr = *varOp->GetIdentifier() + "[opIndex] = ";
 	equationStr += *varArg->GetIdentifier();
-	appendArrayPosition(&equationStr, vecArg->__space_, std::string{"argIndexTuple"});
+	appendArrayPosition(&equationStr, vecArg->Space(), std::string{"argIndexTuple"});
 	equationStr += ";";
 
 	file->PrintfLine(equationStr.c_str());
@@ -2686,7 +2686,7 @@ bool CodeGenerator::VectorScalarProductCode(const Node* node, FileWriter * file,
 	if(!lVarIsScalar || !rVarIsScalar)
 	{
 		file->PrintfLine("for(uint32_t dim = 0; dim < %u; dim++)",
-				vecOp->__space_->GetDim());
+				vecOp->Space()->GetDim());
 
 		file->PrintfLine("{");
 		file->Indent();
@@ -2859,9 +2859,9 @@ bool CodeGenerator::FetchVariables()
 				properties = (Variable::properties_t) (properties | Variable::PROPERTY_POINTER | Variable::PROPERTY_CONST);
 			}
 
-			value = vector->__value_;
-			length = vector->__space_->GetDim();
-			switch(vector->__space_->GetRing())
+			value = vector->InitValue();
+			length = vector->Space()->GetDim();
+			switch(vector->Space()->GetRing())
 			{
 			case Algebra::Ring::Float32:
 				type = Variable::Type::float_;
@@ -2873,11 +2873,11 @@ bool CodeGenerator::FetchVariables()
 
 			case Algebra::Ring::None: // no break intended
 			default:
-				Error("Unknown Ring %u!\n", vector->__space_->GetRing());
+				Error("Unknown Ring %u!\n", vector->Space()->GetRing());
 				return false;
 			}
 
-			if(nullptr != vector->__value_)
+			if(nullptr != vector->InitValue())
 			{
 				properties = (Variable::properties_t) (
 						properties |

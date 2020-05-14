@@ -62,9 +62,6 @@ public:
 
 	class Vector : public NodeRef {
 	public:
-		const VectorSpace * __space_;
-		const void* __value_ = nullptr;
-
 		void PrintInfo() const;
 		static bool SameValue(const Vector * lVec, const Vector * rVec);
 
@@ -137,8 +134,14 @@ public:
 		Vector(Graph* graph, const VectorSpace * vSpace, const void * value, const std::map<Property, const void *> &properties = std::map<Property, const void *>{});
 
 		const std::map<Property, const void *> * Properties() const;
+		const VectorSpace * Space() const;
+		const void * InitValue() const;
 
 	private:
+		const VectorSpace * Space_ = nullptr;
+		const void * Value_ = nullptr;
+		std::map<Property, const void *> Properties_;
+
 		bool Init(Graph* graph, const VectorSpace * vSpace, const void * value, const std::map<Property, const void *> &properties = std::map<Property, const void *>{});
 		static bool AreCompatible(const Vector* vec1, const Vector* vec2);
 
@@ -157,8 +160,6 @@ public:
 		static const Vector* PowerDerivative(const Vector* vecValuedFct, const Vector* arg);
 		static const Vector* ProjectDerivative(const Vector* vecValuedFct, const Vector* arg);
 		static const Vector* CrossCorrelationDerivative(const Vector* vecValuedFct, const Vector* arg);
-
-		std::map<Property, const void *> Properties_;
 	};
 
 	const Vector * Element(Graph* graph, const std::map<Vector::Property, const void *> &properties) const;
