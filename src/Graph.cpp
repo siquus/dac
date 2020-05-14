@@ -230,6 +230,26 @@ const char* Node::getName(Type type)
 	return nullptr;
 }
 
+void Node::UseAsStorageFor(Id_t id)
+{
+	usedAsStorageBy_.insert(id);
+}
+
+bool Node::RemoveStorageFor(Id_t id)
+{
+	if(usedAsStorageBy_.erase(id))
+	{
+		return true;
+	}
+
+	return false;
+}
+
+bool Node::UsedAsStorageByOthers() const
+{
+	return !usedAsStorageBy_.empty();
+}
+
 // Create a hash which will *help* to identify equal nodes.
 // Hash will be the same for nodes of the same type
 // with the same parents.
@@ -472,6 +492,19 @@ bool Node::areDuplicate(const Node &lNode, const Node &rNode)
 	return true;
 }
 
+bool Node::StoreIn(Id_t id)
+{
+	// TODO: Check compatibility
+	storedIn_ = id;
+
+	return true;
+}
+
+Node::Id_t Node::IsStoredIn() const
+{
+	return storedIn_;
+}
+
 bool Graph::GetRootAncestors(std::set<Node::Id_t> * rootParents, Node::Id_t child) const
 {
 	const Node * childNode = GetNode(child);
@@ -636,14 +669,14 @@ bool Graph::ReduceToOne(const std::vector<Node::Id_t> &nodes)
 				nodePair.second.branchFalse = newNodeId;
 			}
 
-			if(cmpId == nodePair.second.storedIn_)
+			if(cmpId == nodePair.second.IsStoredIn())
 			{
-				nodePair.second.storedIn_ = newNodeId;
+				nodePair.second.StoreIn(newNodeId);
 			}
 
-			if(nodePair.second.usedAsStorageBy_.erase(cmpId))
+			if(nodePair.second.RemoveStorageFor(cmpId))
 			{
-				nodePair.second.usedAsStorageBy_.insert(newNodeId);
+				nodePair.second.UseAsStorageFor(newNodeId);
 			}
 		}
 	}
@@ -667,7 +700,7 @@ bool NodeRef::StoreIn(const NodeRef* nodeRef) const
 		return false;
 	}
 
-	thisNode->storedIn_ = nodeRef->nodeId_;
+	thisNode->StoreIn(nodeRef->nodeId_);
 
 	Node * storageNode = graph_->GetNodeModifyable(nodeRef->nodeId_);
 	if(nullptr == storageNode)
@@ -676,7 +709,7 @@ bool NodeRef::StoreIn(const NodeRef* nodeRef) const
 		return false;
 	}
 
-	storageNode->usedAsStorageBy_.insert(nodeId_);
+	storageNode->UseAsStorageFor(nodeId_);
 
 	return true;
 }
@@ -695,17 +728,6 @@ void NodeRef::SetType(Node::Type type, const void * param)
 	thisNode->typeParameters = param;
 
 	// TODO: Check that param != nullptr when it is needed!
-
-	switch(type)
-	{
-	case Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT:
-		thisNode->noStorage_ = true;
-		break;
-
-	default:
-		// nothing;
-		break;
-	}
 }
 
 void NodeRef::PushParent(Node::Id_t parent)

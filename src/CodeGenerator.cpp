@@ -2801,9 +2801,9 @@ Variable* CodeGenerator::GetVariable(Node::Id_t id)
 	}
 
 	Node::Id_t storageNodeId;
-	if(Node::ID_NONE != nodeIt->second.storedIn_)
+	if(Node::ID_NONE != nodeIt->second.IsStoredIn())
 	{
-		storageNodeId = nodeIt->second.storedIn_;
+		storageNodeId = nodeIt->second.IsStoredIn();
 	}
 	else
 	{
@@ -2826,7 +2826,7 @@ bool CodeGenerator::FetchVariables()
 	auto nodes = graph_->GetNodes();
 	for(const auto &nodePair: *nodes)
 	{
-		if(nodePair.second.noStorage_ || (Node::ID_NONE != nodePair.second.storedIn_))
+		if(Node::ID_NONE != nodePair.second.IsStoredIn())
 		{
 			continue; // This node is not stored in its own variable or doesn't require storage
 		}
@@ -2899,7 +2899,7 @@ bool CodeGenerator::FetchVariables()
 			return false;
 		}
 
-		if(nodePair.second.usedAsStorageBy_.size())
+		if(nodePair.second.UsedAsStorageByOthers())
 		{
 			properties = (Variable::properties_t) (
 					properties & ~Variable::PROPERTY_CONST);

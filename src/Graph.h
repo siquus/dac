@@ -111,10 +111,21 @@ public:
 	const void* typeParameters = nullptr; // see fooParameters_t
 	ObjectType objectType = ObjectType::NONE;
 	const void* object = nullptr;
+
 	Id_t id = ID_NONE;
-	Id_t storedIn_ = ID_NONE;
-	bool noStorage_ = false;
+
+	void UseAsStorageFor(Id_t id);
+	bool RemoveStorageFor(Id_t id);
+	bool UsedAsStorageByOthers() const;
+
+	bool StoreIn(Id_t id);
+	Node::Id_t IsStoredIn() const;
+
+private:
 	std::set<Id_t> usedAsStorageBy_;
+	Id_t storedIn_ = ID_NONE;
+
+
 };
 
 class Graph {
