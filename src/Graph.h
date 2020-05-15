@@ -171,12 +171,18 @@ private:
 };
 
 class NodeRef {
+	Node::Id_t nodeId_ = Node::ID_NONE;
+	Graph* graph_ = nullptr;
+
+protected:
+	void SetNodeRef(Graph* graph, Node::Id_t id);
+
 public:
 	bool StoreIn(const NodeRef* nodeRef) const;
 	void PushParent(Node::Id_t parent);
 
-	Node::Id_t nodeId_ = Node::ID_NONE;
-	Graph* graph_ = nullptr;
+	Node::Id_t Id() const;
+	Graph* GetGraph() const;
 };
 
 #endif /* SRC_GRAPH_H_ */

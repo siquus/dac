@@ -514,7 +514,7 @@ int main(int argc, char* argv[])
 
 	std::vector<const NodeRef *> whileParents{&Output};
 
-	ControlTransfer::While While(&graph);
+	ControlTransfer::While While;
 	While.Set(
 			IterationCntDown,
 			whileParents,

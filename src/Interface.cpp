@@ -51,18 +51,18 @@ void Output::Init(Graph * graph, const char * name)
 		return;
 	}
 
-	graph_ = graph;
-
 	Node node(
 			Node::Object_t::INTERFACE_OUTPUT, this,
 			Node::Type::OUTPUT, nullptr);
 
-	nodeId_ = graph->AddNode(&node);
-	if(Node::ID_NONE == nodeId_)
+	Node::Id_t id = graph->AddNode(&node);
+	if(Node::ID_NONE == id)
 	{
 		Error("Could not add node!\n");
 		return;
 	}
+
+	SetNodeRef(graph, id);
 }
 
 bool Output::Set(const Algebra::Module::VectorSpace::Vector * vector)
@@ -73,13 +73,13 @@ bool Output::Set(const Algebra::Module::VectorSpace::Vector * vector)
 		return false;
 	}
 
-	if(graph_ != vector->graph_)
+	if(GetGraph() != vector->GetGraph())
 	{
 		Error("Not on same Graph");
 		return false;
 	}
 
-	bool success = graph_->AddParent(vector->nodeId_, nodeId_);
+	bool success = GetGraph()->AddParent(vector->Id(), Id());
 	if(!success)
 	{
 		Error("Could not AddParent to Output!\n");
@@ -187,7 +187,8 @@ const Algebra::Module::VectorSpace::Vector * Input::Get(const Algebra::Module::V
 
 	Algebra::Module::VectorSpace::Vector::propertyExternalInput_t extInput = {.InputNode = inNodeId};
 
-	auto vector = vspace->Element(graph_,
+	auto vector = vspace->Element(
+			graph_,
 			std::map<Algebra::Module::VectorSpace::Vector::Property, const void *>{
 		{Algebra::Module::VectorSpace::Vector::Property::ExternalInput, &extInput}});
 

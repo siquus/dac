@@ -733,6 +733,12 @@ bool Graph::ReduceToOne(const std::vector<Node::Id_t> &nodes)
 	return true;
 }
 
+void NodeRef::SetNodeRef(Graph* graph, Node::Id_t id)
+{
+	graph_ = graph;
+	nodeId_ = id;
+}
+
 bool NodeRef::StoreIn(const NodeRef* nodeRef) const
 {
 	if(nodeRef->graph_ != graph_)
@@ -771,4 +777,14 @@ void NodeRef::PushParent(Node::Id_t parent)
 	{
 		Error("Could not push parent!\n");
 	}
+}
+
+Node::Id_t NodeRef::Id() const
+{
+	return nodeId_;
+}
+
+Graph* NodeRef::GetGraph() const
+{
+	return graph_;
 }

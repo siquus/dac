@@ -24,9 +24,9 @@
 
 using namespace ControlTransfer;
 
-While::While(Graph * graph)
+While::While()
 {
-	graph_ = graph;
+
 }
 
 bool While::Set(
@@ -35,15 +35,9 @@ bool While::Set(
 		const NodeRef* trueNode,
 		const NodeRef* falseNode)
 {
-	if((nullptr == graph_) || (nullptr == condition))
+	if(nullptr == condition)
 	{
 		Error("nullptr\n");
-		return false;
-	}
-
-	if(condition->graph_ != graph_)
-	{
-		Error("Condition graph does not match While Graph!\n");
 		return false;
 	}
 
@@ -53,13 +47,13 @@ bool While::Set(
 		return false;
 	}
 
-	if((nullptr != trueNode) && (trueNode->graph_ != graph_))
+	if((nullptr != trueNode) && (trueNode->GetGraph() != condition->GetGraph()))
 	{
 		Error("trueNode graph does not match While Graph!\n");
 		return false;
 	}
 
-	if((nullptr != falseNode) && (falseNode->graph_ != graph_))
+	if((nullptr != falseNode) && (falseNode->GetGraph() != condition->GetGraph()))
 	{
 		Error("falseNode graph does not match While Graph!\n");
 		return false;
@@ -69,33 +63,35 @@ bool While::Set(
 
 	if(nullptr != falseNode)
 	{
-		param->BranchFalse = falseNode->nodeId_;
+		param->BranchFalse = falseNode->Id();
 	}
 
 	if(nullptr != trueNode)
 	{
-		param->BranchTrue = trueNode->nodeId_;
+		param->BranchTrue = trueNode->Id();
 	}
 
 	Node node(
 			Node::Object_t::NONE, nullptr,
 			Node::Type::CONTROL_TRANSFER_WHILE, param);
 
-	nodeId_ = graph_->AddNode(&node);
+	Node::Id_t id = condition->GetGraph()->AddNode(&node);
 
-	if(Node::ID_NONE == nodeId_)
+	if(Node::ID_NONE == id)
 	{
 		Error("Could not add Node!\n");
 		return false;
 	}
 
-	PushParent(condition->nodeId_);
+	SetNodeRef(condition->GetGraph(), id);
+
+	PushParent(condition->Id());
 
 	for(const NodeRef * nodeRef: parents)
 	{
 		if(nodeRef != condition) // Make sure condition is not added twice
 		{
-			PushParent(nodeRef->nodeId_);
+			PushParent(nodeRef->Id());
 		}
 	}
 

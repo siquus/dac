@@ -30,8 +30,8 @@
 namespace ControlTransfer {
 
 class While : public NodeRef {
-	public:
-	While(Graph* graph);
+public:
+	While();
 
 	bool Set(
 			const Algebra::Module::VectorSpace::Vector * condition,

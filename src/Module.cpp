@@ -464,14 +464,14 @@ bool VectorSpace::Vector::SameValue(const Vector * lVec, const Vector * rVec)
 
 void VectorSpace::Vector::PrintInfo() const {
 
-	const Node* thisNode = graph_->GetNode(nodeId_);
+	const Node* thisNode = GetGraph()->GetNode(Id());
 	if(nullptr == thisNode)
 	{
 		Error("Could not find node!\n");
 	}
 
 	printf("NodeId: %u, Type: %s, Factor-Dim. (",
-			nodeId_,
+			Id(),
 			thisNode->getName()	);
 
 	for(size_t factor = 0; factor < Space_->Factors_.size(); factor++)
@@ -492,7 +492,6 @@ bool VectorSpace::Vector::Init(
 {
 	Space_ = vSpace;
 	Value_ = value;
-	graph_ = graph;
 
 	Properties_ = properties;
 
@@ -500,12 +499,14 @@ bool VectorSpace::Vector::Init(
 			Node::Object_t::MODULE_VECTORSPACE_VECTOR, this,
 			type, typeParam);
 
-	nodeId_ = graph->AddNode(&node);
-	if(Node::ID_NONE == nodeId_)
+	Node::Id_t id = graph->AddNode(&node);
+	if(Node::ID_NONE == id)
 	{
 		Error("Could not add node!\n");
 		return false;
 	}
+
+	SetNodeRef(graph, id);
 
 	return true;
 }
@@ -583,7 +584,7 @@ const void * VectorSpace::Vector::InitValue() const
 const VectorSpace::Vector* VectorSpace::Vector::Power(const Vector* vec, const std::vector<uint32_t> &lfactors, const std::vector<uint32_t> &rfactors) const
 {
 	// TODO: Catch exponent of 0?
-	if(graph_ != vec->graph_)
+	if(GetGraph() != vec->GetGraph())
 	{
 		Error("Not on the same Graph!\n");
 		return nullptr;
@@ -638,22 +639,12 @@ const VectorSpace::Vector* VectorSpace::Vector::Power(const Vector* vec, const s
 	}
 
 
-	Vector* retVec = new Vector(graph_, Space_);
-
-	Node node(
-			Node::Object_t::MODULE_VECTORSPACE_VECTOR, retVec,
+	Vector* retVec = new Vector(
+			GetGraph(), Space_,
 			Node::Type::VECTOR_POWER, nullptr);
 
-	node.parents.push_back(nodeId_);
-	node.parents.push_back(vec->nodeId_);
-
-	retVec->nodeId_ = graph_->AddNode(&node);
-
-	if(Node::ID_NONE == retVec->nodeId_)
-	{
-		Error("Could not add Node!\n");
-		return nullptr;
-	}
+	retVec->PushParent(Id());
+	retVec->PushParent(vec->Id());
 
 	return retVec;
 }
@@ -662,14 +653,14 @@ template<typename inType>
 const VectorSpace::Vector* VectorSpace::Vector::Power(inType exp) const
 {
 	// TODO: Catch exponent of 0?
-	return Power(Space_->Scalar(graph_, exp));
+	return Power(Space_->Scalar(GetGraph(), exp));
 }
 
 const VectorSpace::Vector* VectorSpace::Vector::Power(const Vector* vec) const
 {
 	// TODO: Catch exponent of 0?
 
-	if(graph_ != vec->graph_)
+	if(GetGraph() != vec->GetGraph())
 	{
 		Error("Not on the same Graph!\n");
 		return nullptr;
@@ -682,18 +673,18 @@ const VectorSpace::Vector* VectorSpace::Vector::Power(const Vector* vec) const
 	}
 
 	Vector* retVec = new Vector(
-			graph_, Space_,
+			GetGraph(), Space_,
 			Node::Type::VECTOR_POWER, nullptr);
 
-	retVec->PushParent(nodeId_);
-	retVec->PushParent(vec->nodeId_);
+	retVec->PushParent(Id());
+	retVec->PushParent(vec->Id());
 
 	return retVec;
 }
 
 const VectorSpace::Vector* VectorSpace::Vector::Divide(const Vector* vec) const
 {
-	const Vector * minusOne = vec->Space_->Scalar(vec->graph_, -1.f);
+	const Vector * minusOne = vec->Space_->Scalar(vec->GetGraph(), -1.f);
 	if(nullptr == minusOne)
 	{
 		Error("Could not create scalar!\n");
@@ -720,14 +711,14 @@ const VectorSpace::Vector* VectorSpace::Vector::Divide(const Vector* vec) const
 template<typename inType>
 const VectorSpace::Vector* VectorSpace::Vector::Multiply(inType factor) const
 {
-	auto factorVec = Space_->Scalar(graph_, factor);
+	auto factorVec = Space_->Scalar(GetGraph(), factor);
 
 	return Multiply(factorVec);
 }
 
 const VectorSpace::Vector* VectorSpace::Vector::Multiply(const Vector* vec) const
 {
-	if(graph_ != vec->graph_)
+	if(GetGraph() != vec->GetGraph())
 	{
 		Error("Not on the same Graph!\n");
 		return nullptr;
@@ -770,11 +761,11 @@ const VectorSpace::Vector* VectorSpace::Vector::Multiply(const Vector* vec) cons
 		}
 
 		Vector* retVec = new Vector(
-				graph_, retSpace,
+				GetGraph(), retSpace,
 				Node::Type::VECTOR_SCALAR_PRODUCT, nullptr);
 
-		retVec->PushParent(nodeId_);
-		retVec->PushParent(vec->nodeId_);
+		retVec->PushParent(Id());
+		retVec->PushParent(vec->Id());
 
 		return retVec;
 	}
@@ -789,11 +780,11 @@ const VectorSpace::Vector* VectorSpace::Vector::Multiply(const Vector* vec) cons
 	}
 
 	Vector* retVec = new Vector(
-			graph_, retSpace,
+			GetGraph(), retSpace,
 			Node::Type::VECTOR_VECTOR_PRODUCT, nullptr);
 
-	retVec->PushParent(nodeId_);
-	retVec->PushParent(vec->nodeId_);
+	retVec->PushParent(Id());
+	retVec->PushParent(vec->Id());
 
 	return retVec;
 }
@@ -874,10 +865,10 @@ const VectorSpace::Vector* VectorSpace::Vector::JoinIndices(std::vector<std::vec
 	std::sort(param->Indices.begin(), param->Indices.end());
 
 	Vector* retVec = new Vector(
-			graph_, retSpace,
+			GetGraph(), retSpace,
 			Node::Type::VECTOR_JOIN_INDICES, param);
 
-	retVec->PushParent(nodeId_);
+	retVec->PushParent(Id());
 
 	return retVec;
 }
@@ -890,18 +881,18 @@ const VectorSpace::Vector* VectorSpace::Vector::IsSmaller(const Vector* vec) con
 		return nullptr;
 	}
 
-	if(graph_ != vec->graph_)
+	if(GetGraph() != vec->GetGraph())
 	{
 		Error("Not on the same Graph!\n");
 		return nullptr;
 	}
 
 	Vector* retVec = new Vector(
-			graph_,new VectorSpace(Ring::Int32, 1),
+			GetGraph(),new VectorSpace(Ring::Int32, 1),
 			Node::Type::VECTOR_COMPARISON_IS_SMALLER, nullptr);
 
-	retVec->PushParent(nodeId_);
-	retVec->PushParent(vec->nodeId_);
+	retVec->PushParent(Id());
+	retVec->PushParent(vec->Id());
 
 	return retVec;
 }
@@ -944,17 +935,17 @@ const VectorSpace::Vector * VectorSpace::Vector::MaxPool(const std::vector<uint3
 	param->PoolSize = poolSize;
 
 	Vector* retVec = new Vector(
-			graph_, retSpace,
+			GetGraph(), retSpace,
 			Node::Type::VECTOR_MAX_POOL, param);
 
-	retVec->PushParent(nodeId_);
+	retVec->PushParent(Id());
 
 	return retVec;
 }
 
 const VectorSpace::Vector * VectorSpace::Vector::CrossCorrelate(const Vector* Kernel) const
 {
-	if(graph_ != Kernel->graph_)
+	if(GetGraph() != Kernel->GetGraph())
 	{
 		Error("Not on the same Graph!\n");
 		return nullptr;
@@ -997,11 +988,11 @@ const VectorSpace::Vector * VectorSpace::Vector::CrossCorrelate(const Vector* Ke
 	}
 
 	Vector* retVec = new Vector(
-			graph_, retSpace,
+			GetGraph(), retSpace,
 			Node::Type::VECTOR_CROSS_CORRELATION, nullptr);
 
-	retVec->PushParent(nodeId_);
-	retVec->PushParent(Kernel->nodeId_);
+	retVec->PushParent(Id());
+	retVec->PushParent(Kernel->Id());
 
 	return retVec;
 }
@@ -1013,7 +1004,7 @@ const std::map<VectorSpace::Vector::Property, const void *> * VectorSpace::Vecto
 
 bool VectorSpace::Vector::AreCompatible(const Vector* vec1, const Vector* vec2)
 {
-	if(vec1->graph_ != vec2->graph_)
+	if(vec1->GetGraph() != vec2->GetGraph())
 	{
 		Error("Not on the same Graph!\n");
 		return false;
@@ -1047,7 +1038,7 @@ bool VectorSpace::Vector::AreCompatible(const Vector* vec1, const Vector* vec2)
 const VectorSpace::Vector * VectorSpace::Vector::Derivative(const Vector* vec) const
 {
 	// TODO: Carry out this code in generation phase.
-	if(graph_ != vec->graph_)
+	if(GetGraph() != vec->GetGraph())
 	{
 		Error("Not on the same Graph!\n");
 		return nullptr;
@@ -1055,7 +1046,7 @@ const VectorSpace::Vector * VectorSpace::Vector::Derivative(const Vector* vec) c
 
 	// Find all operations where this node was effected by the input
 	// Find this node
-	const Node* thisNode = graph_->GetNode(nodeId_);
+	const Node* thisNode = GetGraph()->GetNode(Id());
 	if(nullptr == thisNode)
 	{
 		Error("Could not find node!\n");
@@ -1065,7 +1056,7 @@ const VectorSpace::Vector * VectorSpace::Vector::Derivative(const Vector* vec) c
 	// Go through all parents and their parents ... to see if input is involved
 	// and build a graph for this
 	std::map<Node::Id_t, depNode_t> dependenceGraph;
-	TraverseParents(&dependenceGraph, nodeId_, vec->nodeId_);
+	TraverseParents(&dependenceGraph, Id(), vec->Id());
 
 	// Now we have a graph who's roots are either the dependency node or another node (dah!).
 	// What's special is that there will be no non-root dep. node!
@@ -1087,7 +1078,7 @@ const VectorSpace::Vector * VectorSpace::Vector::Derivative(const Vector* vec) c
 
 		for(auto &dep: dependenceGraph)
 		{
-			if((0 == dep.second.parents.size()) && (vec->nodeId_ != dep.first))
+			if((0 == dep.second.parents.size()) && (vec->Id() != dep.first))
 			{
 				depNodesToRemove.push_back(dep.first);
 			}
@@ -1097,7 +1088,7 @@ const VectorSpace::Vector * VectorSpace::Vector::Derivative(const Vector* vec) c
 	// The single root is the dependency node now.
 #define PRINT_FINAL_DEP_TREE 1
 #if PRINT_FINAL_DEP_TREE
-	printf("dNode Id %u, Dep Node Id %u\n", nodeId_, vec->nodeId_);
+	printf("dNode Id %u, Dep Node Id %u\n", Id(), vec->Id());
 	for(const auto &dep: dependenceGraph)
 	{
 		printf("Node Id%u: Parents: ", dep.first);
@@ -1118,12 +1109,12 @@ const VectorSpace::Vector * VectorSpace::Vector::Derivative(const Vector* vec) c
 	// Chain rule: Contract / Add the derivatives of all nodes above
 	// Start Node: Sum over all derivatives w.r.t. all parents
 
-	return CreateDerivative(&dependenceGraph, this, vec->nodeId_);
+	return CreateDerivative(&dependenceGraph, this, vec->Id());
 }
 
 void VectorSpace::Vector::TraverseParents(std::map<Node::Id_t, depNode_t> * depNodes, Node::Id_t currentNode, Node::Id_t depNodeId) const
 {
-	const Node * currentNodePt = graph_->GetNode(currentNode);
+	const Node * currentNodePt = GetGraph()->GetNode(currentNode);
 	if(nullptr == currentNodePt)
 	{
 		Error("Could not find node Id%u!\n", currentNode);
@@ -1146,13 +1137,13 @@ void VectorSpace::Vector::TraverseParents(std::map<Node::Id_t, depNode_t> * depN
 
 const VectorSpace::Vector* VectorSpace::Vector::CreateDerivative(std::map<Node::Id_t, depNode_t> * depNodes, const VectorSpace::Vector * currentVec, Node::Id_t depNodeId) const
 {
-	if(currentVec->nodeId_ == depNodeId)
+	if(currentVec->Id() == depNodeId)
 	{
 		Error("Taking derivative w.r.t. oneself!\n");
 		return nullptr;
 	}
 
-	if(0 == (*depNodes)[currentVec->nodeId_].parents.size())
+	if(0 == (*depNodes)[currentVec->Id()].parents.size())
 	{
 		Error("Taking derivative of parentless vector!\n");
 		return nullptr;
@@ -1165,16 +1156,16 @@ const VectorSpace::Vector* VectorSpace::Vector::CreateDerivative(std::map<Node::
 	// Inside that Loop, this function will be called recursively to create the sums for the chain-rule, e.g. above
 	// for B(C, F) ... i.e. dC and dF are summed.
 	const Vector * summandVec = nullptr;
-	for(const Node::Id_t &parentId: (*depNodes)[currentVec->nodeId_].parents)
+	for(const Node::Id_t &parentId: (*depNodes)[currentVec->Id()].parents)
 	{
-		const Node * parentNode = graph_->GetNode(parentId);
+		const Node * parentNode = GetGraph()->GetNode(parentId);
 		if(nullptr == parentNode)
 		{
 			Error("Unknown Node Id!\n");
 			return nullptr;
 		}
 
-		const Node* fctNode = currentVec->graph_->GetNode(currentVec->nodeId_);
+		const Node* fctNode = currentVec->GetGraph()->GetNode(currentVec->Id());
 		printf("DepNode %u ParNode %u: Calculating derivative of %s (id %u) w.r.t. %s (id %u)\n",
 				depNodeId, parentId,
 				fctNode->getName(), fctNode->id,
@@ -1272,8 +1263,8 @@ const VectorSpace::Vector* VectorSpace::Vector::CreateDerivative(std::map<Node::
 const VectorSpace::Vector* VectorSpace::Vector::CreateDerivative(const Vector* vecValuedFct, const Vector* arg)
 {
 	// Check if arg actually is a parent to this function
-	const Node* fctNode = vecValuedFct->graph_->GetNode(vecValuedFct->nodeId_);
-	if(fctNode->parents.end() == std::find(fctNode->parents.begin(), fctNode->parents.end(), arg->nodeId_))
+	const Node* fctNode = vecValuedFct->GetGraph()->GetNode(vecValuedFct->Id());
+	if(fctNode->parents.end() == std::find(fctNode->parents.begin(), fctNode->parents.end(), arg->Id()))
 	{
 		Error("Tried to take derivative w.r.t. non-existing input node!\n");
 		return nullptr;
@@ -1314,7 +1305,7 @@ const VectorSpace::Vector* VectorSpace::Vector::CreateDerivative(const Vector* v
 
 const VectorSpace::Vector* VectorSpace::Vector::Contract(const Vector* vec, const std::vector<uint32_t> &lfactors, const std::vector<uint32_t> &rfactors) const
 {
-	if(graph_ != vec->graph_)
+	if(GetGraph() != vec->GetGraph())
 	{
 		Error("Not on the same Graph!\n");
 		return nullptr;
@@ -1406,8 +1397,8 @@ const VectorSpace::Vector* VectorSpace::Vector::Contract(const Vector* vec, cons
 
 	Vector* retVec = nullptr;
 
-	const Node * thisNode = graph_->GetNode(nodeId_);
-	const Node * vecNode = graph_->GetNode(vec->nodeId_);
+	const Node * thisNode = GetGraph()->GetNode(Id());
+	const Node * vecNode = GetGraph()->GetNode(vec->Id());
 
 	if((Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == thisNode->GetType()) &&
 			(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == vecNode->GetType()))
@@ -1498,7 +1489,7 @@ const VectorSpace::Vector* VectorSpace::Vector::Contract(const Vector* vec, cons
 		}
 
 		retVec = new Vector(
-				graph_, retSpace,
+				GetGraph(), retSpace,
 				Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT, opKronParam);
 	}
 	else
@@ -1508,11 +1499,11 @@ const VectorSpace::Vector* VectorSpace::Vector::Contract(const Vector* vec, cons
 		opParameters->rfactors = rfactors;
 
 		retVec = new Vector(
-				graph_, retSpace,
+				GetGraph(), retSpace,
 				Node::Type::VECTOR_CONTRACTION, opParameters);
 
-		retVec->PushParent(nodeId_);
-		retVec->PushParent(vec->nodeId_);
+		retVec->PushParent(Id());
+		retVec->PushParent(vec->Id());
 	}
 
 	return retVec;
@@ -1576,10 +1567,10 @@ const VectorSpace::Vector* VectorSpace::Vector::Project(const std::vector<std::p
 	opParameters->range = range;
 
 	Vector* retVec = new Vector(
-			graph_, retSpace,
+			GetGraph(), retSpace,
 			Node::Type::VECTOR_PROJECTION, opParameters);
 
-	retVec->PushParent(nodeId_);
+	retVec->PushParent(Id());
 
 	return retVec;
 }
@@ -1609,10 +1600,10 @@ const VectorSpace::Vector* VectorSpace::Vector::Permute(const std::vector<uint32
 	opParameters->indices = indices;
 
 	Vector* retVec = new Vector(
-			graph_, Space_,
+			GetGraph(), Space_,
 			Node::Type::VECTOR_PERMUTATION, opParameters);
 
-	retVec->PushParent(nodeId_);
+	retVec->PushParent(Id());
 
 	return retVec;
 }
@@ -1654,24 +1645,24 @@ const VectorSpace::Vector * VectorSpace::Vector::IndexSplitSum(const std::vector
 	opParameters->SplitPosition = splitPosition;
 
 	Vector* retVec = new Vector(
-			graph_, new VectorSpace(retSimpleVs),
+			GetGraph(), new VectorSpace(retSimpleVs),
 			Node::Type::VECTOR_INDEX_SPLIT_SUM, opParameters);
 
-	retVec->PushParent(nodeId_);
+	retVec->PushParent(Id());
 
 	return retVec;
 }
 
 const VectorSpace::Vector* VectorSpace::Vector::CrossCorrelationDerivative(const Vector* vecValuedFct, const Vector* arg)
 {
-	const Node * fctNode = vecValuedFct->graph_->GetNode(vecValuedFct->nodeId_);
+	const Node * fctNode = vecValuedFct->GetGraph()->GetNode(vecValuedFct->Id());
 	if(nullptr == fctNode)
 	{
 		Error("Could not find node!\n");
 		return nullptr;
 	}
 
-	bool argIsKernel = (arg->nodeId_ == fctNode->parents[1]);
+	bool argIsKernel = (arg->Id() == fctNode->parents[1]);
 	if(!argIsKernel)
 	{
 		Error("Not implemented: Cross-correlations derivative w.r.t. input\n"); // TODO: Implement
@@ -1680,7 +1671,7 @@ const VectorSpace::Vector* VectorSpace::Vector::CrossCorrelationDerivative(const
 
 	const Vector * kernelVector = arg; // for readability
 
-	const Node * inputNode = vecValuedFct->graph_->GetNode(fctNode->parents[0]);
+	const Node * inputNode = vecValuedFct->GetGraph()->GetNode(fctNode->parents[0]);
 	if(nullptr == inputNode)
 	{
 		Error("Could not find node!\n");
@@ -1714,7 +1705,7 @@ const VectorSpace::Vector* VectorSpace::Vector::ProjectDerivative(const Vector* 
 		return nullptr;
 	}
 
-	const Node * fctNode = vecValuedFct->graph_->GetNode(vecValuedFct->nodeId_);
+	const Node * fctNode = vecValuedFct->GetGraph()->GetNode(vecValuedFct->Id());
 	if(nullptr == fctNode)
 	{
 		Error("Could not find node!\n");
@@ -1776,7 +1767,7 @@ const VectorSpace::Vector* VectorSpace::Vector::ProjectDerivative(const Vector* 
 	paramSparse.Initializer = paramSparse.DENSE;
 
 	const VectorSpace::Vector* retVec = retSpace->Element(
-			arg->graph_,
+			arg->GetGraph(),
 			*initializer,
 			Property::Sparse,
 			&paramSparse);
@@ -1794,21 +1785,21 @@ const VectorSpace::Vector* VectorSpace::Vector::PowerDerivative(const Vector* ve
 {
 	// TODO: Catch exponent of 1?
 
-	const Node * fctNode = vecValuedFct->graph_->GetNode(vecValuedFct->nodeId_);
+	const Node * fctNode = vecValuedFct->GetGraph()->GetNode(vecValuedFct->Id());
 	if(nullptr == fctNode)
 	{
 		Error("Could not find node!\n");
 		return nullptr;
 	}
 
-	const Node * lNode = arg->graph_->GetNode(fctNode->parents[0]);
+	const Node * lNode = arg->GetGraph()->GetNode(fctNode->parents[0]);
 	if(nullptr == lNode)
 	{
 		Error("Could not find node Id%u!\n", fctNode->parents[0]);
 		return nullptr;
 	}
 
-	const Node * rNode = arg->graph_->GetNode(fctNode->parents[1]);
+	const Node * rNode = arg->GetGraph()->GetNode(fctNode->parents[1]);
 	if(nullptr == rNode)
 	{
 		Error("Could not find node Id%u!\n", fctNode->parents[1]);
@@ -1818,7 +1809,7 @@ const VectorSpace::Vector* VectorSpace::Vector::PowerDerivative(const Vector* ve
 	const Vector* baseVector = (const Vector *) lNode->GetObjectPt();
 	const Vector* expVector = (const Vector *) rNode->GetObjectPt();
 
-	bool derivativeWrtBase = (fctNode->parents[0] == arg->nodeId_);
+	bool derivativeWrtBase = (fctNode->parents[0] == arg->Id());
 
 	if(!derivativeWrtBase)
 	{
@@ -1827,7 +1818,7 @@ const VectorSpace::Vector* VectorSpace::Vector::PowerDerivative(const Vector* ve
 	}
 
 	// d/db b^e = e * b^(e-1)
-	const Vector* minusOne = expVector->Space_->Scalar(expVector->graph_, -1.f);
+	const Vector* minusOne = expVector->Space_->Scalar(expVector->GetGraph(), -1.f);
 	if(nullptr == minusOne)
 	{
 		Error("Could not create scalar!\n");
@@ -1872,7 +1863,7 @@ const VectorSpace::Vector* VectorSpace::Vector::PowerDerivative(const Vector* ve
 
 	VectorSpace * kronVectorSpace = new VectorSpace(*arg->Space_, 2);
 
-	const Vector * kronVec = kronVectorSpace->Element(arg->graph_, deltaPairs);
+	const Vector * kronVec = kronVectorSpace->Element(arg->GetGraph(), deltaPairs);
 	if(nullptr == kronVec)
 	{
 		Error("Could not create Kronecker\n");
@@ -1906,7 +1897,7 @@ const VectorSpace::Vector* VectorSpace::Vector::MultiplyDerivative(const Vector*
 {
 	// Is arg the right side, i.e. the scalar?
 	// On which side of the contraction is the non-arg node?
-	const Node * fctNode = vecValuedFct->graph_->GetNode(vecValuedFct->nodeId_);
+	const Node * fctNode = vecValuedFct->GetGraph()->GetNode(vecValuedFct->Id());
 	if(nullptr == fctNode)
 	{
 		Error("Could not find node!\n");
@@ -1915,7 +1906,7 @@ const VectorSpace::Vector* VectorSpace::Vector::MultiplyDerivative(const Vector*
 
 	bool argOnRightSide;
 	Node::Id_t otherNodeId;
-	if(fctNode->parents[0] == arg->nodeId_)
+	if(fctNode->parents[0] == arg->Id())
 	{
 		argOnRightSide = false;
 		otherNodeId = fctNode->parents[1];
@@ -1926,7 +1917,7 @@ const VectorSpace::Vector* VectorSpace::Vector::MultiplyDerivative(const Vector*
 		otherNodeId = fctNode->parents[0];
 	}
 
-	const Node * otherNode = arg->graph_->GetNode(otherNodeId);
+	const Node * otherNode = arg->GetGraph()->GetNode(otherNodeId);
 	if(nullptr == otherNode)
 	{
 		Error("Could not find node Id%u!\n", otherNodeId);
@@ -1953,7 +1944,7 @@ const VectorSpace::Vector* VectorSpace::Vector::MultiplyDerivative(const Vector*
 
 	VectorSpace * kronVectorSpace = new VectorSpace(*arg->Space_, 2);
 
-	const Vector * kronVec = kronVectorSpace->Element(arg->graph_, deltaPairs);
+	const Vector * kronVec = kronVectorSpace->Element(arg->GetGraph(), deltaPairs);
 	if(nullptr == kronVec)
 	{
 		Error("Could not create Kronecker\n");
@@ -1996,7 +1987,7 @@ const VectorSpace::Vector* VectorSpace::Vector::MultiplyDerivative(const Vector*
 
 const VectorSpace::Vector* VectorSpace::Vector::PermuteDerivative(const Vector* vecValuedFct, const Vector* arg)
 {
-	const Node * fctNode = vecValuedFct->graph_->GetNode(vecValuedFct->nodeId_);
+	const Node * fctNode = vecValuedFct->GetGraph()->GetNode(vecValuedFct->Id());
 	if(nullptr == fctNode)
 	{
 		Error("Could not find node!\n");
@@ -2015,7 +2006,7 @@ const VectorSpace::Vector* VectorSpace::Vector::PermuteDerivative(const Vector* 
 
 	VectorSpace * kronVectorSpace = new VectorSpace(*arg->Space_, 2);
 
-	return kronVectorSpace->Element(arg->graph_, deltaPairs);
+	return kronVectorSpace->Element(arg->GetGraph(), deltaPairs);
 }
 
 const VectorSpace::Vector* VectorSpace::Vector::ContractDerivative(const Vector* vecValuedFct, const Vector* arg)
@@ -2029,7 +2020,7 @@ const VectorSpace::Vector* VectorSpace::Vector::ContractDerivative(const Vector*
 	// C_ijkmn = Permute(E_kmijn)
 
 	// On which side of the contraction is the non-arg node?
-	const Node * fctNode = vecValuedFct->graph_->GetNode(vecValuedFct->nodeId_);
+	const Node * fctNode = vecValuedFct->GetGraph()->GetNode(vecValuedFct->Id());
 	if(nullptr == fctNode)
 	{
 		Error("Could not find node!\n");
@@ -2042,18 +2033,18 @@ const VectorSpace::Vector* VectorSpace::Vector::ContractDerivative(const Vector*
 	const std::vector<uint32_t> * otherContrFactors;
 	const Node * otherNode = nullptr;
 	bool argOnRightSide;
-	if(fctNode->parents[0] == arg->nodeId_)
+	if(fctNode->parents[0] == arg->Id())
 	{
 		argContrFactors = &contractValue->lfactors;
 		otherContrFactors = &contractValue->rfactors;
-		otherNode = vecValuedFct->graph_->GetNode(fctNode->parents[1]);
+		otherNode = vecValuedFct->GetGraph()->GetNode(fctNode->parents[1]);
 		argOnRightSide = false;
 	}
 	else
 	{
 		otherContrFactors = &contractValue->lfactors;
 		argContrFactors = &contractValue->rfactors;
-		otherNode = vecValuedFct->graph_->GetNode(fctNode->parents[0]);
+		otherNode = vecValuedFct->GetGraph()->GetNode(fctNode->parents[0]);
 		argOnRightSide = true;
 	}
 
@@ -2075,7 +2066,7 @@ const VectorSpace::Vector* VectorSpace::Vector::ContractDerivative(const Vector*
 	}
 
 	VectorSpace * kronVectorSpace = new VectorSpace(*arg->Space_, 2);
-	const Vector * kronVec = kronVectorSpace->Element(arg->graph_, deltaPairs);
+	const Vector * kronVec = kronVectorSpace->Element(arg->GetGraph(), deltaPairs);
 
 	std::vector<uint32_t> lFactors;
 	lFactors.resize(otherContrFactors->size());
@@ -2131,7 +2122,7 @@ const VectorSpace::Vector* VectorSpace::Vector::AddDerivative(const Vector* vecV
 	if(argIsScalar)
 	{
 		// Do not add indices with Kronecker, but simply return identity.
-		return vecValuedFct->Space_->Scalar(vecValuedFct->graph_, 1.0f); // TODO: Only works for float
+		return vecValuedFct->Space_->Scalar(vecValuedFct->GetGraph(), 1.0f); // TODO: Only works for float
 	}
 
 	// General derivative of Add is easy: Just the product of Kronecker Deltas
@@ -2148,7 +2139,7 @@ const VectorSpace::Vector* VectorSpace::Vector::AddDerivative(const Vector* vecV
 	}
 
 	Vector* retVec = new Vector(
-			vecValuedFct->graph_, new VectorSpace(factors),
+			vecValuedFct->GetGraph(), new VectorSpace(factors),
 			Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT, opParameters);
 
 	return retVec;
@@ -2162,7 +2153,7 @@ const VectorSpace::Vector* VectorSpace::Vector::Subtract(const Vector* vec) cons
 		return nullptr;
 	}
 
-	const Vector * minusOne = vec->Space_->Scalar(vec->graph_, -1.f);
+	const Vector * minusOne = vec->Space_->Scalar(vec->GetGraph(), -1.f);
 	if(nullptr == minusOne)
 	{
 		Error("Could not create scalar!\n");
@@ -2213,11 +2204,11 @@ const VectorSpace::Vector* VectorSpace::Vector::Add(const Vector* vec) const
 	}
 
 	Vector* retVec = new Vector(
-			graph_, retSpace,
+			GetGraph(), retSpace,
 			Node::Type::VECTOR_ADDITION, nullptr);
 
-	retVec->PushParent(nodeId_);
-	retVec->PushParent(vec->nodeId_);
+	retVec->PushParent(Id());
+	retVec->PushParent(vec->Id());
 
 	return retVec;
 }
