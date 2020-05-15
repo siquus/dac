@@ -130,6 +130,7 @@ public:
 		Vector(Graph* graph, const VectorSpace * vSpace);
 		Vector(Graph* graph, const VectorSpace * vSpace, const std::map<Property, const void *> &properties);
 		Vector(Graph* graph, const VectorSpace * vSpace, const void * value, const std::map<Property, const void *> &properties = std::map<Property, const void *>{});
+		Vector(Graph* graph, const VectorSpace * vSpace, Node::Type type, void * typeParam);
 
 		const std::map<Property, const void *> * Properties() const;
 		const VectorSpace * Space() const;
@@ -140,7 +141,13 @@ public:
 		const void * Value_ = nullptr;
 		std::map<Property, const void *> Properties_;
 
-		bool Init(Graph* graph, const VectorSpace * vSpace, const void * value, const std::map<Property, const void *> &properties = std::map<Property, const void *>{});
+		bool Init(
+				Graph* graph,
+				const VectorSpace * vSpace,
+				const void * value,
+				const std::map<Property, const void *> &properties,
+				Node::Type type, void * typeParam);
+
 		static bool AreCompatible(const Vector* vec1, const Vector* vec2);
 
 		typedef struct depNode_s {

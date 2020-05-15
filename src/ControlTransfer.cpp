@@ -65,9 +65,6 @@ bool While::Set(
 		return false;
 	}
 
-	Node node;
-	node.Type_ = Node::Type::CONTROL_TRANSFER_WHILE;
-
 	auto param = new Node::ControlTransferParameters_t;
 
 	if(nullptr != falseNode)
@@ -80,7 +77,9 @@ bool While::Set(
 		param->BranchTrue = trueNode->nodeId_;
 	}
 
-	node.TypeParameters_ = param;
+	Node node(
+			Node::Object_t::NONE, nullptr,
+			Node::Type::CONTROL_TRANSFER_WHILE, param);
 
 	nodeId_ = graph_->AddNode(&node);
 

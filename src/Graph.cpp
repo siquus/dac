@@ -506,14 +506,38 @@ bool Node::StoreIn(Id_t id)
 	return true;
 }
 
-//void Node::Node(ObjectType objectType, const void * object, Type type, void * typeParam)
-//{
-//	objectType = objectType;
-//}
+Node::Node(Object_t object, const void * pObject, Type type, void * pType)
+{
+	if((Object_t::NONE != object) && (nullptr == pObject))
+	{
+		Error("Object Pointer can't be null if object is specified!\n");
+	}
+
+	Object_ = object;
+	ObjectPt_ = pObject;
+
+	Type_ = type;
+	TypeParameters_ = pType;
+}
 
 Node::Id_t Node::IsStoredIn() const
 {
 	return storedIn_;
+}
+
+Node::Object_t Node::GetObject() const
+{
+	return Object_;
+}
+
+const void * Node::GetObjectPt() const
+{
+	return ObjectPt_;
+}
+
+Node::Type Node::GetType() const
+{
+	return Type_;
 }
 
 const void * Node::TypeParameters() const
@@ -680,7 +704,7 @@ bool Graph::ReduceToOne(const std::vector<Node::Id_t> &nodes)
 				nodePair.second.children.insert(newNodeId);
 			}
 
-			if(Node::Type::CONTROL_TRANSFER_WHILE == nodePair.second.Type_)
+			if(Node::Type::CONTROL_TRANSFER_WHILE == nodePair.second.GetType())
 			{
 				auto pWhile = (Node::ControlTransferParameters_t*) nodePair.second.TypeParametersModifiable();
 				if(cmpId == pWhile->BranchTrue)
@@ -737,22 +761,6 @@ bool NodeRef::StoreIn(const NodeRef* nodeRef) const
 	storageNode->UseAsStorageFor(nodeId_);
 
 	return true;
-}
-
-void NodeRef::SetType(Node::Type type, void * param)
-{
-	Node * thisNode = graph_->GetNodeModifyable(nodeId_);
-
-	if(nullptr == thisNode)
-	{
-		Error("Could not get Node!\n");
-		return;
-	}
-
-	thisNode->Type_ = type;
-	thisNode->TypeParameters_ = param;
-
-	// TODO: Check that param != nullptr when it is needed!
 }
 
 void NodeRef::PushParent(Node::Id_t parent)

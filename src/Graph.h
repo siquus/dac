@@ -117,25 +117,26 @@ public:
 	bool StoreIn(Id_t id);
 	Node::Id_t IsStoredIn() const;
 
+	Type GetType() const;
 	const void * TypeParameters() const;
 	void * TypeParametersModifiable();
 
 	Id_t id = ID_NONE;
 
-	//Node(ObjectType objectType, const void * object, Type type, void * typeParam);
+	Node(Object_t object, const void * pObject, Type type, void * pType);
 
+	Object_t GetObject() const;
+	const void * GetObjectPt() const;
+
+private:
+	std::set<Id_t> usedAsStorageBy_;
+	Id_t storedIn_ = ID_NONE;
 
 	Object_t Object_ = Object_t::NONE;
 	const void* ObjectPt_ = nullptr;
 
 	Type Type_ = Type::NONE;
 	void* TypeParameters_ = nullptr; // see fooParameters_t
-
-private:
-	std::set<Id_t> usedAsStorageBy_;
-	Id_t storedIn_ = ID_NONE;
-
-
 };
 
 class Graph {
@@ -172,8 +173,6 @@ private:
 class NodeRef {
 public:
 	bool StoreIn(const NodeRef* nodeRef) const;
-
-	void SetType(Node::Type type, void * param = nullptr);
 	void PushParent(Node::Id_t parent);
 
 	Node::Id_t nodeId_ = Node::ID_NONE;
