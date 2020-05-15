@@ -1624,10 +1624,12 @@ bool CodeGenerator::ControlTransferWhileCode(const Node* node, FileWriter * file
 		return false;
 	}
 
+	auto whileParam = (const Node::ControlTransferParameters_t*) node->typeParameters;
+
 	std::set<uint32_t> arrayPosTrue;
-	if(Node::ID_NONE != node->branchTrue)
+	if(Node::ID_NONE != whileParam->BranchTrue)
 	{
-		bool success = GetRootAncestorInstructionPositions(&arrayPosTrue, node->branchTrue);
+		bool success = GetRootAncestorInstructionPositions(&arrayPosTrue, whileParam->BranchTrue);
 		if(!success)
 		{
 			Error("Could not get root ancestor instructions!\n");
@@ -1636,9 +1638,9 @@ bool CodeGenerator::ControlTransferWhileCode(const Node* node, FileWriter * file
 	}
 
 	std::set<uint32_t> arrayPosFalse;
-	if(Node::ID_NONE != node->branchFalse)
+	if(Node::ID_NONE != whileParam->BranchFalse)
 	{
-		bool success = GetRootAncestorInstructionPositions(&arrayPosFalse, node->branchFalse);
+		bool success = GetRootAncestorInstructionPositions(&arrayPosFalse, whileParam->BranchFalse);
 		if(!success)
 		{
 			Error("Could not get root ancestor instructions!\n");

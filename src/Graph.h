@@ -82,6 +82,11 @@ public:
 		std::vector<uint32_t> PoolSize;
 	} PoolParameters_t;
 
+	typedef struct {
+		id_t BranchTrue = Node::ID_NONE;
+		id_t BranchFalse = Node::ID_NONE;
+	} ControlTransferParameters_t;
+
 	// TODO: Should be called getTypeStr or so
 	static const char* getName(Type type);
 	const char * getName() const;
@@ -104,15 +109,11 @@ public:
 
 	std::vector<Id_t> parents; // TODO: No std::set, because position matters
 	std::set<Id_t> children;
-	Id_t branchTrue = ID_NONE;
-	Id_t branchFalse = ID_NONE;
 
 	Type type = Type::NONE;
 	const void* typeParameters = nullptr; // see fooParameters_t
 	ObjectType objectType = ObjectType::NONE;
 	const void* object = nullptr;
-
-	Id_t id = ID_NONE;
 
 	void UseAsStorageFor(Id_t id);
 	bool RemoveStorageFor(Id_t id);
@@ -121,11 +122,11 @@ public:
 	bool StoreIn(Id_t id);
 	Node::Id_t IsStoredIn() const;
 
+	Id_t id = ID_NONE;
+
 private:
 	std::set<Id_t> usedAsStorageBy_;
 	Id_t storedIn_ = ID_NONE;
-
-
 };
 
 class Graph {

@@ -360,9 +360,20 @@ bool Node::sameTypeParameters(const Node &lNode, const Node &rNode)
 	case Type::OUTPUT: // no break intended
 	case Type::INPUT: // no break intended
 	case Type::VECTOR_CROSS_CORRELATION: // no break intended
-	case Type::CONTROL_TRANSFER_WHILE:
 		Error("Error comparing node types!\n");
 		return false;
+
+	case Type::CONTROL_TRANSFER_WHILE:
+	{
+		auto lWhile = (const ControlTransferParameters_t*) lNode.typeParameters;
+		auto rWhile = (const ControlTransferParameters_t*) rNode.typeParameters;
+
+		if((lWhile->BranchFalse != rWhile->BranchFalse) || (lWhile->BranchTrue != rWhile->BranchTrue))
+		{
+			return false;
+		}
+	}
+	break;
 
 	case Type::VECTOR_CONTRACTION:
 	{
@@ -470,11 +481,6 @@ bool Node::areDuplicate(const Node &lNode, const Node &rNode)
 	}
 
 	if(!std::equal(lNode.usedAsStorageBy_.begin(), lNode.usedAsStorageBy_.end(), rNode.usedAsStorageBy_.begin()))
-	{
-		return false;
-	}
-
-	if((lNode.branchFalse != rNode.branchFalse) || (lNode.branchTrue != rNode.branchTrue))
 	{
 		return false;
 	}
@@ -659,14 +665,18 @@ bool Graph::ReduceToOne(const std::vector<Node::Id_t> &nodes)
 				nodePair.second.children.insert(newNodeId);
 			}
 
-			if(cmpId == nodePair.second.branchTrue)
+			if(Node::Type::CONTROL_TRANSFER_WHILE == nodePair.second.type)
 			{
-				nodePair.second.branchTrue = newNodeId;
-			}
+				auto pWhile = (Node::ControlTransferParameters_t*) nodePair.second.typeParameters;
+				if(cmpId == pWhile->BranchTrue)
+				{
+					pWhile->BranchTrue = newNodeId;
+				}
 
-			if(cmpId == nodePair.second.branchFalse)
-			{
-				nodePair.second.branchFalse = newNodeId;
+				if(cmpId == pWhile->BranchFalse)
+				{
+					pWhile->BranchFalse = newNodeId;
+				}
 			}
 
 			if(cmpId == nodePair.second.IsStoredIn())
