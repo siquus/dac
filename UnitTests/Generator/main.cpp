@@ -35,6 +35,7 @@
 #include "ModuleContract.h"
 #include "ModulePermute.h"
 #include "ModuleProduct.h"
+#include "ModuleCNN.h"
 
 #include "main.h"
 
@@ -68,6 +69,9 @@ int main()
 
 	ModuleProduct moduleProduct;
 	FATAL_ON_FALSE(moduleProduct.Generate(outpath));
+
+	ModuleCNN moduleCNN;
+	FATAL_ON_FALSE(moduleCNN.Generate(outpath));
 
 	printf("Success!\n");
 	return 0;

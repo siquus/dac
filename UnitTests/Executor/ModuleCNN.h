@@ -20,25 +20,39 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef SRC_CONTROLTRANSFER_H_
-#define SRC_CONTROLTRANSFER_H_
+#ifndef MODULECNN_H_
+#define MODULECNN_H_
 
-#include "GlobalDefines.h"
-#include "Graph.h"
-#include "Module.h"
+#include "main.h"
 
-namespace ControlTransfer {
-
-class While : public NodeRef {
+class ModuleCNN: public TestExecutor {
 public:
-	While();
+	ModuleCNN();
 
-	bool Set(
-			const Algebra::Module::VectorSpace::Vector * condition,
-			const std::vector<const NodeRef*> &parents, // These nodes need to be executed before condition is checked
-			const NodeRef* trueNode, // Execute all parents and their children (including this one) of this node if condition is true
-			const NodeRef* falseNode); // Execute all parents and their children (including this one) of this node if condition is false. Set null if done.
+	void Execute(size_t threadsNrOf);
+
+	void CC(const float * data, size_t size);
+	void CCMaxPool(const float * data, size_t size);
+	void VectorSplit(const float * data, size_t size);
+	void Vector21(const float * data, size_t size);
+	void Vector42(const float * data, size_t size);
+
+	const float * VectorInput(size_t identifier, size_t size);
+
+private:
+	size_t ThreadsNrOf_ = 0;
+
+	enum {
+		CALLED_CC,
+		CALLED_CCMaxPool,
+		CALLED_VectorSplit,
+		CALLED_Vector21,
+		CALLED_Vector42,
+		CALLED_NrOf,
+	};
+
+	bool called_[CALLED_NrOf] = {false};
 };
 
-}
-#endif /* SRC_CONTROLTRANSFER_H_ */
+
+#endif /* MODULECNN_H_ */

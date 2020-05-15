@@ -43,8 +43,12 @@ public:
 		VECTOR_KRONECKER_DELTA_PRODUCT, // i.e. deta^i_j * delta^k_l * ...
 		VECTOR_PERMUTATION,
 		VECTOR_JOIN_INDICES,
+		VECTOR_INDEX_SPLIT_SUM,
 		VECTOR_PROJECTION,
+		VECTOR_CROSS_CORRELATION,
+		VECTOR_MAX_POOL,
 		OUTPUT,
+		INPUT,
 		CONTROL_TRANSFER_WHILE,
 	};
 
@@ -66,9 +70,22 @@ public:
 	} joinIndicesParameters_t;
 
 	typedef struct {
+		std::vector<uint32_t> SplitPosition;
+	} splitSumIndicesParameters_t;
+
+	typedef struct {
 		std::vector<uint32_t> DeltaPair; // I.e. for delta^i_j * delta^k_l * , ... position i will contain j and vice versa.
 		float Scaling = 1.;
 	} KroneckerDeltaParameters_t;
+
+	typedef struct {
+		std::vector<uint32_t> PoolSize;
+	} PoolParameters_t;
+
+	typedef struct {
+		id_t BranchTrue = Node::ID_NONE;
+		id_t BranchFalse = Node::ID_NONE;
+	} ControlTransferParameters_t;
 
 	// TODO: Should be called getTypeStr or so
 	static const char* getName(Type type);
@@ -78,30 +95,54 @@ public:
 
 	static bool areDuplicate(const Node &lNode, const Node &rNode);
 	static bool sameObject(const Node &lNode, const Node &rNode);
-	static bool sameTypeParameters(const Node &lNode, const Node &rNode);
+	static bool sameType(const Node &lNode, const Node &rNode);
 
-	enum class ObjectType {
+	enum class Object_t {
 		NONE,
 		MODULE_VECTORSPACE_VECTOR,
-		INTERFACE_OUTPUT
+		INTERFACE_OUTPUT,
+		INTERFACE_INPUT,
 	};
 
 	typedef uint32_t Id_t;
 	static constexpr Id_t ID_NONE = 0;
 
+	void UseAsStorageFor(Id_t id);
+	bool RemoveStorageFor(Id_t id);
+	bool UsedAsStorageByOthers() const;
+
+	bool StoreIn(Id_t id);
+	Node::Id_t IsStoredIn() const;
+
+	Type GetType() const;
+	const void * TypeParameters() const;
+	void * TypeParametersModifiable();
+
+	Id_t id = ID_NONE;
+
+	Node(Object_t object, const void * pObject, Type type, void * pType);
+
+	Object_t GetObject() const;
+	const void * GetObjectPt() const;
+
+	const std::vector<Id_t> * Parents() const;
+	std::vector<Id_t> * ParentsModifiable();
+
+	const std::set<Id_t> * Children() const;
+	std::set<Id_t> * ChildrenModifiable();
+
+private:
+	std::set<Id_t> usedAsStorageBy_;
+	Id_t storedIn_ = ID_NONE;
+
+	Object_t Object_ = Object_t::NONE;
+	const void* ObjectPt_ = nullptr;
+
+	Type Type_ = Type::NONE;
+	void* TypeParameters_ = nullptr; // see fooParameters_t
+
 	std::vector<Id_t> parents; // TODO: No std::set, because position matters
 	std::set<Id_t> children;
-	Id_t branchTrue = ID_NONE;
-	Id_t branchFalse = ID_NONE;
-
-	Type type = Type::NONE;
-	const void* typeParameters = nullptr; // see fooParameters_t
-	ObjectType objectType = ObjectType::NONE;
-	const void* object = nullptr;
-	Id_t id = ID_NONE;
-	Id_t storedIn_ = ID_NONE;
-	bool noStorage_ = false;
-	std::set<Id_t> usedAsStorageBy_;
 };
 
 class Graph {
@@ -136,11 +177,18 @@ private:
 };
 
 class NodeRef {
-public:
-	bool StoreIn(const NodeRef* nodeRef) const;
-
 	Node::Id_t nodeId_ = Node::ID_NONE;
 	Graph* graph_ = nullptr;
+
+protected:
+	void SetNodeRef(Graph* graph, Node::Id_t id);
+
+public:
+	bool StoreIn(const NodeRef* nodeRef) const;
+	void PushParent(Node::Id_t parent);
+
+	Node::Id_t Id() const;
+	Graph* GetGraph() const;
 };
 
 #endif /* SRC_GRAPH_H_ */

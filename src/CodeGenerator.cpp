@@ -109,8 +109,118 @@ static const char fileHeader[] = \
  */\n\
 \n";
 
+// TODO: This is very wasteful
+static void getAllTuples(std::vector<std::vector<uint32_t>> &tuples, const std::vector<std::pair<uint32_t, uint32_t>> &ranges)
+{
+	const size_t nrOfTuplesLimit = 1000;
+
+	size_t nrOfTuples = 1;
+	for(const auto &range: ranges)
+	{
+		nrOfTuples *= range.second - range.first;
+	}
+
+	if(nrOfTuples > nrOfTuplesLimit)
+	{
+		Fatal("Tried to generated %lu tuples. Limit is %lu!\n",
+				nrOfTuples, nrOfTuplesLimit);
+	}
+
+	tuples.resize(nrOfTuples);
+
+	// Initialize first tuple to all lowest indices
+	tuples[0].resize(ranges.size());
+	for(size_t index = 0; index < ranges.size(); index++)
+	{
+		tuples[0].at(index) = ranges[index].first;
+	}
+
+	const uint32_t lastIndexLimit = ranges[ranges.size() - 1].second;
+	for(size_t tuple = 1; tuple < nrOfTuples; tuple++)
+	{
+		tuples[tuple] = tuples[tuple -1];
+
+		 uint32_t lastIndex = tuples[tuple].at(ranges.size() - 1);
+
+		 if(lastIndex < lastIndexLimit - 1)
+		 {
+			 tuples[tuple].at(ranges.size() - 1)++;
+		 }
+		 else // Increase other index
+		 {
+			 tuples[tuple].at(ranges.size() - 1) = 0;
+
+			 for(int index = ranges.size() - 2; index >= 0; index--)
+			 {
+				 if(tuples[tuple].at(index) < ranges[index].second - 1)
+				 {
+					 tuples[tuple].at(index)++;
+					 break;
+				 }
+				 else
+				 {
+					 tuples[tuple].at(index) = 0;
+				 }
+			 }
+		 }
+	}
+}
 
 static const uint32_t NODE_T_MAX_EDGE_NUMBER = 42;
+
+static void appendArrayPosition(std::string * out, const Algebra::Module::VectorSpace * vspace, const std::string &indexTuple)
+{
+	std::vector<uint32_t> strides;
+	vspace->GetStrides(&strides);
+
+	*out += "[";
+	for(size_t stride = 0; stride < strides.size(); stride++)
+	{
+		*out += indexTuple + "[" + std::to_string(stride) + "]";
+
+		if(strides[stride])
+		{
+			*out += " * " + std::to_string(strides[stride]);
+		}
+
+		if(strides.size() - 1 != stride)
+		{
+			*out += " + ";
+		}
+	}
+	*out += "]";
+}
+
+static void appendIndexTuple(std::string * out, const Algebra::Module::VectorSpace * vspace, const std::string &arrayPos)
+{
+	std::vector<uint32_t> strides;
+	vspace->GetStrides(&strides);
+
+	*out += "{";
+	for(size_t stride = 0; stride < strides.size(); stride++)
+	{
+		if(0 == stride)
+		{
+			*out += arrayPos;
+		}
+		else
+		{
+			*out += "(" + arrayPos + " % " + std::to_string(strides[stride - 1]) + ")";
+		}
+
+		if(1 != strides[stride])
+		{
+			*out += " / " + std::to_string(strides[stride]);
+		}
+
+		if(strides.size() - 1 != stride)
+		{
+			*out += ", ";
+		}
+	}
+
+	*out += "}";
+}
 
 FileWriter::~FileWriter()
 {
@@ -205,15 +315,15 @@ bool CodeGenerator::Generate(const Graph* graph)
 	{
 		DEBUG("nodeMap Node%2u: %s,\t\t ObjType %2u,  Children ",
 				nodePair.first,
-				Node::getName(nodePair.second.type),
-				(unsigned int) nodePair.second.objectType);
+				Node::getName(nodePair.second.GetType()),
+				(unsigned int) nodePair.second.GetObject());
 
-		for(Node::Id_t nodeId: nodePair.second.children)
+		for(const Node::Id_t &nodeId: *nodePair.second.Children())
 		{
 			DEBUG("%u, ", nodeId);
 		}
 		DEBUG("Parents ");
-		for(Node::Id_t nodeId: nodePair.second.parents)
+		for(const Node::Id_t &nodeId: *nodePair.second.Parents())
 		{
 			DEBUG("%u, ", nodeId);
 		}
@@ -274,7 +384,7 @@ bool CodeGenerator::Generate(const Graph* graph)
 	fileDacH_.PrintfLine("extern \"C\" {");
 	fileDacH_.PrintfLine("#endif // __cplusplus\n");
 	fileDacH_.PrintfLine("#include <stddef.h>\n");
-	retFalseOnFalse(GenerateOutputFunctions(), "Could not generate Output Functions\n!");
+	retFalseOnFalse(GenerateInterfaceFunctions(), "Could not generate interface Functions\n!");
 	fileInstructions_.PrintfLine("");
 
 	// Generate Variables
@@ -311,38 +421,90 @@ bool CodeGenerator::GenerateNodesArray()
 	{
 		// Only include parents/children which require an instruction
 		std::vector<uint32_t> parentsArrayPosition;
-		for(const Node::Id_t &parent: nodePair.second->parents)
+		for(const Node::Id_t &parent: *nodePair.second->Parents())
 		{
 			if(nodesInstructionMap_.end() != nodesInstructionMap_.find(parent))
 			{
 				const auto &arrayPos = nodeArrayPos_.find(parent);
 				if(nodeArrayPos_.end() == arrayPos)
 				{
-					Error("Couldn't find array position");
+					Error("Couldn't find array position for node %u\n", parent);
 					return false;
 				}
 
 				parentsArrayPosition.push_back(arrayPos->second);
 			}
+			else // Maybe the parent is just a intermediate variable for e.g. an input
+			{
+				const Node * parentNode = graph_->GetNode(parent);
+				for(const Node::Id_t &grandParent: *parentNode->Parents())
+				{
+					if(nodesInstructionMap_.end() != nodesInstructionMap_.find(grandParent))
+					{
+						const auto &arrayPos = nodeArrayPos_.find(grandParent);
+						if(nodeArrayPos_.end() == arrayPos)
+						{
+							Error("Couldn't find array position for node %u\n", grandParent);
+							return false;
+						}
+
+						parentsArrayPosition.push_back(arrayPos->second);
+					}
+				}
+			}
 		}
 
 		std::vector<uint32_t> childrenArrayPosition;
-		if(nodePair.second->type != Node::Type::CONTROL_TRANSFER_WHILE) // Control Transfers don't have children
+		switch(nodePair.second->GetType())
 		{
-			for(const Node::Id_t &child: nodePair.second->children)
+		case Node::Type::CONTROL_TRANSFER_WHILE:
+			// Control Transfers don't have children
+			break;
+
+		case Node::Type::INPUT:
+		{
+			// Add children of child
+			Node::Id_t childId = *(nodePair.second->Children()->begin());
+			const Node * childNode = graph_->GetNode(childId);
+			if(nullptr == childNode)
+			{
+				Error("Could not get node!\n");
+				return false;
+			}
+
+			for(const Node::Id_t &child: *childNode->Children())
 			{
 				if(nodesInstructionMap_.end() != nodesInstructionMap_.find(child))
 				{
 					const auto &arrayPos = nodeArrayPos_.find(child);
 					if(nodeArrayPos_.end() == arrayPos)
 					{
-						Error("Couldn't find array position");
+						Error("Couldn't find array position for node %u\n", child);
 						return false;
 					}
 
 					childrenArrayPosition.push_back(arrayPos->second);
 				}
 			}
+		}
+		break;
+
+		default:
+			for(const Node::Id_t &child: *nodePair.second->Children())
+			{
+				if(nodesInstructionMap_.end() != nodesInstructionMap_.find(child))
+				{
+					const auto &arrayPos = nodeArrayPos_.find(child);
+					if(nodeArrayPos_.end() == arrayPos)
+					{
+						Error("Couldn't find array position for node %u\n", child);
+						return false;
+					}
+
+					childrenArrayPosition.push_back(arrayPos->second);
+				}
+			}
+			break;
 		}
 
 		retFalseOnFalse(
@@ -367,7 +529,7 @@ bool CodeGenerator::GenerateNodesArray()
 		const auto &arrayPos = nodeArrayPos_.find(node);
 		if(nodeArrayPos_.end() == arrayPos)
 		{
-			Error("Couldn't find array position\n");
+			Error("Couldn't find array position for node %u\n", node);
 			return false;
 		}
 
@@ -405,12 +567,22 @@ bool CodeGenerator::GetFirstNodesToExecute(std::set<Node::Id_t> * nodeSet)
 	auto nodes = graph_->GetNodes();
 	for(const auto &nodePair: *nodes)
 	{
-		if(0 == nodePair.second.parents.size())
+		if(0 == nodePair.second.Parents()->size())
 		{
 			roots.insert(nodePair.second.id);
-			std::copy(
-					nodePair.second.children.begin(), nodePair.second.children.end(),
-					std::inserter(*nodeSet, nodeSet->end()));
+
+			bool nodeIsInstruction = (nodesInstructionMap_.find(nodePair.second.id) != nodesInstructionMap_.end());
+
+			if(nodeIsInstruction)
+			{
+				nodeSet->insert(nodePair.second.id);
+			}
+			else
+			{
+				std::copy(
+						nodePair.second.Children()->begin(), nodePair.second.Children()->end(),
+						std::inserter(*nodeSet, nodeSet->end()));
+			}
 		}
 	}
 
@@ -428,7 +600,7 @@ bool CodeGenerator::GetFirstNodesToExecute(std::set<Node::Id_t> * nodeSet)
 
 		const Node* childNode = &childNodeIt->second;
 
-		for(Node::Id_t parentId: childNode->parents)
+		for(const Node::Id_t &parentId: *childNode->Parents())
 		{
 			if(roots.end() == roots.find(parentId))
 			{
@@ -454,10 +626,10 @@ bool CodeGenerator::GenerateInstructions()
 	for(const auto &nodePair: *nodes)
 	{
 		// Does this node require a function?
-		switch(nodePair.second.type)
+		switch(nodePair.second.GetType())
 		{
 		default:
-			Error("Unknown Node-Type %u\n", (uint8_t) nodePair.second.type);
+			Error("Unknown Node-Type %u\n", (uint8_t) nodePair.second.GetType());
 			return false;
 
 		case Node::Type::NONE:
@@ -478,7 +650,11 @@ bool CodeGenerator::GenerateInstructions()
 		case Node::Type::VECTOR_PERMUTATION: // no break intended
 		case Node::Type::VECTOR_PROJECTION: // no break intended
 		case Node::Type::VECTOR_JOIN_INDICES: // no break intended
-		case Node::Type::OUTPUT:
+		case Node::Type::VECTOR_INDEX_SPLIT_SUM: // no break intended
+		case Node::Type::VECTOR_CROSS_CORRELATION: // no break intended
+		case Node::Type::VECTOR_MAX_POOL: // no break intended
+		case Node::Type::OUTPUT: // no break intended
+		case Node::Type::INPUT:
 			break; // create instruction
 		}
 
@@ -487,7 +663,7 @@ bool CodeGenerator::GenerateInstructions()
 		GenerateInstructionId(&fctId, nodePair.second.id);
 
 		// Set param to unused if not used
-		if(Node::Type::CONTROL_TRANSFER_WHILE != nodePair.second.type)
+		if(Node::Type::CONTROL_TRANSFER_WHILE != nodePair.second.GetType())
 		{
 			fileInstructions_.PrintfLine("static void %s(void * instance __attribute__((unused)), void (*PushNode)(void * instance, struct node_s * node) __attribute__((unused)))", fctId.c_str());
 		}
@@ -521,24 +697,46 @@ bool CodeGenerator::GenerateInstructions()
 
 bool CodeGenerator::GenerateCallbackPtCheck(FileWriter* file) const
 {
+	std::set<const void *> inputCheckCreated;
+
 	auto nodes = graph_->GetNodes();
 	for(const auto &nodePair: *nodes)
 	{
-		if(Node::Type::OUTPUT != nodePair.second.type)
+		switch(nodePair.second.GetType())
 		{
-			continue;
+		case Node::Type::OUTPUT:
+		{
+			auto output = (const Interface::Output*) nodePair.second.GetObjectPt();
+
+			file->PrintfLine("if(NULL == %s)", output->GetCallbackName()->c_str());
+			file->PrintfLine("{");
+			file->PrintfLine("\tfatal(\"%s == NULL\");", output->GetCallbackName()->c_str());
+			file->PrintfLine("}\n");
 		}
+		break;
 
-		auto output = (const Interface::Output*) nodePair.second.object;
+		case Node::Type::INPUT:
+		{
+			auto insert = inputCheckCreated.insert(nodePair.second.GetObjectPt());
+			if(!insert.second)
+			{
+				// Pointer check for this input already created
+				continue;
+			}
 
-		file->PrintfLine("if(NULL == Dac%sOutputCallback%s)",
-				graph_->Name().c_str(),
-				output->GetOutputName()->c_str());
-		file->PrintfLine("{");
-		file->PrintfLine("\tfatal(\"Dac%sOutputCallback%s == NULL\");",
-				graph_->Name().c_str(),
-				output->GetOutputName()->c_str());
-		file->PrintfLine("}\n");
+			auto input = (const Interface::Input*) nodePair.second.GetObjectPt();
+
+			file->PrintfLine("if(NULL == %s)", input->GetCallbackName()->c_str());
+			file->PrintfLine("{");
+			file->PrintfLine("\tfatal(\"%s == NULL\");", input->GetCallbackName()->c_str());
+			file->PrintfLine("}\n");
+		}
+		break;
+
+		default:
+			// do nothing
+			break;
+		}
 	}
 
 	return true;
@@ -650,16 +848,44 @@ bool CodeGenerator::GenerateRunFunction()
 	return true;
 }
 
+bool CodeGenerator::InputCode(const Node* node, FileWriter * file)
+{
+	file->PrintfLine("// %s\n", __func__);
+
+	auto input = (const Interface::Input* ) node->GetObjectPt();
+
+	// What is the identifier?
+	size_t identifier = input->GetIdentifier(node->id);
+	if(SIZE_MAX == identifier)
+	{
+		Error("Could not get identifier!\n");
+		return false;
+	}
+
+	// For which node do we set the input?
+	Node::Id_t targetNodeId = *(node->Children()->begin());
+	getVarRetFalseOnError(targetVar, targetNodeId);
+
+	file->PrintfLine("%s = %s(%lu, %lu * sizeof(%s));",
+			targetVar->GetIdentifier()->c_str(),
+			input->GetCallbackName()->c_str(),
+			identifier,
+			targetVar->Length(),
+			targetVar->GetTypeString());
+
+	return true;
+}
+
 bool CodeGenerator::OutputCode(const Node* node, FileWriter * file)
 {
 	file->PrintfLine("// %s\n", __func__);
 
 	// Call corresponding function callbacks
-	for(Node::Id_t outId: node->parents)
+	for(const Node::Id_t &outId: *node->Parents())
 	{
 		getVarRetFalseOnError(var, outId);
 
-		auto output = (const Interface::Output*) node->object;
+		auto output = (const Interface::Output*) node->GetObjectPt();
 
 		const std::string * varIdentifier = var->GetIdentifier();
 		if(nullptr == varIdentifier)
@@ -676,11 +902,11 @@ bool CodeGenerator::OutputCode(const Node* node, FileWriter * file)
 		}
 		NodeStr += *varIdentifier;
 
-		file->PrintfLine("Dac%sOutputCallback%s(%s, sizeof(%s));\n",
-				graph_->Name().c_str(),
-				output->GetOutputName()->c_str(),
+		file->PrintfLine("%s(%s, %lu * sizeof(%s));\n",
+				output->GetCallbackName()->c_str(),
 				NodeStr.c_str(),
-				varIdentifier->c_str());
+				var->Length(),
+				var->GetTypeString());
 	}
 
 	file->PrintfLine("");
@@ -690,7 +916,7 @@ bool CodeGenerator::OutputCode(const Node* node, FileWriter * file)
 
 bool CodeGenerator::GenerateOperationCode(const Node* node, FileWriter * file)
 {
-	switch(node->type)
+	switch(node->GetType())
 	{
 	case Node::Type::VECTOR_ADDITION:
 		retFalseOnFalse(VectorAdditionCode(node, file), "Could not generate Vector Addition Code!\n");
@@ -716,6 +942,16 @@ bool CodeGenerator::GenerateOperationCode(const Node* node, FileWriter * file)
 				"Could not generate Vector Projection Code!\n");
 		break;
 
+	case Node::Type::VECTOR_CROSS_CORRELATION:
+		retFalseOnFalse(VectorCrossCorrelationCode(node, file),
+				"Could not generate Vector Cross-Correlation Code!\n");
+		break;
+
+	case Node::Type::VECTOR_MAX_POOL:
+		retFalseOnFalse(VectorMaxPoolCode(node, file),
+				"Could not generate Vector max pool Code!\n");
+		break;
+
 	case Node::Type::VECTOR_VECTOR_PRODUCT:
 		retFalseOnFalse(VectorVectorProductCode(node, file),
 				"Could not generate Vector Vector Product Code!\n");
@@ -725,6 +961,11 @@ bool CodeGenerator::GenerateOperationCode(const Node* node, FileWriter * file)
 		retFalseOnFalse(VectorJoinIndicesCode(node, file),
 						"Could not generate Vector Join Indices Code!\n");
 		break;
+
+	case Node::Type::VECTOR_INDEX_SPLIT_SUM:
+			retFalseOnFalse(VectorIndexSplitSumCode(node, file),
+							"Could not generate Vector Split Sum Indices Code!\n");
+			break;
 
 	case Node::Type::VECTOR_COMPARISON_IS_SMALLER:
 		retFalseOnFalse(VectorComparisonIsSmallerCode(node, file),
@@ -736,8 +977,13 @@ bool CodeGenerator::GenerateOperationCode(const Node* node, FileWriter * file)
 				"Could not generate Output Code!\n");
 		break;
 
+	case Node::Type::INPUT:
+		retFalseOnFalse(InputCode(node, file),
+				"Could not generate Input Code!\n");
+		break;
+
 	case Node::Type::VECTOR:
-		Error("Type %i is no operation!\n", (int) node->type);
+		Error("Type %i is no operation!\n", (int) node->GetType());
 		return false;
 
 	case Node::Type::VECTOR_CONTRACTION:
@@ -751,7 +997,7 @@ bool CodeGenerator::GenerateOperationCode(const Node* node, FileWriter * file)
 		break;
 
 	default:
-		Error("Unknown Type %i!\n", (int) node->type);
+		Error("Unknown Type %i!\n", (int) node->GetType());
 		return false;
 	}
 
@@ -776,19 +1022,19 @@ bool CodeGenerator::VectorAdditionCode(const Node* node, FileWriter * file)
 	file->PrintfLine("// %s\n", __func__);
 
 	getVarRetFalseOnError(varOp, node->id);
-	getVarRetFalseOnError(varSum1, node->parents[0]);
-	getVarRetFalseOnError(varSum2, node->parents[1]);
+	getVarRetFalseOnError(varSum1, node->Parents()->at(0));
+	getVarRetFalseOnError(varSum2, node->Parents()->at(1));
 
 	GenerateLocalVariableDeclaration(varOp);
 
-	auto vecOp = (const Algebra::Module::VectorSpace::Vector*) node->object;
+	auto vecOp = (const Algebra::Module::VectorSpace::Vector*) node->GetObjectPt();
 
-	bool resultIsArray = (1 < vecOp->__space_->GetDim());
+	bool resultIsArray = (1 < vecOp->Space()->GetDim());
 
 	if(resultIsArray)
 	{
 		file->PrintfLine("for(uint32_t dim = 0; dim < %u; dim++)",
-				vecOp->__space_->GetDim());
+				vecOp->Space()->GetDim());
 
 		file->PrintfLine("{");
 
@@ -815,22 +1061,22 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 	file->PrintfLine("// %s\n", __func__);
 
 	auto nodes = graph_->GetNodes();
-	const auto lnode = nodes->find(node->parents[0]);
+	const auto lnode = nodes->find(node->Parents()->at(0));
 	if(nodes->end() == lnode)
 	{
-		Error("Could not find Node for id %u\n", node->parents[0]);
+		Error("Could not find Node for id %u\n", node->Parents()->at(0));
 		return false;
 	}
 
-	const auto rnode = nodes->find(node->parents[1]);
+	const auto rnode = nodes->find(node->Parents()->at(1));
 	if(nodes->end() == rnode)
 	{
-		Error("Could not find Node for id %u\n", node->parents[1]);
+		Error("Could not find Node for id %u\n", node->Parents()->at(1));
 		return false;
 	}
 
-	if((Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lnode->second.type) &&
-			(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == rnode->second.type))
+	if((Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lnode->second.GetType()) &&
+			(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == rnode->second.GetType()))
 	{
 		Error("Contraction of two KroneckerDeltas not supported: Should be handled in graph creation!\n");
 		return false;
@@ -839,7 +1085,7 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 	const Node * argVecNode;
 	const Node * kronNode;
 	bool argVecIsLeftArg;
-	if(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lnode->second.type)
+	if(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lnode->second.GetType())
 	{
 		argVecNode = &rnode->second;
 		kronNode = &lnode->second;
@@ -855,11 +1101,11 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 	getVarRetFalseOnError(varOp, node->id);
 	getVarRetFalseOnError(varArgVec, argVecNode->id);
 
-	const Algebra::Module::VectorSpace::Vector* argVec = (const Algebra::Module::VectorSpace::Vector*) argVecNode->object;
-	const Algebra::Module::VectorSpace::Vector* kronVec = (const Algebra::Module::VectorSpace::Vector*) kronNode->object;
-	const Algebra::Module::VectorSpace::Vector* opVec = (const Algebra::Module::VectorSpace::Vector*) node->object;
+	const Algebra::Module::VectorSpace::Vector* argVec = (const Algebra::Module::VectorSpace::Vector*) argVecNode->GetObjectPt();
+	const Algebra::Module::VectorSpace::Vector* kronVec = (const Algebra::Module::VectorSpace::Vector*) kronNode->GetObjectPt();
+	const Algebra::Module::VectorSpace::Vector* opVec = (const Algebra::Module::VectorSpace::Vector*) node->GetObjectPt();
 
-	const Node::contractParameters_t * contractValue = (const Node::contractParameters_t *) node->typeParameters;
+	const Node::contractParameters_t * contractValue = (const Node::contractParameters_t *) node->TypeParameters();
 
 	const std::vector<uint32_t> * argContractFactors;
 	const std::vector<uint32_t> * kronContractFactors;
@@ -874,7 +1120,7 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 		kronContractFactors = &contractValue->lfactors;
 	}
 
-	const Node::KroneckerDeltaParameters_t * kroneckerParam = (Node::KroneckerDeltaParameters_t *) kronNode->typeParameters;
+	const Node::KroneckerDeltaParameters_t * kroneckerParam = (Node::KroneckerDeltaParameters_t *) kronNode->TypeParameters();
 
 	// Copy delta pairs array into file
 	std::string deltaPairs = "const uint32_t deltaPairs[] = {";
@@ -886,62 +1132,20 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 	deltaPairs += "};";
 	file->PrintfLine("%s", deltaPairs.c_str());
 
-	// Calculate Strides, assume Row-Major Layout
-	// https://en.wikipedia.org/wiki/Row-_and_column-major_order#Address_calculation_in_general
-	std::vector<uint32_t> argStrides;
-	argVec->__space_->GetStrides(&argStrides);
-	const char argStridesId[] = "argStrides";
-	file->PrintfLine("const uint32_t %s[] = {", argStridesId);
-	for(const uint32_t &stride: argStrides)
-	{
-		file->PrintfLine("\t %u,", stride);
-	}
-	file->PrintfLine("};");
-
 	const char * varOpId = varOp->GetIdentifier()->c_str();
 
 	bool resultIsArray = (1 < varOp->Length());
 
 	if(resultIsArray)
 	{
-		std::vector<uint32_t> opStrides;
-		opVec->__space_->GetStrides(&opStrides);
-		const char opstridesId[] = "opStrides";
-		file->PrintfLine("const uint32_t %s[] = {", opstridesId);
-		for(const uint32_t &stride: opStrides)
-		{
-			file->PrintfLine("\t %u,", stride);
-		}
-		file->PrintfLine("};\n");
-
 		file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
 				varOpId, varOpId);
 		file->PrintfLine("{");
 		file->Indent();
 
-		std::string opIndexTuple = "const uint32_t opIndexTuple[] = {";
-		for(uint32_t stride = 0; stride < opStrides.size(); stride++)
-		{
-			if(0 == stride)
-			{
-				opIndexTuple += "opIndex / ";
-				opIndexTuple += opstridesId;
-				opIndexTuple += "[";
-				opIndexTuple += std::to_string(stride);
-				opIndexTuple += "]";
-				opIndexTuple += ", ";
-			}
-			else
-			{
-				opIndexTuple += "(opIndex % opStrides[";
-				opIndexTuple += std::to_string(stride - 1);
-				opIndexTuple += "]) / opStrides[";
-				opIndexTuple += std::to_string(stride);
-				opIndexTuple += "], ";
-			}
-		}
-		opIndexTuple.erase(opIndexTuple.end() - 2, opIndexTuple.end()); // remove last ", "
-		opIndexTuple += "};";
+		std::string opIndexTuple = "const uint32_t opIndexTuple[] = ";
+		appendIndexTuple(&opIndexTuple, opVec->Space(), std::string{"opIndex"});
+		opIndexTuple += ";";
 
 		file->PrintfLine("%s", opIndexTuple.c_str());
 	}
@@ -951,7 +1155,7 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 	{
 		file->PrintfLine("for(int dim%u = 0; dim%u < %u; dim%u++)",
 				factorIndex, factorIndex,
-				argVec->__space_->factors_[argContractFactors->at(factorIndex)].dim_,
+				argVec->Space()->Factors()->at(argContractFactors->at(factorIndex)).Dim,
 				factorIndex);
 		file->PrintfLine("{");
 		file->Indent();
@@ -960,11 +1164,11 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 	uint32_t opIndex = 0;
 	if(!argVecIsLeftArg)
 	{
-		opIndex = opVec->__space_->factors_.size() - (argVec->__space_->factors_.size() - argContractFactors->size());
+		opIndex = opVec->Space()->Factors()->size() - (argVec->Space()->Factors()->size() - argContractFactors->size());
 	}
 
 	std::string argIndexTuple = "const uint32_t argIndexTuple[] = {";
-	for(uint32_t lDim = 0; lDim < argVec->__space_->factors_.size(); lDim++)
+	for(uint32_t lDim = 0; lDim < argVec->Space()->Factors()->size(); lDim++)
 	{
 		auto it = std::find(
 				argContractFactors->begin(),
@@ -995,7 +1199,7 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 	}
 
 	std::string kronIndexTuple = "const uint32_t kronIndexTuple[] = {";
-	for(uint32_t rDim = 0; rDim < kronVec->__space_->factors_.size(); rDim++)
+	for(uint32_t rDim = 0; rDim < kronVec->Space()->Factors()->size(); rDim++)
 	{
 		auto it = std::find(
 				kronContractFactors->begin(),
@@ -1031,15 +1235,10 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 	//			= B_ijnn d_kl
 
 	std::string sum = "sum += ";
-	sum += *(varArgVec->GetIdentifier()) + "[";
-	for(uint32_t argIndex = 0; argIndex < argVec->__space_->factors_.size(); argIndex++)
-	{
-		sum += "argIndexTuple[" +
-				std::to_string(argIndex) + "] * "
-				+  argStridesId + "[" +  std::to_string(argIndex) + "] + ";
-	}
-	sum.erase(sum.end() - 3, sum.end()); // remove last " +"
-	sum += "] *";
+	sum += *(varArgVec->GetIdentifier());
+	appendArrayPosition(&sum, argVec->Space(), std::string{"argIndexTuple"});
+
+	sum += " *";
 
 	for(size_t paramPos = 0; paramPos < kroneckerParam->DeltaPair.size(); paramPos++)
 	{
@@ -1081,62 +1280,32 @@ bool CodeGenerator::VectorPermutationCode(const Node* node, FileWriter * file)
 {
 	file->PrintfLine("// %s\n", __func__);
 
-	const Node::permuteParameters_t * permuteParam = (const Node::permuteParameters_t *) node->typeParameters;
+	const Node::permuteParameters_t * permuteParam = (const Node::permuteParameters_t *) node->TypeParameters();
 
 	auto nodes = graph_->GetNodes();
-	const auto argNode = nodes->find(node->parents[0]);
+	const auto argNode = nodes->find(node->Parents()->at(0));
 	if(nodes->end() == argNode)
 	{
-		Error("Could not find Node for id %u\n", node->parents[0]);
+		Error("Could not find Node for id %u\n", node->Parents()->at(0));
 		return false;
 	}
 
-	const Algebra::Module::VectorSpace::Vector* vec = (const Algebra::Module::VectorSpace::Vector*) argNode->second.object;
+	const Algebra::Module::VectorSpace::Vector* vec = (const Algebra::Module::VectorSpace::Vector*) argNode->second.GetObjectPt();
 
 	getVarRetFalseOnError(varOp, node->id);
-	getVarRetFalseOnError(varArg, node->parents[0]);
+	getVarRetFalseOnError(varArg, node->Parents()->at(0));
 
 	const char * varOpId = varOp->GetIdentifier()->c_str();
 	const char * varArgId = varArg->GetIdentifier()->c_str();
-
-	std::vector<uint32_t> strides;
-	vec->__space_->GetStrides(&strides);
-	const char stridesId[] = "strides";
-	file->PrintfLine("const uint32_t %s[] = {", stridesId);
-	for(const uint32_t &stride: strides)
-	{
-		file->PrintfLine("\t %u,", stride);
-	}
-	file->PrintfLine("};\n");
 
 	file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
 			varOpId, varOpId);
 	file->PrintfLine("{");
 	file->Indent();
 
-	std::string opIndexTuple = "const uint32_t opIndexTuple[] = {";
-	for(uint32_t stride = 0; stride < strides.size(); stride++)
-	{
-		if(0 == stride)
-		{
-			opIndexTuple += "opIndex / ";
-			opIndexTuple += stridesId;
-			opIndexTuple += "[";
-			opIndexTuple += std::to_string(stride);
-			opIndexTuple += "]";
-			opIndexTuple += ", ";
-		}
-		else
-		{
-			opIndexTuple += "(opIndex % strides[";
-			opIndexTuple += std::to_string(stride - 1);
-			opIndexTuple += "]) / strides[";
-			opIndexTuple += std::to_string(stride);
-			opIndexTuple += "], ";
-		}
-	}
-	opIndexTuple.erase(opIndexTuple.end() - 2, opIndexTuple.end()); // remove last ", "
-	opIndexTuple += "};";
+	std::string opIndexTuple = "const uint32_t opIndexTuple[] = ";
+	appendIndexTuple(&opIndexTuple, vec->Space(), std::string{"opIndex"});
+	opIndexTuple += ";";
 
 	file->PrintfLine("%s", opIndexTuple.c_str());
 
@@ -1156,14 +1325,8 @@ bool CodeGenerator::VectorPermutationCode(const Node* node, FileWriter * file)
 	opValue += "[opIndex]";
 	opValue += " = ";
 	opValue += varArgId;
-	opValue += "[";
-
-	for(size_t argIndex = 0; argIndex < vec->__space_->factors_.size(); argIndex++)
-	{
-		opValue += "argIndexTuple[" + std::to_string(argIndex) + "] * " + stridesId + "[" + std::to_string(argIndex) + "] + ";
-	}
-	opValue.erase(opValue.end() - 3, opValue.end()); // remove last " + "
-	opValue += "];";
+	appendArrayPosition(&opValue, vec->Space(), std::string{"argIndexTuple"});
+	opValue += ";";
 
 	file->PrintfLine("%s", opValue.c_str());
 
@@ -1178,57 +1341,35 @@ bool CodeGenerator::VectorContractionCode(const Node* node, FileWriter * file)
 	file->PrintfLine("// %s\n", __func__);
 
 	auto nodes = graph_->GetNodes();
-	const auto lnode = nodes->find(node->parents[0]);
+	const auto lnode = nodes->find(node->Parents()->at(0));
 	if(nodes->end() == lnode)
 	{
-		Error("Could not find Node for id %u\n", node->parents[0]);
+		Error("Could not find Node for id %u\n", node->Parents()->at(0));
 		return false;
 	}
 
-	const auto rnode = nodes->find(node->parents[1]);
+	const auto rnode = nodes->find(node->Parents()->at(1));
 	if(nodes->end() == rnode)
 	{
-		Error("Could not find Node for id %u\n", node->parents[1]);
+		Error("Could not find Node for id %u\n", node->Parents()->at(1));
 		return false;
 	}
 
-	if((Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lnode->second.type) ||
-			(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == rnode->second.type))
+	if((Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lnode->second.GetType()) ||
+			(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == rnode->second.GetType()))
 	{
 		return VectorContractionKroneckerDeltaCode(node, file);
 	}
 
 	getVarRetFalseOnError(varOp, node->id);
-	getVarRetFalseOnError(varLVec, node->parents[0]);
-	getVarRetFalseOnError(varRVec, node->parents[1]);
+	getVarRetFalseOnError(varLVec, node->Parents()->at(0));
+	getVarRetFalseOnError(varRVec, node->Parents()->at(1));
 
-	const Algebra::Module::VectorSpace::Vector* lVec = (const Algebra::Module::VectorSpace::Vector*) lnode->second.object;
-	const Algebra::Module::VectorSpace::Vector* rVec = (const Algebra::Module::VectorSpace::Vector*) rnode->second.object;
+	const Algebra::Module::VectorSpace::Vector* lVec = (const Algebra::Module::VectorSpace::Vector*) lnode->second.GetObjectPt();
+	const Algebra::Module::VectorSpace::Vector* rVec = (const Algebra::Module::VectorSpace::Vector*) rnode->second.GetObjectPt();
 
-	const Algebra::Module::VectorSpace::Vector* opVec = (const Algebra::Module::VectorSpace::Vector*) node->object;
-	const Node::contractParameters_t * contractValue = (Node::contractParameters_t *) node->typeParameters;
-
-	// Calculate Strides, assume Row-Major Layout
-	// https://en.wikipedia.org/wiki/Row-_and_column-major_order#Address_calculation_in_general
-	std::vector<uint32_t> lStrides;
-	lVec->__space_->GetStrides(&lStrides);
-	const char lstridesId[] = "lStrides";
-	file->PrintfLine("const uint32_t %s[] = {", lstridesId);
-	for(const uint32_t &stride: lStrides)
-	{
-		file->PrintfLine("\t %u,", stride);
-	}
-	file->PrintfLine("};");
-
-	std::vector<uint32_t> rStrides;
-	rVec->__space_->GetStrides(&rStrides);
-	const char rstridesId[] = "rStrides";
-	file->PrintfLine("const uint32_t %s[] = {", rstridesId);
-	for(const uint32_t &stride: rStrides)
-	{
-		file->PrintfLine("\t %u,", stride);
-	}
-	file->PrintfLine("};");
+	const Algebra::Module::VectorSpace::Vector* opVec = (const Algebra::Module::VectorSpace::Vector*) node->GetObjectPt();
+	const Node::contractParameters_t * contractValue = (Node::contractParameters_t *) node->TypeParameters();
 
 	const char * varOpId = varOp->GetIdentifier()->c_str();
 
@@ -1236,44 +1377,14 @@ bool CodeGenerator::VectorContractionCode(const Node* node, FileWriter * file)
 
 	if(resultIsArray)
 	{
-		std::vector<uint32_t> opStrides;
-		opVec->__space_->GetStrides(&opStrides);
-		const char opstridesId[] = "opStrides";
-		file->PrintfLine("const uint32_t %s[] = {", opstridesId);
-		for(const uint32_t &stride: opStrides)
-		{
-			file->PrintfLine("\t %u,", stride);
-		}
-		file->PrintfLine("};\n");
-
 		file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
 				varOpId, varOpId);
 		file->PrintfLine("{");
 		file->Indent();
 
-		std::string opIndexTuple = "const uint32_t opIndexTuple[] = {";
-		for(uint32_t stride = 0; stride < opStrides.size(); stride++)
-		{
-			if(0 == stride)
-			{
-				opIndexTuple += "opIndex / ";
-				opIndexTuple += opstridesId;
-				opIndexTuple += "[";
-				opIndexTuple += std::to_string(stride);
-				opIndexTuple += "]";
-				opIndexTuple += ", ";
-			}
-			else
-			{
-				opIndexTuple += "(opIndex % opStrides[";
-				opIndexTuple += std::to_string(stride - 1);
-				opIndexTuple += "]) / opStrides[";
-				opIndexTuple += std::to_string(stride);
-				opIndexTuple += "], ";
-			}
-		}
-		opIndexTuple.erase(opIndexTuple.end() - 2, opIndexTuple.end()); // remove last ", "
-		opIndexTuple += "};";
+		std::string opIndexTuple = "const uint32_t opIndexTuple[] = ";
+		appendIndexTuple(&opIndexTuple, opVec->Space(), std::string{"opIndex"});
+		opIndexTuple += ";";
 
 		file->PrintfLine("%s", opIndexTuple.c_str());
 	}
@@ -1283,7 +1394,7 @@ bool CodeGenerator::VectorContractionCode(const Node* node, FileWriter * file)
 	{
 		file->PrintfLine("for(int dim%u = 0; dim%u < %u; dim%u++)",
 				factorIndex, factorIndex,
-				lVec->__space_->factors_[contractValue->lfactors[factorIndex]].dim_,
+				lVec->Space()->Factors()->at(contractValue->lfactors[factorIndex]).Dim,
 				factorIndex);
 		file->PrintfLine("{");
 		file->Indent();
@@ -1291,7 +1402,7 @@ bool CodeGenerator::VectorContractionCode(const Node* node, FileWriter * file)
 
 	uint32_t opIndex = 0;
 	std::string lIndexTuple = "const uint32_t lIndexTuple[] = {";
-	for(uint32_t lDim = 0; lDim < lVec->__space_->factors_.size(); lDim++)
+	for(uint32_t lDim = 0; lDim < lVec->Space()->Factors()->size(); lDim++)
 	{
 		auto it = std::find(
 				contractValue->lfactors.begin(),
@@ -1317,7 +1428,7 @@ bool CodeGenerator::VectorContractionCode(const Node* node, FileWriter * file)
 	file->PrintfLine(lIndexTuple.c_str());
 
 	std::string rIndexTuple = "const uint32_t rIndexTuple[] = {";
-	for(uint32_t rDim = 0; rDim < rVec->__space_->factors_.size(); rDim++)
+	for(uint32_t rDim = 0; rDim < rVec->Space()->Factors()->size(); rDim++)
 	{
 		auto it = std::find(
 				contractValue->rfactors.begin(),
@@ -1343,27 +1454,13 @@ bool CodeGenerator::VectorContractionCode(const Node* node, FileWriter * file)
 	file->PrintfLine(rIndexTuple.c_str());
 
 	std::string sum = "sum += ";
-	sum += *(varLVec->GetIdentifier()) + "[";
-	for(uint32_t lIndex = 0; lIndex < lVec->__space_->factors_.size(); lIndex++)
-	{
-		sum += "lIndexTuple[" +
-				std::to_string(lIndex) + "] * "
-				+  lstridesId + "[" +  std::to_string(lIndex) + "] + ";
-	}
-	sum.erase(sum.end() - 3, sum.end()); // remove last " +"
-	sum += "]";
-
+	sum += *(varLVec->GetIdentifier());
+	appendArrayPosition(&sum, lVec->Space(), std::string{"lIndexTuple"});
 	sum += " * ";
 
-	sum += *(varRVec->GetIdentifier()) + "[";
-	for(uint32_t rIndex = 0; rIndex < rVec->__space_->factors_.size(); rIndex++)
-	{
-		sum += "rIndexTuple[" +
-				std::to_string(rIndex) + "] * "
-				+  rstridesId + "[" +  std::to_string(rIndex) + "] + ";
-	}
-	sum.erase(sum.end() - 3, sum.end()); // remove last " +"
-	sum += "];";
+	sum += *(varRVec->GetIdentifier());
+	appendArrayPosition(&sum, rVec->Space(), std::string{"rIndexTuple"});
+	sum += ";";
 
 	file->PrintfLine(sum.c_str());
 
@@ -1397,8 +1494,8 @@ bool CodeGenerator::VectorComparisonIsSmallerCode(const Node* node, FileWriter *
 
 	// TODO: Create extra Norm-Nodes for this.
 	getVarRetFalseOnError(varOp, node->id);
-	getVarRetFalseOnError(varLVec, node->parents[0]);
-	getVarRetFalseOnError(varRVec, node->parents[1]);
+	getVarRetFalseOnError(varLVec, node->Parents()->at(0));
+	getVarRetFalseOnError(varRVec, node->Parents()->at(1));
 
 	std::string lNormId;
 	lNormId += *(varLVec->GetIdentifier());
@@ -1472,7 +1569,7 @@ bool CodeGenerator::GetRootAncestorInstructionPositions(std::set<uint32_t> * ins
 	{
 		const Node * rootNode = graph_->GetNode(rootId);
 
-		for(const Node::Id_t &rootChildId: rootNode->children)
+		for(const Node::Id_t &rootChildId: *rootNode->Children())
 		{
 			rootAncesorChildren.insert(rootChildId);
 		}
@@ -1485,7 +1582,7 @@ bool CodeGenerator::GetRootAncestorInstructionPositions(std::set<uint32_t> * ins
 		const Node * rootNode = graph_->GetNode(childId);
 
 		bool allParentsRoot = true;
-		for(const Node::Id_t &parentId: rootNode->parents)
+		for(const Node::Id_t &parentId: *rootNode->Parents())
 		{
 			if(rootAncestors.end() == rootAncestors.find(parentId))
 			{
@@ -1519,7 +1616,7 @@ bool CodeGenerator::ControlTransferWhileCode(const Node* node, FileWriter * file
 {
 	file->PrintfLine("// %s\n", __func__);
 
-	getVarRetFalseOnError(varCond, node->parents[0]);
+	getVarRetFalseOnError(varCond, node->Parents()->at(0));
 
 	if(1 != varCond->Length())
 	{
@@ -1527,10 +1624,12 @@ bool CodeGenerator::ControlTransferWhileCode(const Node* node, FileWriter * file
 		return false;
 	}
 
+	auto whileParam = (const Node::ControlTransferParameters_t*) node->TypeParameters();
+
 	std::set<uint32_t> arrayPosTrue;
-	if(Node::ID_NONE != node->branchTrue)
+	if(Node::ID_NONE != whileParam->BranchTrue)
 	{
-		bool success = GetRootAncestorInstructionPositions(&arrayPosTrue, node->branchTrue);
+		bool success = GetRootAncestorInstructionPositions(&arrayPosTrue, whileParam->BranchTrue);
 		if(!success)
 		{
 			Error("Could not get root ancestor instructions!\n");
@@ -1539,9 +1638,9 @@ bool CodeGenerator::ControlTransferWhileCode(const Node* node, FileWriter * file
 	}
 
 	std::set<uint32_t> arrayPosFalse;
-	if(Node::ID_NONE != node->branchFalse)
+	if(Node::ID_NONE != whileParam->BranchFalse)
 	{
-		bool success = GetRootAncestorInstructionPositions(&arrayPosFalse, node->branchFalse);
+		bool success = GetRootAncestorInstructionPositions(&arrayPosFalse, whileParam->BranchFalse);
 		if(!success)
 		{
 			Error("Could not get root ancestor instructions!\n");
@@ -1551,7 +1650,7 @@ bool CodeGenerator::ControlTransferWhileCode(const Node* node, FileWriter * file
 
 	// Add the condition to the instruction calculated when true
 	std::set<uint32_t> arrayPosCondition;
-	bool success = GetRootAncestorInstructionPositions(&arrayPosCondition, node->parents[0]);
+	bool success = GetRootAncestorInstructionPositions(&arrayPosCondition, node->Parents()->at(0));
 	if(!success)
 	{
 		Error("Could not get root ancestor instructions!\n");
@@ -1606,26 +1705,26 @@ bool CodeGenerator::VectorScalarProductKroneckerDeltaCode(const Node* node, File
 	file->PrintfLine("// %s\n", __func__);
 
 	auto nodes = graph_->GetNodes();
-	const auto lVecNode = nodes->find(node->parents[0]);
+	const auto lVecNode = nodes->find(node->Parents()->at(0));
 	if(nodes->end() == lVecNode)
 	{
-		Error("Could not find Node for id %u\n", node->parents[0]);
+		Error("Could not find Node for id %u\n", node->Parents()->at(0));
 		return false;
 	}
 
-	const auto rVecNode = nodes->find(node->parents[1]);
+	const auto rVecNode = nodes->find(node->Parents()->at(1));
 	if(nodes->end() == rVecNode)
 	{
-		Error("Could not find Node for id %u\n", node->parents[1]);
+		Error("Could not find Node for id %u\n", node->Parents()->at(1));
 		return false;
 	}
 
 	Node::Id_t varScalarNodeId;
 	const Node * kronNode = nullptr;
-	if(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lVecNode->second.type)
+	if(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lVecNode->second.GetType())
 	{
 		kronNode = &lVecNode->second;
-		varScalarNodeId = node->parents[1];
+		varScalarNodeId = node->Parents()->at(1);
 	}
 	else
 	{
@@ -1637,30 +1736,20 @@ bool CodeGenerator::VectorScalarProductKroneckerDeltaCode(const Node* node, File
 			return false;
 		}
 
-		varScalarNodeId = node->parents[0];
+		varScalarNodeId = node->Parents()->at(0);
 	}
 
 	getVarRetFalseOnError(varOp, node->id);
 	getVarRetFalseOnError(varScalar, varScalarNodeId);
 
-	const Node::KroneckerDeltaParameters_t * kroneckerParam = (const Node::KroneckerDeltaParameters_t *) kronNode->typeParameters;
+	const Node::KroneckerDeltaParameters_t * kroneckerParam = (const Node::KroneckerDeltaParameters_t *) kronNode->TypeParameters();
 
 	retFalseOnFalse(GenerateLocalVariableDeclaration(varOp), "Could not generate Var. Decl.\n");
 
-	auto opVec = (const Algebra::Module::VectorSpace::Vector*) node->object;
+	auto opVec = (const Algebra::Module::VectorSpace::Vector*) node->GetObjectPt();
 
 	// TODO: This is a giant waste of resources: Every Node should have a "scaling" attached to it, so multiplication needs
 	// to only be performed on that.
-
-	std::vector<uint32_t> opStrides;
-	opVec->__space_->GetStrides(&opStrides);
-	const char opstridesId[] = "opStrides";
-	file->PrintfLine("const uint32_t %s[] = {", opstridesId);
-	for(const uint32_t &stride: opStrides)
-	{
-		file->PrintfLine("\t %u,", stride);
-	}
-	file->PrintfLine("};\n");
 
 	std::string deltaPairs = "const uint32_t deltaPairs[] = {";
 	for(size_t paramPos = 0; paramPos < kroneckerParam->DeltaPair.size(); paramPos++)
@@ -1672,35 +1761,14 @@ bool CodeGenerator::VectorScalarProductKroneckerDeltaCode(const Node* node, File
 	file->PrintfLine("%s", deltaPairs.c_str());
 
 	file->PrintfLine("for(uint32_t opIndex = 0; opIndex < %u; opIndex++)",
-			opVec->__space_->GetDim());
+			opVec->Space()->GetDim());
 
 	file->PrintfLine("{");
 	file->Indent();
 
-	std::string opIndexTuple = "const uint32_t opIndexTuple[] = {";
-	for(uint32_t stride = 0; stride < opStrides.size(); stride++)
-	{
-		if(0 == stride)
-		{
-			opIndexTuple += "opIndex / ";
-			opIndexTuple += opstridesId;
-			opIndexTuple += "[";
-			opIndexTuple += std::to_string(stride);
-			opIndexTuple += "]";
-			opIndexTuple += ", ";
-		}
-		else
-		{
-			opIndexTuple += "(opIndex % opStrides[";
-			opIndexTuple += std::to_string(stride - 1);
-			opIndexTuple += "]) / opStrides[";
-			opIndexTuple += std::to_string(stride);
-			opIndexTuple += "], ";
-		}
-	}
-	opIndexTuple.erase(opIndexTuple.end() - 2, opIndexTuple.end()); // remove last ", "
-
-	opIndexTuple += "};";
+	std::string opIndexTuple = "const uint32_t opIndexTuple[] = ";
+	appendIndexTuple(&opIndexTuple, opVec->Space(), std::string{"opIndex"});
+	opIndexTuple += ";";
 
 	file->PrintfLine("%s", opIndexTuple.c_str());
 
@@ -1741,22 +1809,22 @@ bool CodeGenerator::VectorVectorProductKroneckerDeltaCode(const Node* node, File
 
 	auto nodes = graph_->GetNodes();
 
-	const auto lnode = nodes->find(node->parents[0]);
+	const auto lnode = nodes->find(node->Parents()->at(0));
 	if(nodes->end() == lnode)
 	{
-		Error("Could not find Node for id %u\n", node->parents[0]);
+		Error("Could not find Node for id %u\n", node->Parents()->at(0));
 		return false;
 	}
 
-	const auto rnode = nodes->find(node->parents[1]);
+	const auto rnode = nodes->find(node->Parents()->at(1));
 	if(nodes->end() == rnode)
 	{
-		Error("Could not find Node for id %u\n", node->parents[1]);
+		Error("Could not find Node for id %u\n", node->Parents()->at(1));
 		return false;
 	}
 
-	bool lNodeIsKron = (Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lnode->second.type);
-	bool rNodeIsKron = (Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == rnode->second.type);
+	bool lNodeIsKron = (Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lnode->second.GetType());
+	bool rNodeIsKron = (Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == rnode->second.GetType());
 
 	if(lNodeIsKron && rNodeIsKron)
 	{
@@ -1776,45 +1844,23 @@ bool CodeGenerator::VectorVectorProductKroneckerDeltaCode(const Node* node, File
 	const Node::KroneckerDeltaParameters_t * kroneckerParam;
 	if(lNodeIsKron)
 	{
-		vecNodeId = node->parents[1];
-		kronVec = (const Algebra::Module::VectorSpace::Vector*) lnode->second.object;
-		vec = (const Algebra::Module::VectorSpace::Vector*) rnode->second.object;
-		kroneckerParam = (const Node::KroneckerDeltaParameters_t *) lnode->second.typeParameters;
+		vecNodeId = node->Parents()->at(1);
+		kronVec = (const Algebra::Module::VectorSpace::Vector*) lnode->second.GetObjectPt();
+		vec = (const Algebra::Module::VectorSpace::Vector*) rnode->second.GetObjectPt();
+		kroneckerParam = (const Node::KroneckerDeltaParameters_t *) lnode->second.TypeParameters();
 	}
 	else
 	{
-		vecNodeId = node->parents[0];
-		kronVec = (const Algebra::Module::VectorSpace::Vector*) rnode->second.object;
-		vec = (const Algebra::Module::VectorSpace::Vector*) lnode->second.object;
-		kroneckerParam = (const Node::KroneckerDeltaParameters_t *) rnode->second.typeParameters;
+		vecNodeId = node->Parents()->at(0);
+		kronVec = (const Algebra::Module::VectorSpace::Vector*) rnode->second.GetObjectPt();
+		vec = (const Algebra::Module::VectorSpace::Vector*) lnode->second.GetObjectPt();
+		kroneckerParam = (const Node::KroneckerDeltaParameters_t *) rnode->second.TypeParameters();
 	}
 
 	getVarRetFalseOnError(varOp, node->id);
 	getVarRetFalseOnError(varVec, vecNodeId);
 
-	const Algebra::Module::VectorSpace::Vector* opVec = (const Algebra::Module::VectorSpace::Vector*) node->object;
-
-	// Calculate Strides, assume Row-Major Layout
-	// https://en.wikipedia.org/wiki/Row-_and_column-major_order#Address_calculation_in_general
-	std::vector<uint32_t> vecStrides;
-	vec->__space_->GetStrides(&vecStrides);
-	const char vecStridesId[] = "vecStrides";
-	file->PrintfLine("const uint32_t %s[] = {", vecStridesId);
-	for(const uint32_t &stride: vecStrides)
-	{
-		file->PrintfLine("\t %u,", stride);
-	}
-	file->PrintfLine("};");
-
-	std::vector<uint32_t> opStrides;
-	opVec->__space_->GetStrides(&opStrides);
-	const char opstridesId[] = "opStrides";
-	file->PrintfLine("const uint32_t %s[] = {", opstridesId);
-	for(const uint32_t &stride: opStrides)
-	{
-		file->PrintfLine("\t %u,", stride);
-	}
-	file->PrintfLine("};\n");
+	const Algebra::Module::VectorSpace::Vector* opVec = (const Algebra::Module::VectorSpace::Vector*) node->GetObjectPt();
 
 	std::string deltaPairs = "const uint32_t deltaPairs[] = {";
 	for(size_t paramPos = 0; paramPos < kroneckerParam->DeltaPair.size(); paramPos++)
@@ -1832,40 +1878,20 @@ bool CodeGenerator::VectorVectorProductKroneckerDeltaCode(const Node* node, File
 	file->PrintfLine("{");
 	file->Indent();
 
-	std::string opIndexTuple = "const uint32_t opIndexTuple[] = {";
-	for(uint32_t stride = 0; stride < opStrides.size(); stride++)
-	{
-		if(0 == stride)
-		{
-			opIndexTuple += "opIndex / ";
-			opIndexTuple += opstridesId;
-			opIndexTuple += "[";
-			opIndexTuple += std::to_string(stride);
-			opIndexTuple += "]";
-			opIndexTuple += ", ";
-		}
-		else
-		{
-			opIndexTuple += "(opIndex % opStrides[";
-			opIndexTuple += std::to_string(stride - 1);
-			opIndexTuple += "]) / opStrides[";
-			opIndexTuple += std::to_string(stride);
-			opIndexTuple += "], ";
-		}
-	}
-	opIndexTuple.erase(opIndexTuple.end() - 2, opIndexTuple.end()); // remove last ", "
-	opIndexTuple += "};";
+	std::string opIndexTuple = "const uint32_t opIndexTuple[] = ";
+	appendIndexTuple(&opIndexTuple, opVec->Space(), std::string{"opIndex"});
+	opIndexTuple += ";";
 
 	file->PrintfLine("%s", opIndexTuple.c_str());
 
 	uint32_t vecIndexOffset = 0;
 	if(lNodeIsKron)
 	{
-		vecIndexOffset = kronVec->__space_->factors_.size();
+		vecIndexOffset = kronVec->Space()->Factors()->size();
 	}
 
 	std::string vecIndexTuple = "const uint32_t vecIndexTuple[] = {";
-	for(uint32_t lDim = 0; lDim < vec->__space_->factors_.size(); lDim++)
+	for(uint32_t lDim = 0; lDim < vec->Space()->Factors()->size(); lDim++)
 	{
 		vecIndexTuple += "opIndexTuple[";
 		vecIndexTuple += std::to_string(lDim + vecIndexOffset);
@@ -1876,14 +1902,14 @@ bool CodeGenerator::VectorVectorProductKroneckerDeltaCode(const Node* node, File
 	vecIndexTuple += "};";
 	file->PrintfLine(vecIndexTuple.c_str());
 
-	uint32_t kronIndexOffset = vec->__space_->factors_.size();
+	uint32_t kronIndexOffset = vec->Space()->Factors()->size();
 	if(lNodeIsKron)
 	{
 		kronIndexOffset = 0;
 	}
 
 	std::string kronIndexTuple = "const uint32_t kronIndexTuple[] = {";
-	for(uint32_t rDim = 0; rDim < kronVec->__space_->factors_.size(); rDim++)
+	for(uint32_t rDim = 0; rDim < kronVec->Space()->Factors()->size(); rDim++)
 	{
 		kronIndexTuple += "opIndexTuple[";
 		kronIndexTuple += std::to_string(rDim + kronIndexOffset);
@@ -1916,15 +1942,9 @@ bool CodeGenerator::VectorVectorProductKroneckerDeltaCode(const Node* node, File
 		product += " * ";
 	}
 
-	product += *(varVec->GetIdentifier()) + "[";
-	for(uint32_t lIndex = 0; lIndex < vec->__space_->factors_.size(); lIndex++)
-	{
-		product += "vecIndexTuple[" +
-				std::to_string(lIndex) + "] * "
-				+  vecStridesId + "[" +  std::to_string(lIndex) + "] + ";
-	}
-	product.erase(product.end() - 3, product.end()); // remove last " +"
-	product += "];";
+	product += *(varVec->GetIdentifier());
+	appendArrayPosition(&product, vec->Space(), std::string{"vecIndexTuple"});
+	product += ";";
 
 	file->PrintfLine(product.c_str());
 
@@ -1942,66 +1962,34 @@ bool CodeGenerator::VectorVectorProductCode(const Node* node, FileWriter * file,
 
 	auto nodes = graph_->GetNodes();
 
-	const auto lnode = nodes->find(node->parents[0]);
+	const auto lnode = nodes->find(node->Parents()->at(0));
 	if(nodes->end() == lnode)
 	{
-		Error("Could not find Node for id %u\n", node->parents[0]);
+		Error("Could not find Node for id %u\n", node->Parents()->at(0));
 		return false;
 	}
 
-	const auto rnode = nodes->find(node->parents[1]);
+	const auto rnode = nodes->find(node->Parents()->at(1));
 	if(nodes->end() == rnode)
 	{
-		Error("Could not find Node for id %u\n", node->parents[1]);
+		Error("Could not find Node for id %u\n", node->Parents()->at(1));
 		return false;
 	}
 
-	if((Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lnode->second.type) ||
-			(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == rnode->second.type))
+	if((Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lnode->second.GetType()) ||
+			(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == rnode->second.GetType()))
 	{
 		return VectorVectorProductKroneckerDeltaCode(node, file, divide);
 	}
 
 	getVarRetFalseOnError(varOp, node->id);
-	getVarRetFalseOnError(varLVec, node->parents[0]);
-	getVarRetFalseOnError(varRVec, node->parents[1]);
+	getVarRetFalseOnError(varLVec, node->Parents()->at(0));
+	getVarRetFalseOnError(varRVec, node->Parents()->at(1));
 
-	const Algebra::Module::VectorSpace::Vector* lVec = (const Algebra::Module::VectorSpace::Vector*) lnode->second.object;
-	const Algebra::Module::VectorSpace::Vector* rVec = (const Algebra::Module::VectorSpace::Vector*) rnode->second.object;
+	const Algebra::Module::VectorSpace::Vector* lVec = (const Algebra::Module::VectorSpace::Vector*) lnode->second.GetObjectPt();
+	const Algebra::Module::VectorSpace::Vector* rVec = (const Algebra::Module::VectorSpace::Vector*) rnode->second.GetObjectPt();
 
-	const Algebra::Module::VectorSpace::Vector* opVec = (const Algebra::Module::VectorSpace::Vector*) node->object;
-
-	// Calculate Strides, assume Row-Major Layout
-	// https://en.wikipedia.org/wiki/Row-_and_column-major_order#Address_calculation_in_general
-	std::vector<uint32_t> lStrides;
-	lVec->__space_->GetStrides(&lStrides);
-	const char lstridesId[] = "lStrides";
-	file->PrintfLine("const uint32_t %s[] = {", lstridesId);
-	for(const uint32_t &stride: lStrides)
-	{
-		file->PrintfLine("\t %u,", stride);
-	}
-	file->PrintfLine("};");
-
-	std::vector<uint32_t> rStrides;
-	rVec->__space_->GetStrides(&rStrides);
-	const char rstridesId[] = "rStrides";
-	file->PrintfLine("const uint32_t %s[] = {", rstridesId);
-	for(const uint32_t &stride: rStrides)
-	{
-		file->PrintfLine("\t %u,", stride);
-	}
-	file->PrintfLine("};");
-
-	std::vector<uint32_t> opStrides;
-	opVec->__space_->GetStrides(&opStrides);
-	const char opstridesId[] = "opStrides";
-	file->PrintfLine("const uint32_t %s[] = {", opstridesId);
-	for(const uint32_t &stride: opStrides)
-	{
-		file->PrintfLine("\t %u,", stride);
-	}
-	file->PrintfLine("};\n");
+	const Algebra::Module::VectorSpace::Vector* opVec = (const Algebra::Module::VectorSpace::Vector*) node->GetObjectPt();
 
 	const char * varOpId = varOp->GetIdentifier()->c_str();
 
@@ -2010,34 +1998,14 @@ bool CodeGenerator::VectorVectorProductCode(const Node* node, FileWriter * file,
 	file->PrintfLine("{");
 	file->Indent();
 
-	std::string opIndexTuple = "const uint32_t opIndexTuple[] = {";
-	for(uint32_t stride = 0; stride < opStrides.size(); stride++)
-	{
-		if(0 == stride)
-		{
-			opIndexTuple += "opIndex / ";
-			opIndexTuple += opstridesId;
-			opIndexTuple += "[";
-			opIndexTuple += std::to_string(stride);
-			opIndexTuple += "]";
-			opIndexTuple += ", ";
-		}
-		else
-		{
-			opIndexTuple += "(opIndex % opStrides[";
-			opIndexTuple += std::to_string(stride - 1);
-			opIndexTuple += "]) / opStrides[";
-			opIndexTuple += std::to_string(stride);
-			opIndexTuple += "], ";
-		}
-	}
-	opIndexTuple.erase(opIndexTuple.end() - 2, opIndexTuple.end()); // remove last ", "
-	opIndexTuple += "};";
+	std::string opIndexTuple = "const uint32_t opIndexTuple[] = ";
+	appendIndexTuple(&opIndexTuple, opVec->Space(), std::string{"opIndex"});
+	opIndexTuple += ";";
 
 	file->PrintfLine("%s", opIndexTuple.c_str());
 
 	std::string lIndexTuple = "const uint32_t lIndexTuple[] = {";
-	for(uint32_t lDim = 0; lDim < lVec->__space_->factors_.size(); lDim++)
+	for(uint32_t lDim = 0; lDim < lVec->Space()->Factors()->size(); lDim++)
 	{
 		lIndexTuple += "opIndexTuple[";
 		lIndexTuple += std::to_string(lDim);
@@ -2049,10 +2017,10 @@ bool CodeGenerator::VectorVectorProductCode(const Node* node, FileWriter * file,
 	file->PrintfLine(lIndexTuple.c_str());
 
 	std::string rIndexTuple = "const uint32_t rIndexTuple[] = {";
-	for(uint32_t rDim = 0; rDim < rVec->__space_->factors_.size(); rDim++)
+	for(uint32_t rDim = 0; rDim < rVec->Space()->Factors()->size(); rDim++)
 	{
 		rIndexTuple += "opIndexTuple[";
-		rIndexTuple += std::to_string(rDim + lVec->__space_->factors_.size());
+		rIndexTuple += std::to_string(rDim + lVec->Space()->Factors()->size());
 		rIndexTuple += "], ";
 	}
 
@@ -2062,15 +2030,8 @@ bool CodeGenerator::VectorVectorProductCode(const Node* node, FileWriter * file,
 
 	std::string product = varOpId;
 	product += "[opIndex] = ";
-	product += *(varLVec->GetIdentifier()) + "[";
-	for(uint32_t lIndex = 0; lIndex < lVec->__space_->factors_.size(); lIndex++)
-	{
-		product += "lIndexTuple[" +
-				std::to_string(lIndex) + "] * "
-				+  lstridesId + "[" +  std::to_string(lIndex) + "] + ";
-	}
-	product.erase(product.end() - 3, product.end()); // remove last " +"
-	product += "]";
+	product += *(varLVec->GetIdentifier());
+	appendArrayPosition(&product, lVec->Space(), std::string{"lIndexTuple"});
 
 	if(divide)
 	{
@@ -2081,19 +2042,82 @@ bool CodeGenerator::VectorVectorProductCode(const Node* node, FileWriter * file,
 		product += " * ";
 	}
 
-	product += *(varRVec->GetIdentifier()) + "[";
-	for(uint32_t rIndex = 0; rIndex < rVec->__space_->factors_.size(); rIndex++)
-	{
-		product += "rIndexTuple[" +
-				std::to_string(rIndex) + "] * "
-				+  rstridesId + "[" +  std::to_string(rIndex) + "] + ";
-	}
-	product.erase(product.end() - 3, product.end()); // remove last " +"
-	product += "];";
+	product += *(varRVec->GetIdentifier());
+	appendArrayPosition(&product, rVec->Space(), std::string{"rIndexTuple"});
+	product += ";";
 
 	file->PrintfLine(product.c_str());
 
 	file->PrintfLine("");
+
+	file->Outdent();
+	file->PrintfLine("}");
+
+	return true;
+}
+
+bool CodeGenerator::VectorIndexSplitSumCode(const Node* node, FileWriter * file)
+{
+	file->PrintfLine("// %s\n", __func__);
+
+	// TODO: This is horribly wasteful! The beauty of using code generation is that
+	// we know this is just a different way of addressing indices, so we could continue using
+	// the old vector but just generate code which accesses the indices in the correct manner!
+
+	auto nodes = graph_->GetNodes();
+
+	const Node::splitSumIndicesParameters_t * param = (Node::splitSumIndicesParameters_t *) node->TypeParameters();
+
+	getVarRetFalseOnError(varOp, node->id);
+	getVarRetFalseOnError(varArg, node->Parents()->at(0));
+
+	const auto argNode = nodes->find(node->Parents()->at(0));
+	if(nodes->end() == argNode)
+	{
+		Error("Could not find Node for id %u\n", node->Parents()->at(0));
+		return false;
+	}
+
+	const Algebra::Module::VectorSpace::Vector* vecArg = (const Algebra::Module::VectorSpace::Vector*) argNode->second.GetObjectPt();
+	const Algebra::Module::VectorSpace::Vector* vecOp = (const Algebra::Module::VectorSpace::Vector*) node->GetObjectPt();
+
+	file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
+			varOp->GetIdentifier()->c_str(), varOp->GetIdentifier()->c_str());
+	file->PrintfLine("{");
+	file->Indent();
+
+	std::string opIndexTuple = "const uint32_t opIndexTuple[] = ";
+	appendIndexTuple(&opIndexTuple, vecOp->Space(), std::string{"opIndex"});
+	opIndexTuple += ";";
+
+	file->PrintfLine("%s", opIndexTuple.c_str());
+
+	std::string argIndexTuple = "const uint32_t argIndexTuple[] = {";
+
+	uint32_t opIndexPos = 0;
+	for(size_t factor = 0; factor < param->SplitPosition.size(); factor++)
+	{
+		argIndexTuple += "opIndexTuple[" + std::to_string(opIndexPos) + "]";
+
+		if(param->SplitPosition[factor])
+		{
+			opIndexPos++;
+			argIndexTuple += " + opIndexTuple[" + std::to_string(opIndexPos) + "]";
+		}
+
+		argIndexTuple += ", ";
+	}
+	argIndexTuple.erase(argIndexTuple.end() - 2, argIndexTuple.end()); // remove last ", "
+	argIndexTuple += "};\n";
+
+	file->PrintfLine("%s", argIndexTuple.c_str());
+
+	std::string equationStr = *varOp->GetIdentifier() + "[opIndex] = ";
+	equationStr += *varArg->GetIdentifier();
+	appendArrayPosition(&equationStr, vecArg->Space(), std::string{"argIndexTuple"});
+	equationStr += ";";
+
+	file->PrintfLine(equationStr.c_str());
 
 	file->Outdent();
 	file->PrintfLine("}");
@@ -2107,75 +2131,35 @@ bool CodeGenerator::VectorJoinIndicesCode(const Node* node, FileWriter * file)
 
 	auto nodes = graph_->GetNodes();
 
-	const Node::joinIndicesParameters_t * param = (Node::joinIndicesParameters_t *) node->typeParameters;
+	const Node::joinIndicesParameters_t * param = (Node::joinIndicesParameters_t *) node->TypeParameters();
 
 	getVarRetFalseOnError(varOp, node->id);
-	getVarRetFalseOnError(varArg, node->parents[0]);
+	getVarRetFalseOnError(varArg, node->Parents()->at(0));
 
-	const auto argNode = nodes->find(node->parents[0]);
+	const auto argNode = nodes->find(node->Parents()->at(0));
 	if(nodes->end() == argNode)
 	{
-		Error("Could not find Node for id %u\n", node->parents[0]);
+		Error("Could not find Node for id %u\n", node->Parents()->at(0));
 		return false;
 	}
 
-	const Algebra::Module::VectorSpace::Vector* vecArg = (const Algebra::Module::VectorSpace::Vector*) argNode->second.object;
-	const Algebra::Module::VectorSpace::Vector* vecOp = (const Algebra::Module::VectorSpace::Vector*) node->object;
-
-	std::vector<uint32_t> opStrides;
-	vecOp->__space_->GetStrides(&opStrides);
-	const char opstridesId[] = "opStrides";
-	file->PrintfLine("const uint32_t %s[] = {", opstridesId);
-	for(const uint32_t &stride: opStrides)
-	{
-		file->PrintfLine("\t %u,", stride);
-	}
-	file->PrintfLine("};\n");
-
-	std::vector<uint32_t> argStrides;
-	vecArg->__space_->GetStrides(&argStrides);
-	const char argstridesId[] = "argStrides";
-	file->PrintfLine("const uint32_t %s[] = {", argstridesId);
-	for(const uint32_t &stride: argStrides)
-	{
-		file->PrintfLine("\t %u,", stride);
-	}
-	file->PrintfLine("};");
+	const Algebra::Module::VectorSpace::Vector* vecArg = (const Algebra::Module::VectorSpace::Vector*) argNode->second.GetObjectPt();
+	const Algebra::Module::VectorSpace::Vector* vecOp = (const Algebra::Module::VectorSpace::Vector*) node->GetObjectPt();
 
 	file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
 			varOp->GetIdentifier()->c_str(), varOp->GetIdentifier()->c_str());
 	file->PrintfLine("{");
 	file->Indent();
 
-	std::string opIndexTuple = "const uint32_t opIndexTuple[] = {";
-	for(uint32_t stride = 0; stride < opStrides.size(); stride++)
-	{
-		if(0 == stride)
-		{
-			opIndexTuple += "opIndex / ";
-			opIndexTuple += opstridesId;
-			opIndexTuple += "[";
-			opIndexTuple += std::to_string(stride);
-			opIndexTuple += "]";
-			opIndexTuple += ", ";
-		}
-		else
-		{
-			opIndexTuple += "(opIndex % opStrides[";
-			opIndexTuple += std::to_string(stride - 1);
-			opIndexTuple += "]) / opStrides[";
-			opIndexTuple += std::to_string(stride);
-			opIndexTuple += "], ";
-		}
-	}
-	opIndexTuple.erase(opIndexTuple.end() - 2, opIndexTuple.end()); // remove last ", "
-	opIndexTuple += "};";
+	std::string opIndexTuple = "const uint32_t opIndexTuple[] = ";
+	appendIndexTuple(&opIndexTuple, vecOp->Space(), std::string{"opIndex"});
+	opIndexTuple += ";";
 
 	file->PrintfLine("%s", opIndexTuple.c_str());
 
 	std::vector<uint32_t> opIndexPos(param->Indices.size(), UINT32_MAX);
 	std::string argIndexTuple = "const uint32_t argIndexTuple[] = {";
-	for(uint32_t dim = 0; dim < vecArg->__space_->factors_.size(); dim++)
+	for(uint32_t dim = 0; dim < vecArg->Space()->Factors()->size(); dim++)
 	{
 		argIndexTuple += "opIndexTuple[";
 
@@ -2213,18 +2197,311 @@ bool CodeGenerator::VectorJoinIndicesCode(const Node* node, FileWriter * file)
 	file->PrintfLine(argIndexTuple.c_str());
 
 	std::string equationStr = *varOp->GetIdentifier() + "[opIndex] = ";
-	equationStr += *varArg->GetIdentifier() + "[";
-
-	for(uint32_t argIndex = 0; argIndex < vecArg->__space_->factors_.size(); argIndex++)
-	{
-		equationStr += "argIndexTuple[" +
-				std::to_string(argIndex) + "] * "
-				+  argstridesId + "[" +  std::to_string(argIndex) + "] + ";
-	}
-	equationStr.erase(equationStr.end() - 3, equationStr.end()); // remove last " +"
-	equationStr += "];";
+	equationStr += *varArg->GetIdentifier();
+	appendArrayPosition(&equationStr, vecArg->Space(), std::string{"argIndexTuple"});
+	equationStr += ";";
 
 	file->PrintfLine(equationStr.c_str());
+
+	file->Outdent();
+	file->PrintfLine("}");
+
+	return true;
+}
+
+bool CodeGenerator::VectorMaxPoolCode(const Node* node, FileWriter * file)
+{
+	file->PrintfLine("// %s\n", __func__);
+
+	getVarRetFalseOnError(varOp, node->id);
+	getVarRetFalseOnError(varIn, node->Parents()->at(0));
+
+	const Node::PoolParameters_t * param = (const Node::PoolParameters_t *) node->TypeParameters();
+
+	const char * varOpId = varOp->GetIdentifier()->c_str();
+	const char * varInId = varIn->GetIdentifier()->c_str();
+
+	auto nodes = graph_->GetNodes();
+	const auto inNode = nodes->find(node->Parents()->at(0));
+	if(nodes->end() == inNode)
+	{
+		Error("Could not find Node for id %u\n", node->Parents()->at(0));
+		return false;
+	}
+
+	auto inVec = (const Algebra::Module::VectorSpace::Vector*) inNode->second.GetObjectPt();
+	auto opVec = (const Algebra::Module::VectorSpace::Vector*) node->GetObjectPt();
+
+	const char maxFunctions[][6] =
+	{
+			"fmaxf",
+	};
+
+	const char* maxFctString = nullptr;
+	switch(varIn->GetType())
+	{
+	case Variable::Type::uint8_: // no break intended
+	case Variable::Type::int8_: // no break intended
+	case Variable::Type::int32_: // no break intended
+		// TODO: Implement https://graphics.stanford.edu/~seander/bithacks.html#IntegerMinOrMax
+		return false; // TODO: #define something like #define max(m,n) ((m) > (n) ? (m) : (n))
+
+	case Variable::Type::float_:
+		maxFctString = maxFunctions[0];
+		break;
+
+	default: // no break intended
+	case Variable::Type::none: // no break intended
+	case Variable::Type::nrOf:
+		Error("Reached default case!\n");
+		return false;
+	}
+
+	// Get strides
+	std::vector<uint32_t> InStrides;
+	inVec->Space()->GetStrides(&InStrides);
+	const char inStridesId[] = "InStrides";
+	file->PrintfLine("const uint32_t %s[] = {", inStridesId);
+	for(const uint32_t &stride: InStrides)
+	{
+		file->PrintfLine("\t %u,", stride);
+	}
+	file->PrintfLine("};");
+
+	// Generate all possible tuples
+	std::vector<std::pair<uint32_t, uint32_t>> ranges;
+	ranges.resize(inVec->Space()->Factors()->size());
+
+	for(size_t range = 0; range < ranges.size(); range++)
+	{
+		ranges[range].first = 0;
+		ranges[range].second = param->PoolSize[range];
+	}
+
+	std::vector<std::vector<uint32_t>> tuples;
+	getAllTuples(tuples, ranges);
+
+	// Loop over all result elements
+	file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
+			varOpId, varOpId);
+	file->PrintfLine("{");
+	file->Indent();
+
+	std::string opIndexTuple = "const uint32_t opIndexTuple[] = ";
+	appendIndexTuple(&opIndexTuple, opVec->Space(), std::string{"opIndex"});
+	opIndexTuple += ";";
+
+	file->PrintfLine("%s", opIndexTuple.c_str());
+
+	std::string inPoolOrigin = "const uint32_t inPoolOrigin[] = {";
+
+	for(size_t factor = 0; factor < opVec->Space()->Factors()->size(); factor++)
+	{
+		inPoolOrigin += "opIndexTuple[" + std::to_string(factor) + "] ";
+		inPoolOrigin += "* " + std::to_string(param->PoolSize[factor]) + ", ";
+	}
+
+	inPoolOrigin.erase(inPoolOrigin.end() - 2, inPoolOrigin.end()); // remove last ", "
+	inPoolOrigin += "};\n";
+
+	file->PrintfLine("%s", inPoolOrigin.c_str());
+
+	file->PrintfLine("%s[opIndex] =", varOpId);
+	file->Indent();
+
+	for(size_t tuple = 0; tuple < tuples.size(); tuple++)
+	{
+		std::string value;
+
+		if(tuple != tuples.size() - 1)
+		{
+			value +=  maxFctString;
+			value += "(";
+		}
+
+		value += varInId;
+		value += "[";
+
+		for(size_t factor = 0; factor < inVec->Space()->Factors()->size(); factor++)
+		{
+			if(tuples[tuple][factor])
+			{
+				value += "(";
+			}
+
+			value += "inPoolOrigin[" + std::to_string(factor) + "]";
+
+			if(tuples[tuple][factor])
+			{
+				value += " + " + std::to_string(tuples[tuple][factor]) + ")";
+			}
+
+			value += " * InStrides[" + std::to_string(factor) + "] + ";
+		}
+		value.erase(value.end() - 3, value.end()); // remove last " + "
+
+		value += "]";
+
+		if(tuple != tuples.size() - 1)
+		{
+			value += ", ";
+		}
+		else
+		{
+			for(size_t tuple = 0; tuple < tuples.size() - 1; tuple++)
+			{
+				value += ")";
+			}
+			value += ";";
+		}
+
+		file->PrintfLine("%s", value.c_str());
+	}
+
+	file->Outdent();
+
+	file->Outdent();
+	file->PrintfLine("}");
+
+	return true;
+}
+
+bool CodeGenerator::VectorCrossCorrelationCode(const Node* node, FileWriter * file)
+{
+	file->PrintfLine("// %s\n", __func__);
+
+	getVarRetFalseOnError(varOp, node->id);
+	getVarRetFalseOnError(varIn, node->Parents()->at(0));
+	getVarRetFalseOnError(varKernel, node->Parents()->at(1));
+
+	const char * varOpId = varOp->GetIdentifier()->c_str();
+	const char * varInId = varIn->GetIdentifier()->c_str();
+	const char * varKernelId = varKernel->GetIdentifier()->c_str();
+
+	auto nodes = graph_->GetNodes();
+	const auto inNode = nodes->find(node->Parents()->at(0));
+	if(nodes->end() == inNode)
+	{
+		Error("Could not find Node for id %u\n", node->Parents()->at(0));
+		return false;
+	}
+
+	const auto kernelNode = nodes->find(node->Parents()->at(1));
+	if(nodes->end() == kernelNode)
+	{
+		Error("Could not find Node for id %u\n", node->Parents()->at(1));
+		return false;
+	}
+
+	auto inVec = (const Algebra::Module::VectorSpace::Vector*) inNode->second.GetObjectPt();
+	auto KernelVec = (const Algebra::Module::VectorSpace::Vector*) kernelNode->second.GetObjectPt();
+	auto opVec = (const Algebra::Module::VectorSpace::Vector*) node->GetObjectPt();
+
+	// Get strides
+	std::vector<uint32_t> InStrides;
+	inVec->Space()->GetStrides(&InStrides);
+	const char inStridesId[] = "InStrides";
+	file->PrintfLine("const uint32_t %s[] = {", inStridesId);
+	for(const uint32_t &stride: InStrides)
+	{
+		file->PrintfLine("\t %u,", stride);
+	}
+	file->PrintfLine("};");
+
+	std::vector<uint32_t> KernelStrides;
+	KernelVec->Space()->GetStrides(&KernelStrides);
+	const char kernelStridesId[] = "KernelStrides";
+	file->PrintfLine("const uint32_t %s[] = {", kernelStridesId);
+	for(const uint32_t &stride: KernelStrides)
+	{
+		file->PrintfLine("\t %u,", stride);
+	}
+	file->PrintfLine("};");
+
+	// Generate all possible tuples
+	std::vector<std::pair<uint32_t, uint32_t>> ranges;
+	ranges.resize(KernelVec->Space()->Factors()->size());
+
+	for(size_t range = 0; range < ranges.size(); range++)
+	{
+		ranges[range].first = 0;
+		ranges[range].second = KernelVec->Space()->Factors()->at(range).Dim;
+	}
+
+	std::vector<std::vector<uint32_t>> tuples;
+	getAllTuples(tuples, ranges);
+
+	// Loop over all result elements
+	file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
+			varOpId, varOpId);
+	file->PrintfLine("{");
+	file->Indent();
+
+	std::string opIndexTuple = "const uint32_t opIndexTuple[] = ";
+	appendIndexTuple(&opIndexTuple, opVec->Space(), std::string{"opIndex"});
+	opIndexTuple += ";";
+
+	file->PrintfLine("%s", opIndexTuple.c_str());
+
+	file->PrintfLine("%s[opIndex] =", varOpId);
+	file->Indent();
+
+	for(size_t tuple = 0; tuple < tuples.size(); tuple++)
+	{
+		std::string kernelMult = varInId;
+
+		kernelMult += "[";
+		for(size_t index = 0; index < tuples[tuple].size(); index++)
+		{
+			if(tuples[tuple][index])
+			{
+				kernelMult += "(";
+			}
+
+			kernelMult += "opIndexTuple[" + std::to_string(index) + "]";
+
+			if(tuples[tuple][index])
+			{
+				kernelMult += " + " + std::to_string(tuples[tuple][index]) + ")";
+			}
+
+			kernelMult += " * InStrides[" + std::to_string(index) + "] + ";
+		}
+		kernelMult.erase(kernelMult.end() - 3, kernelMult.end()); // remove last " + "
+
+		kernelMult += "]";
+
+		kernelMult += " * ";
+		kernelMult += varKernelId;
+		kernelMult += "[";
+		for(size_t index = 0; index < tuples[tuple].size(); index++)
+		{
+			if(tuples[tuple][index])
+			{
+				kernelMult += std::to_string(tuples[tuple][index]);
+				kernelMult += " * KernelStrides[" + std::to_string(index) + "] + ";
+			}
+			else
+			{
+				kernelMult += "0 + ";
+			}
+		}
+		kernelMult.erase(kernelMult.end() - 3, kernelMult.end()); // remove last " + "
+		kernelMult += "]";
+
+		if(tuple != tuples.size() - 1)
+		{
+			kernelMult += " +";
+		}
+		else
+		{
+			kernelMult += ";";
+		}
+
+		file->PrintfLine(kernelMult.c_str());
+	}
+
+	file->Outdent();
 
 	file->Outdent();
 	file->PrintfLine("}");
@@ -2238,74 +2515,34 @@ bool CodeGenerator::VectorProjectionCode(const Node* node, FileWriter * file)
 
 	auto nodes = graph_->GetNodes();
 
-	const Node::projectParameters_t * param = (const Node::projectParameters_t *) node->typeParameters;
+	const Node::projectParameters_t * param = (const Node::projectParameters_t *) node->TypeParameters();
 
 	getVarRetFalseOnError(varOp, node->id);
-	getVarRetFalseOnError(varArg, node->parents[0]);
+	getVarRetFalseOnError(varArg, node->Parents()->at(0));
 
-	const auto argNode = nodes->find(node->parents[0]);
+	const auto argNode = nodes->find(node->Parents()->at(0));
 	if(nodes->end() == argNode)
 	{
-		Error("Could not find Node for id %u\n", node->parents[0]);
+		Error("Could not find Node for id %u\n", node->Parents()->at(0));
 		return false;
 	}
 
-	const Algebra::Module::VectorSpace::Vector* vecArg = (const Algebra::Module::VectorSpace::Vector*) argNode->second.object;
-	const Algebra::Module::VectorSpace::Vector* vecOp = (const Algebra::Module::VectorSpace::Vector*) node->object;
-
-	std::vector<uint32_t> opStrides;
-	vecOp->__space_->GetStrides(&opStrides);
-	const char opstridesId[] = "opStrides";
-	file->PrintfLine("const uint32_t %s[] = {", opstridesId);
-	for(const uint32_t &stride: opStrides)
-	{
-		file->PrintfLine("\t %u,", stride);
-	}
-	file->PrintfLine("};\n");
-
-	std::vector<uint32_t> argStrides;
-	vecArg->__space_->GetStrides(&argStrides);
-	const char argstridesId[] = "argStrides";
-	file->PrintfLine("const uint32_t %s[] = {", argstridesId);
-	for(const uint32_t &stride: argStrides)
-	{
-		file->PrintfLine("\t %u,", stride);
-	}
-	file->PrintfLine("};");
+	const Algebra::Module::VectorSpace::Vector* vecArg = (const Algebra::Module::VectorSpace::Vector*) argNode->second.GetObjectPt();
+	const Algebra::Module::VectorSpace::Vector* vecOp = (const Algebra::Module::VectorSpace::Vector*) node->GetObjectPt();
 
 	file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
 			varOp->GetIdentifier()->c_str(), varOp->GetIdentifier()->c_str());
 	file->PrintfLine("{");
 	file->Indent();
 
-	std::string opIndexTuple = "const uint32_t opIndexTuple[] = {";
-	for(uint32_t stride = 0; stride < opStrides.size(); stride++)
-	{
-		if(0 == stride)
-		{
-			opIndexTuple += "opIndex / ";
-			opIndexTuple += opstridesId;
-			opIndexTuple += "[";
-			opIndexTuple += std::to_string(stride);
-			opIndexTuple += "]";
-			opIndexTuple += ", ";
-		}
-		else
-		{
-			opIndexTuple += "(opIndex % opStrides[";
-			opIndexTuple += std::to_string(stride - 1);
-			opIndexTuple += "]) / opStrides[";
-			opIndexTuple += std::to_string(stride);
-			opIndexTuple += "], ";
-		}
-	}
-	opIndexTuple.erase(opIndexTuple.end() - 2, opIndexTuple.end()); // remove last ", "
-	opIndexTuple += "};";
+	std::string opIndexTuple = "const uint32_t opIndexTuple[] = ";
+	appendIndexTuple(&opIndexTuple, vecOp->Space(), std::string{"opIndex"});
+	opIndexTuple += ";";
 
 	file->PrintfLine("%s", opIndexTuple.c_str());
 
 	std::string argIndexTuple = "const uint32_t argIndexTuple[] = {";
-	for(uint32_t dim = 0; dim < vecArg->__space_->factors_.size(); dim++)
+	for(uint32_t dim = 0; dim < vecArg->Space()->Factors()->size(); dim++)
 	{
 		argIndexTuple += "opIndexTuple[";
 		argIndexTuple += std::to_string(dim);
@@ -2324,16 +2561,9 @@ bool CodeGenerator::VectorProjectionCode(const Node* node, FileWriter * file)
 	file->PrintfLine(argIndexTuple.c_str());
 
 	std::string equationStr = *varOp->GetIdentifier() + "[opIndex] = ";
-	equationStr += *varArg->GetIdentifier() + "[";
-
-	for(uint32_t argIndex = 0; argIndex < vecArg->__space_->factors_.size(); argIndex++)
-	{
-		equationStr += "argIndexTuple[" +
-				std::to_string(argIndex) + "] * "
-				+  argstridesId + "[" +  std::to_string(argIndex) + "] + ";
-	}
-	equationStr.erase(equationStr.end() - 3, equationStr.end()); // remove last " +"
-	equationStr += "];";
+	equationStr += *varArg->GetIdentifier();
+	appendArrayPosition(&equationStr, vecArg->Space(), std::string{"argIndexTuple"});
+	equationStr += ";";
 
 	file->PrintfLine(equationStr.c_str());
 
@@ -2348,8 +2578,8 @@ bool CodeGenerator::VectorPowerCode(const Node* node, FileWriter * file)
 	file->PrintfLine("// %s\n", __func__);
 
 	getVarRetFalseOnError(varOp, node->id);
-	getVarRetFalseOnError(lVar, node->parents[0]);
-	getVarRetFalseOnError(rVar, node->parents[1]);
+	getVarRetFalseOnError(lVar, node->Parents()->at(0));
+	getVarRetFalseOnError(rVar, node->Parents()->at(1));
 
 	retFalseOnFalse(GenerateLocalVariableDeclaration(varOp), "Could not generate Var. Decl.\n");
 
@@ -2424,33 +2654,33 @@ bool CodeGenerator::VectorScalarProductCode(const Node* node, FileWriter * file,
 
 	auto nodes = graph_->GetNodes();
 
-	const auto lVecNode = nodes->find(node->parents[0]);
+	const auto lVecNode = nodes->find(node->Parents()->at(0));
 	if(nodes->end() == lVecNode)
 	{
-		Error("Could not find Node for id %u\n", node->parents[0]);
+		Error("Could not find Node for id %u\n", node->Parents()->at(0));
 		return false;
 	}
 
-	const auto rVecNode = nodes->find(node->parents[1]);
+	const auto rVecNode = nodes->find(node->Parents()->at(1));
 	if(nodes->end() == rVecNode)
 	{
-		Error("Could not find Node for id %u\n", node->parents[1]);
+		Error("Could not find Node for id %u\n", node->Parents()->at(1));
 		return false;
 	}
 
-	if((Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lVecNode->second.type) ||
-			(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == rVecNode->second.type))
+	if((Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lVecNode->second.GetType()) ||
+			(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == rVecNode->second.GetType()))
 	{
 		return VectorScalarProductKroneckerDeltaCode(node, file, divide);
 	}
 
 	getVarRetFalseOnError(varOp, node->id);
-	getVarRetFalseOnError(lVar, node->parents[0]);
-	getVarRetFalseOnError(rVar, node->parents[1]);
+	getVarRetFalseOnError(lVar, node->Parents()->at(0));
+	getVarRetFalseOnError(rVar, node->Parents()->at(1));
 
 	retFalseOnFalse(GenerateLocalVariableDeclaration(varOp), "Could not generate Var. Decl.\n");
 
-	auto vecOp = (const Algebra::Module::VectorSpace::Vector*) node->object;
+	auto vecOp = (const Algebra::Module::VectorSpace::Vector*) node->GetObjectPt();
 
 	bool lVarIsScalar = (1 == lVar->Length());
 	bool rVarIsScalar = (1 == rVar->Length());
@@ -2458,7 +2688,7 @@ bool CodeGenerator::VectorScalarProductCode(const Node* node, FileWriter * file,
 	if(!lVarIsScalar || !rVarIsScalar)
 	{
 		file->PrintfLine("for(uint32_t dim = 0; dim < %u; dim++)",
-				vecOp->__space_->GetDim());
+				vecOp->Space()->GetDim());
 
 		file->PrintfLine("{");
 		file->Indent();
@@ -2573,9 +2803,9 @@ Variable* CodeGenerator::GetVariable(Node::Id_t id)
 	}
 
 	Node::Id_t storageNodeId;
-	if(Node::ID_NONE != nodeIt->second.storedIn_)
+	if(Node::ID_NONE != nodeIt->second.IsStoredIn())
 	{
-		storageNodeId = nodeIt->second.storedIn_;
+		storageNodeId = nodeIt->second.IsStoredIn();
 	}
 	else
 	{
@@ -2598,7 +2828,7 @@ bool CodeGenerator::FetchVariables()
 	auto nodes = graph_->GetNodes();
 	for(const auto &nodePair: *nodes)
 	{
-		if(nodePair.second.noStorage_ || (Node::ID_NONE != nodePair.second.storedIn_))
+		if(Node::ID_NONE != nodePair.second.IsStoredIn())
 		{
 			continue; // This node is not stored in its own variable or doesn't require storage
 		}
@@ -2613,21 +2843,27 @@ bool CodeGenerator::FetchVariables()
 		SNPRINTF(tmpIdStr, sizeof(tmpIdStr), "Node%u", nodePair.second.id);
 		identifier.append(tmpIdStr);
 
-		switch(nodePair.second.objectType)
+		switch(nodePair.second.GetObject())
 		{
-		case Node::ObjectType::MODULE_VECTORSPACE_VECTOR:
+		case Node::Object_t::MODULE_VECTORSPACE_VECTOR:
 		{
-			if((Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == nodePair.second.type) ||
-					(Node::Type::CONTROL_TRANSFER_WHILE == nodePair.second.type))
+			if((Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == nodePair.second.GetType()) ||
+					(Node::Type::CONTROL_TRANSFER_WHILE == nodePair.second.GetType()))
 			{
 				continue; // doesn't require variable.
 			}
 
-			auto vector = (const Algebra::Module::VectorSpace::Vector*) nodePair.second.object;
+			auto vector = (const Algebra::Module::VectorSpace::Vector*) nodePair.second.GetObjectPt();
+			auto vecProperties = vector->Properties();
 
-			value = vector->__value_;
-			length = vector->__space_->GetDim();
-			switch(vector->__space_->GetRing())
+			if(vecProperties->end() != vecProperties->find(vector->Property::ExternalInput))
+			{
+				properties = (Variable::properties_t) (properties | Variable::PROPERTY_POINTER | Variable::PROPERTY_CONST);
+			}
+
+			value = vector->InitValue();
+			length = vector->Space()->GetDim();
+			switch(vector->Space()->GetRing())
 			{
 			case Algebra::Ring::Float32:
 				type = Variable::Type::float_;
@@ -2639,11 +2875,11 @@ bool CodeGenerator::FetchVariables()
 
 			case Algebra::Ring::None: // no break intended
 			default:
-				Error("Unknown Ring %u!\n", vector->__space_->GetRing());
+				Error("Unknown Ring %u!\n", vector->Space()->GetRing());
 				return false;
 			}
 
-			if(nullptr != vector->__value_)
+			if(nullptr != vector->InitValue())
 			{
 				properties = (Variable::properties_t) (
 						properties |
@@ -2654,8 +2890,9 @@ bool CodeGenerator::FetchVariables()
 		}
 		break;
 
-		case Node::ObjectType::NONE: // no break intended
-		case Node::ObjectType::INTERFACE_OUTPUT: // no break intended
+		case Node::Object_t::NONE: // no break intended
+		case Node::Object_t::INTERFACE_OUTPUT:
+		case Node::Object_t::INTERFACE_INPUT:
 			// No variable to create.
 			continue;
 
@@ -2664,47 +2901,51 @@ bool CodeGenerator::FetchVariables()
 			return false;
 		}
 
-		if(variables_.end() != variables_.find(nodePair.second.id))
-		{
-			Error("Variable already exists!\n");
-			return false;
-		}
-
-		if(nodePair.second.usedAsStorageBy_.size())
+		if(nodePair.second.UsedAsStorageByOthers())
 		{
 			properties = (Variable::properties_t) (
 					properties & ~Variable::PROPERTY_CONST);
 		}
 
-		variables_.insert(
+		auto insertRet = variables_.insert(
 				std::make_pair(
 						nodePair.second.id,
 						Variable(&identifier, properties, type, length, value)));
+
+		if(!insertRet.second)
+		{
+			Error("Variable already exists!\n");
+			return false;
+		}
 	}
 
-	// Identify Outputs and mark output variables as such
+	// Identify interfaces and mark their variables as such
 	for(const auto &nodePair: *nodes)
 	{
-		if(Node::Type::OUTPUT != nodePair.second.type)
+		switch(nodePair.second.GetType())
 		{
-			continue;
-		}
-
-		// Find all variables of the output's parents, i.e. the nodes that
-		// shall be output
-		for(const auto &potparnodePair: *nodes)
-		{
-			for(const Node::Id_t &parentNodeId: potparnodePair.second.parents)
+		case Node::Type::OUTPUT: // no break intended
+			// Find all variables of the output's parents, i.e. the nodes that
+			// shall be output
+			for(const auto &potparnodePair: *nodes)
 			{
-				if(parentNodeId != potparnodePair.second.id)
+				for(const Node::Id_t &parentNodeId: *potparnodePair.second.Parents())
 				{
-					continue;
-				}
+					if(parentNodeId != potparnodePair.second.id)
+					{
+						continue;
+					}
 
-				getVarRetFalseOnError(var, parentNodeId);
-				var->AddProperty(Variable::PROPERTY_GLOBAL);
-				var->AddProperty(Variable::PROPERTY_STATIC);
+					getVarRetFalseOnError(var, parentNodeId);
+					var->AddProperty(Variable::PROPERTY_GLOBAL);
+					var->AddProperty(Variable::PROPERTY_STATIC);
+				}
 			}
+			break;
+
+		default:
+			// do nothing
+			break;
 		}
 	}
 
@@ -2720,60 +2961,116 @@ bool CodeGenerator::FetchVariables()
 	return true;
 }
 
-bool CodeGenerator::GenerateOutputFunctions()
+bool CodeGenerator::GenerateInterfaceFunctions()
 {
 	std::string fctDefinitions;
+
+	std::set<const void *> inputCreated;
 
 	auto nodes = graph_->GetNodes();
 	for(const auto &nodePair: *nodes)
 	{
-		if(Node::Type::OUTPUT != nodePair.second.type)
+		switch(nodePair.second.GetType())
 		{
-			continue;
+		case Node::Type::OUTPUT:
+		{
+			auto * output = (const Interface::Output* ) nodePair.second.GetObjectPt();
+
+			// Get Variable attached to node
+			getVarRetFalseOnError(var, nodePair.second.Parents()->at(0));
+
+			std::string callbackTypedef;
+			callbackTypedef += "typedef void (*";
+			callbackTypedef += *output->GetCallbackName();
+			callbackTypedef += "_t)(";
+			callbackTypedef += "const ";
+			callbackTypedef += var->GetTypeString();
+			callbackTypedef += "* pt, size_t size);";
+
+			// Export function prototype
+			fileDacH_.PrintfLine("%s", callbackTypedef.c_str());
+			fileDacH_.PrintfLine("extern void %s_Register(%s_t callback);",
+					output->GetCallbackName()->c_str(),
+					output->GetCallbackName()->c_str());
+
+			// Declare Static Variables keeping the callback pointers
+			fileDacC_.PrintfLine("%s_t %s = NULL;",
+					output->GetCallbackName()->c_str(),
+					output->GetCallbackName()->c_str());
+
+			fileInstructions_.PrintfLine("extern %s_t %s;",
+					output->GetCallbackName()->c_str(),
+					output->GetCallbackName()->c_str());
+
+			// Define Function
+			char tmpBuff[200];
+			SNPRINTF(tmpBuff, sizeof(tmpBuff), "void %s_Register(%s_t callback)\n{\n",
+					output->GetCallbackName()->c_str(),
+					output->GetCallbackName()->c_str());
+
+			fctDefinitions += tmpBuff;
+
+			SNPRINTF(tmpBuff, sizeof(tmpBuff), "\t %s = callback;\n", output->GetCallbackName()->c_str());
+			fctDefinitions += tmpBuff;
+			fctDefinitions += "}\n\n";
 		}
+		break;
 
-		auto * output = (const Interface::Output* ) nodePair.second.object;
+		case Node::Type::INPUT:
+		{
+			auto insert = inputCreated.insert(nodePair.second.GetObjectPt());
+			if(!insert.second)
+			{
+				// Input was created already
+				continue;
+			}
 
-		// Get Variable attached to node
-		getVarRetFalseOnError(var, nodePair.second.parents[0]);
+			auto * input = (const Interface::Input* ) nodePair.second.GetObjectPt();
 
-		std::string fctPtTypeId = "Dac" + graph_->Name() + "OutputCallback";
-		fctPtTypeId += *(output->GetOutputName());
+			// Get Variable attached to node
+			Node::Id_t childNodeId = *(nodePair.second.Children()->begin());
+			getVarRetFalseOnError(var, childNodeId);
 
-		std::string callbackTypedef;
-		callbackTypedef += "typedef void (*";
-		callbackTypedef += fctPtTypeId;
-		callbackTypedef += "_t)(";
-		callbackTypedef += "const ";
-		callbackTypedef += var->GetTypeString();
-		callbackTypedef += "* pt, size_t size);";
+			std::string callbackTypedef;
+			callbackTypedef += "typedef const ";
+			callbackTypedef += var->GetTypeString();
+			callbackTypedef += " * (*";
+			callbackTypedef += *input->GetCallbackName();
+			callbackTypedef += "_t)(size_t identifier, size_t size);";
 
-		// Export function prototype
-		fileDacH_.PrintfLine("%s", callbackTypedef.c_str());
-		fileDacH_.PrintfLine("extern void %s_Register(%s_t callback);",
-				fctPtTypeId.c_str(),
-				fctPtTypeId.c_str());
+			// Export function prototype
+			fileDacH_.PrintfLine("%s", callbackTypedef.c_str());
+			fileDacH_.PrintfLine("extern void %s_Register(%s_t callback);",
+					input->GetCallbackName()->c_str(),
+					input->GetCallbackName()->c_str());
 
-		// Declare Static Variables keeping the callback pointers
-		fileDacC_.PrintfLine("%s_t %s = NULL;",
-				fctPtTypeId.c_str(),
-				fctPtTypeId.c_str());
+			// Declare Static Variables keeping the callback pointers
+			fileDacC_.PrintfLine("%s_t %s = NULL;",
+					input->GetCallbackName()->c_str(),
+					input->GetCallbackName()->c_str());
 
-		fileInstructions_.PrintfLine("extern %s_t %s;",
-				fctPtTypeId.c_str(),
-				fctPtTypeId.c_str());
+			fileInstructions_.PrintfLine("extern %s_t %s;",
+					input->GetCallbackName()->c_str(),
+					input->GetCallbackName()->c_str());
 
-		// Define Function
-		char tmpBuff[200];
-		SNPRINTF(tmpBuff, sizeof(tmpBuff), "void %s_Register(%s_t callback)\n{\n",
-				fctPtTypeId.c_str(),
-				fctPtTypeId.c_str());
+			// Define Function
+			char tmpBuff[200];
+			SNPRINTF(tmpBuff, sizeof(tmpBuff), "void %s_Register(%s_t callback)\n{\n",
+					input->GetCallbackName()->c_str(),
+					input->GetCallbackName()->c_str());
 
-		fctDefinitions += tmpBuff;
+			fctDefinitions += tmpBuff;
 
-		SNPRINTF(tmpBuff, sizeof(tmpBuff), "\t %s = callback;\n", fctPtTypeId.c_str());
-		fctDefinitions += tmpBuff;
-		fctDefinitions += "}\n\n";
+			SNPRINTF(tmpBuff, sizeof(tmpBuff), "\t %s = callback;\n", input->GetCallbackName()->c_str());
+			fctDefinitions += tmpBuff;
+			fctDefinitions += "}\n\n";
+		}
+		break;
+
+		default:
+			// do nothing
+			break;
+		}
 	}
 
 	fileDacC_.PrintfLine("");
@@ -2936,6 +3233,11 @@ bool Variable::GetDeclaration(std::string* decl) const
 	decl->append(typeStr);
 	decl->append(" ");
 
+	if(properties_ & PROPERTY_POINTER)
+	{
+		decl->append("* ");
+	}
+
 	if(0 == identifier_.length())
 	{
 		Error("Identifier not set!\n");
@@ -2944,19 +3246,22 @@ bool Variable::GetDeclaration(std::string* decl) const
 
 	decl->append(identifier_);
 
-	if(1 < length_) // this is an array
+	if(!(properties_ & PROPERTY_POINTER))
 	{
-		char tmpBuff[40];
-		SNPRINTF(tmpBuff, sizeof(tmpBuff), "[%lu]", length_);
-		decl->append(tmpBuff);
+		if(1 < length_) // this is an array
+		{
+			char tmpBuff[40];
+			SNPRINTF(tmpBuff, sizeof(tmpBuff), "[%lu]", length_);
+			decl->append(tmpBuff);
+		}
 	}
 
 	// Any initializer supplied?
-	if(properties_ & PROPERTY_CONST)
+	if((properties_ & PROPERTY_CONST) && (0 ==(properties_ & PROPERTY_POINTER)))
 	{
 		if(nullptr == value_)
 		{
-			Error("Const variable requires initializer!");
+			Error("Const variable requires initializer!\n");
 			return false;
 		}
 	}

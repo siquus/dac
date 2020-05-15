@@ -30,7 +30,7 @@
 #include "ModuleContract.h"
 #include "ModulePermute.h"
 #include "ModuleProduct.h"
-
+#include "ModuleCNN.h"
 
 int main() {
 
@@ -51,6 +51,13 @@ int main() {
 	ModuleProduct moduleProduct;
 	moduleProduct.Execute(4);
 	if(!moduleProduct.Success())
+	{
+		fatal("Not all tests passed!\n");
+	}
+
+	ModuleCNN moduleCNN;
+	moduleCNN.Execute(4);
+	if(!moduleCNN.Success())
 	{
 		fatal("Not all tests passed!\n");
 	}

@@ -55,11 +55,12 @@ public:
 			return;
 		}
 
-		for(size_t row = 0; row < nData / (sizeof(float) * nCol); row++)
+		const size_t nRow = nData / (sizeof(float) * nCol);
+		for(size_t row = 0; row < nRow; row++)
 		{
 			for(size_t col = 0; col < nCol; col++)
 			{
-				fprintf(stream, "%f, ", (double) data[col]);
+				fprintf(stream, "%f, ", (double) data[row * nCol + col]);
 			}
 			fprintf(stream, "\n");
 		}

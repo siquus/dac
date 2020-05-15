@@ -51,4 +51,27 @@ size_t Ring::GetElementSize(type_t type)
 	case Float32:
 		return 4;
 	}
+
+	Error("Reached unexpected return!\n");
+	return SIZE_MAX;
+}
+
+const char * Ring::GetTypeString(type_t type)
+{
+	switch(type)
+	{
+	default: // no break intended
+	case None:
+		Error("Can't return type string of unknown ring!\n");
+		return nullptr;
+
+	case Int32:
+		return "Int32";
+
+	case Float32:
+		return "Float32";
+	}
+
+	Error("Reached unexpected return!\n");
+	return nullptr;
 }

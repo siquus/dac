@@ -54,7 +54,8 @@ public:
 		PROPERTY_CONST = 	1 << 0,
 		PROPERTY_STATIC = 	1 << 1,
 		PROPERTY_GLOBAL =	1 << 2,
-		PROPERTY_END_OF_ENUM = 1 << 3,
+		PROPERTY_POINTER = 1 << 3,
+		PROPERTY_END_OF_ENUM = 1 << 4,
 	} properties_t;
 
 	enum class Type {
@@ -101,7 +102,7 @@ class CodeGenerator {
 	bool GenerateStatics();
 	bool GenerateIncludes();
 	bool GenerateHeading(const std::string * heading);
-	bool GenerateOutputFunctions();
+	bool GenerateInterfaceFunctions();
 	bool GenerateConstantDeclarations();
 	bool GenerateStaticVariableDeclarations();
 	bool GenerateLocalVariableDeclaration(const Variable * var);
@@ -116,6 +117,7 @@ class CodeGenerator {
 
 	bool GenerateOperationCode(const Node* node, FileWriter * file);
 	bool OutputCode(const Node* node, FileWriter * file);
+	bool InputCode(const Node* node, FileWriter * file);
 	bool GenerateCallbackPtCheck(FileWriter* file) const;
 	bool VectorAdditionCode(const Node* node, FileWriter* file);
 	bool VectorScalarProductCode(const Node* node, FileWriter * file, bool divide = false);
@@ -130,6 +132,9 @@ class CodeGenerator {
 	bool VectorPermutationCode(const Node* node, FileWriter * file);
 	bool VectorProjectionCode(const Node* node, FileWriter * file);
 	bool VectorJoinIndicesCode(const Node* node, FileWriter * file);
+	bool VectorIndexSplitSumCode(const Node* node, FileWriter * file);
+	bool VectorCrossCorrelationCode(const Node* node, FileWriter * file);
+	bool VectorMaxPoolCode(const Node* node, FileWriter * file);
 
 	bool FetchVariables();
 	bool GetFirstNodesToExecute(std::set<Node::Id_t> * nodeSet);

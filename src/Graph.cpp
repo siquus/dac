@@ -25,6 +25,7 @@
 
 #include "Module.h"
 #include "ControlTransfer.h"
+#include "Interface.h"
 
 class Hash {
 	// TODO: The following hash function was the first one to be found online.
@@ -77,17 +78,6 @@ Node::Id_t Graph::AddNode(Node * node)
 
 	nextNodeId_++;
 
-	// Let parents know of its existence
-	for(Node::Id_t &parent: node->parents)
-	{
-		bool success = AddChild(parent, node->id);
-		if(!success)
-		{
-			Error("Could not AddChild to Parents\n");
-			return Node::ID_NONE;
-		}
-	}
-
 	return node->id ;
 }
 
@@ -101,7 +91,7 @@ bool Graph::AddChild(Node::Id_t parent, Node::Id_t child)
 		return false;
 	}
 
-	parentNode->second.children.insert(child);
+	parentNode->second.ChildrenModifiable()->insert(child);
 
 	return true;
 }
@@ -139,11 +129,11 @@ bool Graph::DeleteChildReferences(Node::Id_t child)
 {
 	for(auto &parentPair: nodes_)
 	{
-		for(auto childIt = parentPair.second.children.begin(); childIt != parentPair.second.children.end(); childIt++)
+		for(auto childIt = parentPair.second.Children()->begin(); childIt != parentPair.second.Children()->end(); childIt++)
 		{
 			if(child == *childIt)
 			{
-				parentPair.second.children.erase(childIt);
+				parentPair.second.ChildrenModifiable()->erase(childIt);
 				break;
 			}
 		}
@@ -162,14 +152,14 @@ bool Graph::AddParent(Node::Id_t parent, Node::Id_t child)
 		return false;
 	}
 
-	childPair->second.parents.push_back(parent);
+	childPair->second.ParentsModifiable()->push_back(parent);
 
 	return AddChild(parent, child);
 }
 
 const char * Node::getName() const
 {
-	return getName(type);
+	return getName(Type_);
 }
 
 const char* Node::getName(Type type)
@@ -206,11 +196,23 @@ const char* Node::getName(Type type)
 	case Type::VECTOR_PROJECTION:
 		return "VECTOR_PROJECTION";
 
+	case Type::VECTOR_CROSS_CORRELATION:
+		return "VECTOR_CROSS_CORRELATION";
+
+	case Type::VECTOR_MAX_POOL:
+		return "VECTOR_MAX_POOL";
+
 	case Type::VECTOR_JOIN_INDICES:
 		return "VECTOR_JOIN_INDICES";
 
+	case Type::VECTOR_INDEX_SPLIT_SUM:
+		return "VECTOR_INDEX_SPLIT_SUM";
+
 	case Type::OUTPUT:
 		return "OUTPUT";
+
+	case Type::INPUT:
+		return "INPUT";
 
 	case Type::CONTROL_TRANSFER_WHILE:
 		return "CONTROL_TRANSFER_WHILE";
@@ -228,6 +230,26 @@ const char* Node::getName(Type type)
 	return nullptr;
 }
 
+void Node::UseAsStorageFor(Id_t id)
+{
+	usedAsStorageBy_.insert(id);
+}
+
+bool Node::RemoveStorageFor(Id_t id)
+{
+	if(usedAsStorageBy_.erase(id))
+	{
+		return true;
+	}
+
+	return false;
+}
+
+bool Node::UsedAsStorageByOthers() const
+{
+	return !usedAsStorageBy_.empty();
+}
+
 // Create a hash which will *help* to identify equal nodes.
 // Hash will be the same for nodes of the same type
 // with the same parents.
@@ -237,44 +259,44 @@ size_t Node::getPartialHash() const
 	Hash hash;
 
 	hash.Put((const uint8_t*) parents.data(), parents.size() * sizeof(parents[0]));
-	hash.Put((const uint8_t *) &type, sizeof(type));
-	hash.Put((const uint8_t *) &objectType, sizeof(objectType));
+	hash.Put((const uint8_t *) &Type_, sizeof(Type_));
+	hash.Put((const uint8_t *) &Object_, sizeof(Object_));
 
 	return hash.Get();
 }
 
 bool Node::sameObject(const Node &lNode, const Node &rNode)
 {
-	if(lNode.objectType != rNode.objectType)
+	if(lNode.Object_ != rNode.Object_)
 	{
 		return false;
 	}
 
 	if(
-			((nullptr != lNode.object) && (nullptr == rNode.object)) ||
-			((nullptr == lNode.object) && (nullptr != rNode.object)))
+			((nullptr != lNode.ObjectPt_) && (nullptr == rNode.ObjectPt_)) ||
+			((nullptr == lNode.ObjectPt_) && (nullptr != rNode.ObjectPt_)))
 	{
 		return false;
 	}
-	else if(nullptr == lNode.object) // both are nullptr by above
+	else if(nullptr == lNode.ObjectPt_) // both are nullptr by above
 	{
 		return true;
 	}
 
 	// Same object with non-nullptr
-	switch(lNode.objectType)
+	switch(lNode.Object_)
 	{
 	default: // no break intended
-	case ObjectType::NONE: // then it should have nullptr!
+	case Object_t::NONE: // then it should have nullptr!
 		Error("Error comparing Objects!\n");
 		return false;
 
-	case ObjectType::MODULE_VECTORSPACE_VECTOR:
+	case Object_t::MODULE_VECTORSPACE_VECTOR:
 		{
-			auto lVec = (const Algebra::Module::VectorSpace::Vector *) lNode.object;
-			auto rVec = (const Algebra::Module::VectorSpace::Vector *) rNode.object;
+			auto lVec = (const Algebra::Module::VectorSpace::Vector *) lNode.ObjectPt_;
+			auto rVec = (const Algebra::Module::VectorSpace::Vector *) rNode.ObjectPt_;
 
-			if(!Algebra::Module::VectorSpace::AreEqual(lVec->__space_, rVec->__space_))
+			if(!Algebra::Module::VectorSpace::AreEqual(lVec->Space(), rVec->Space()))
 			{
 				return false;
 			}
@@ -286,35 +308,47 @@ bool Node::sameObject(const Node &lNode, const Node &rNode)
 		}
 		break;
 
-	case ObjectType::INTERFACE_OUTPUT:
-		// TODO: currently, outputs objects only contain the output name
+	case Object_t::INTERFACE_OUTPUT:
+		// TODO: currently, interface objects only contain the name
 		// so technically they are the same with different names.
 		// with this code we are simply replacing one of them, which might be unexpected.
+		break;
+
+	case Object_t::INTERFACE_INPUT:
+	{
+		auto lIn = (const Interface::Input *) lNode.ObjectPt_;
+		auto rIn = (const Interface::Input *) rNode.ObjectPt_;
+
+		if(!lIn->AreEqual(lIn, rIn))
+		{
+			return false;
+		}
+	}
 		break;
 	}
 
 	return true;
 }
 
-bool Node::sameTypeParameters(const Node &lNode, const Node &rNode)
+bool Node::sameType(const Node &lNode, const Node &rNode)
 {
-	if(lNode.type != rNode.type)
+	if(lNode.Type_ != rNode.Type_)
 	{
 		return false;
 	}
 
 	if(
-			((nullptr != lNode.typeParameters) && (nullptr == rNode.typeParameters)) ||
-			((nullptr == lNode.typeParameters) && (nullptr != rNode.typeParameters)))
+			((nullptr != lNode.TypeParameters_) && (nullptr == rNode.TypeParameters_)) ||
+			((nullptr == lNode.TypeParameters_) && (nullptr != rNode.TypeParameters_)))
 	{
 		return false;
 	}
-	else if(nullptr == lNode.typeParameters) // both are nullptr by above
+	else if(nullptr == lNode.TypeParameters_) // both are nullptr by above
 	{
 		return true;
 	}
 
-	switch(lNode.type)
+	switch(lNode.Type_)
 	{
 	default: // no break intended
 	case Type::VECTOR: // no break intended
@@ -324,14 +358,27 @@ bool Node::sameTypeParameters(const Node &lNode, const Node &rNode)
 	case Type::VECTOR_POWER: // no break intended
 	case Type::VECTOR_COMPARISON_IS_SMALLER: // no break intended
 	case Type::OUTPUT: // no break intended
-	case Type::CONTROL_TRANSFER_WHILE:
+	case Type::INPUT: // no break intended
+	case Type::VECTOR_CROSS_CORRELATION: // no break intended
 		Error("Error comparing node types!\n");
 		return false;
 
+	case Type::CONTROL_TRANSFER_WHILE:
+	{
+		auto lWhile = (const ControlTransferParameters_t*) lNode.TypeParameters_;
+		auto rWhile = (const ControlTransferParameters_t*) rNode.TypeParameters_;
+
+		if((lWhile->BranchFalse != rWhile->BranchFalse) || (lWhile->BranchTrue != rWhile->BranchTrue))
+		{
+			return false;
+		}
+	}
+	break;
+
 	case Type::VECTOR_CONTRACTION:
 	{
-		auto lContr = (const contractParameters_t*) lNode.typeParameters;
-		auto rContr = (const contractParameters_t*) rNode.typeParameters;
+		auto lContr = (const contractParameters_t*) lNode.TypeParameters_;
+		auto rContr = (const contractParameters_t*) rNode.TypeParameters_;
 
 		if((!std::equal(lContr->lfactors.begin(), lContr->lfactors.end(), rContr->lfactors.begin())) ||
 				(!std::equal(lContr->rfactors.begin(), lContr->rfactors.end(), rContr->rfactors.begin())))
@@ -343,8 +390,8 @@ bool Node::sameTypeParameters(const Node &lNode, const Node &rNode)
 
 	case Type::VECTOR_KRONECKER_DELTA_PRODUCT:
 	{
-		auto lKron = (const KroneckerDeltaParameters_t*) lNode.typeParameters;
-		auto rKron = (const KroneckerDeltaParameters_t*) rNode.typeParameters;
+		auto lKron = (const KroneckerDeltaParameters_t*) lNode.TypeParameters_;
+		auto rKron = (const KroneckerDeltaParameters_t*) rNode.TypeParameters_;
 		if(lKron->Scaling != rKron->Scaling) // TODO: Really do exact float comparison?
 		{
 			return false;
@@ -359,8 +406,8 @@ bool Node::sameTypeParameters(const Node &lNode, const Node &rNode)
 
 	case Type::VECTOR_PERMUTATION:
 	{
-		auto lPerm = (const permuteParameters_t*) lNode.typeParameters;
-		auto rPerm = (const permuteParameters_t*) rNode.typeParameters;
+		auto lPerm = (const permuteParameters_t*) lNode.TypeParameters_;
+		auto rPerm = (const permuteParameters_t*) rNode.TypeParameters_;
 
 		if(!std::equal(lPerm->indices.begin(), lPerm->indices.end(), rPerm->indices.begin()))
 		{
@@ -371,8 +418,8 @@ bool Node::sameTypeParameters(const Node &lNode, const Node &rNode)
 
 	case Type::VECTOR_JOIN_INDICES:
 	{
-		auto lJoin = (const joinIndicesParameters_t*) lNode.typeParameters;
-		auto rJoin = (const joinIndicesParameters_t*) rNode.typeParameters;
+		auto lJoin = (const joinIndicesParameters_t*) lNode.TypeParameters_;
+		auto rJoin = (const joinIndicesParameters_t*) rNode.TypeParameters_;
 
 		if(!std::equal(lJoin->Indices.begin(), lJoin->Indices.end(), rJoin->Indices.begin()))
 		{
@@ -381,10 +428,34 @@ bool Node::sameTypeParameters(const Node &lNode, const Node &rNode)
 	}
 	break;
 
+	case Type::VECTOR_INDEX_SPLIT_SUM:
+	{
+		auto lSplit = (const splitSumIndicesParameters_t*) lNode.TypeParameters_;
+		auto rSplit= (const splitSumIndicesParameters_t*) rNode.TypeParameters_;
+
+		if(!std::equal(lSplit->SplitPosition.begin(), lSplit->SplitPosition.end(), rSplit->SplitPosition.begin()))
+		{
+			return false;
+		}
+	}
+	break;
+
+	case Type::VECTOR_MAX_POOL:
+	{
+		auto lPool = (const PoolParameters_t*) lNode.TypeParameters_;
+		auto rPool= (const PoolParameters_t*) rNode.TypeParameters_;
+
+		if(!std::equal(lPool->PoolSize.begin(), lPool->PoolSize.end(), rPool->PoolSize.begin()))
+		{
+			return false;
+		}
+	}
+	break;
+
 	case Type::VECTOR_PROJECTION:
 	{
-		auto lProj = (const projectParameters_t*) lNode.typeParameters;
-		auto rProj = (const projectParameters_t*) rNode.typeParameters;
+		auto lProj = (const projectParameters_t*) lNode.TypeParameters_;
+		auto rProj = (const projectParameters_t*) rNode.TypeParameters_;
 
 		if(!std::equal(lProj->range.begin(), lProj->range.end(), rProj->range.begin()))
 		{
@@ -414,22 +485,89 @@ bool Node::areDuplicate(const Node &lNode, const Node &rNode)
 		return false;
 	}
 
-	if((lNode.branchFalse != rNode.branchFalse) || (lNode.branchTrue != rNode.branchTrue))
-	{
-		return false;
-	}
-
 	if(!sameObject(lNode, rNode))
 	{
 		return false;
 	}
 
-	if(!sameTypeParameters(lNode, rNode))
+	if(!sameType(lNode, rNode))
 	{
 		return false;
 	}
 
 	return true;
+}
+
+bool Node::StoreIn(Id_t id)
+{
+	// TODO: Check compatibility
+	storedIn_ = id;
+
+	return true;
+}
+
+Node::Node(Object_t object, const void * pObject, Type type, void * pType)
+{
+	if((Object_t::NONE != object) && (nullptr == pObject))
+	{
+		Error("Object Pointer can't be null if object is specified!\n");
+	}
+
+	Object_ = object;
+	ObjectPt_ = pObject;
+
+	Type_ = type;
+	TypeParameters_ = pType;
+}
+
+Node::Id_t Node::IsStoredIn() const
+{
+	return storedIn_;
+}
+
+Node::Object_t Node::GetObject() const
+{
+	return Object_;
+}
+
+const void * Node::GetObjectPt() const
+{
+	return ObjectPt_;
+}
+
+Node::Type Node::GetType() const
+{
+	return Type_;
+}
+
+const void * Node::TypeParameters() const
+{
+	return TypeParameters_;
+}
+
+void * Node::TypeParametersModifiable()
+{
+	return TypeParameters_;
+}
+
+const std::vector<Node::Id_t> * Node::Parents() const
+{
+	return &parents;
+}
+
+std::vector<Node::Id_t> * Node::ParentsModifiable()
+{
+	return &parents;
+}
+
+const std::set<Node::Id_t> * Node::Children() const
+{
+	return &children;
+}
+
+std::set<Node::Id_t> * Node::ChildrenModifiable()
+{
+	return &children;
 }
 
 bool Graph::GetRootAncestors(std::set<Node::Id_t> * rootParents, Node::Id_t child) const
@@ -441,13 +579,13 @@ bool Graph::GetRootAncestors(std::set<Node::Id_t> * rootParents, Node::Id_t chil
 		return false;
 	}
 
-	if(0 == childNode->parents.size())
+	if(0 == childNode->Parents()->size())
 	{
 		rootParents->insert(childNode->id);
 		return true;
 	}
 
-	for(const auto &parentId: childNode->parents)
+	for(const auto &parentId: *childNode->Parents())
 	{
 		if(false == GetRootAncestors(rootParents, parentId))
 		{
@@ -558,9 +696,9 @@ bool Graph::ReduceToOne(const std::vector<Node::Id_t> &nodes)
 	{
 		// Carry over children
 		auto eraseNodeIt = nodes_.find(nodes[nodePos]);
-		newNodeIt->second.children.insert(
-				eraseNodeIt->second.children.begin(),
-				eraseNodeIt->second.children.end());
+		newNodeIt->second.ChildrenModifiable()->insert(
+				eraseNodeIt->second.Children()->begin(),
+				eraseNodeIt->second.Children()->end());
 
 		nodes_.erase(eraseNodeIt);
 	}
@@ -573,7 +711,7 @@ bool Graph::ReduceToOne(const std::vector<Node::Id_t> &nodes)
 		{
 			const Node::Id_t cmpId = nodes[nodePos];
 
-			for(Node::Id_t &parent: nodePair.second.parents)
+			for(Node::Id_t &parent: *nodePair.second.ParentsModifiable())
 			{
 				if(cmpId == parent)
 				{
@@ -581,34 +719,44 @@ bool Graph::ReduceToOne(const std::vector<Node::Id_t> &nodes)
 				}
 			}
 
-			if(nodePair.second.children.erase(cmpId))
+			if(nodePair.second.ChildrenModifiable()->erase(cmpId))
 			{
-				nodePair.second.children.insert(newNodeId);
+				nodePair.second.ChildrenModifiable()->insert(newNodeId);
 			}
 
-			if(cmpId == nodePair.second.branchTrue)
+			if(Node::Type::CONTROL_TRANSFER_WHILE == nodePair.second.GetType())
 			{
-				nodePair.second.branchTrue = newNodeId;
+				auto pWhile = (Node::ControlTransferParameters_t*) nodePair.second.TypeParametersModifiable();
+				if(cmpId == pWhile->BranchTrue)
+				{
+					pWhile->BranchTrue = newNodeId;
+				}
+
+				if(cmpId == pWhile->BranchFalse)
+				{
+					pWhile->BranchFalse = newNodeId;
+				}
 			}
 
-			if(cmpId == nodePair.second.branchFalse)
+			if(cmpId == nodePair.second.IsStoredIn())
 			{
-				nodePair.second.branchFalse = newNodeId;
+				nodePair.second.StoreIn(newNodeId);
 			}
 
-			if(cmpId == nodePair.second.storedIn_)
+			if(nodePair.second.RemoveStorageFor(cmpId))
 			{
-				nodePair.second.storedIn_ = newNodeId;
-			}
-
-			if(nodePair.second.usedAsStorageBy_.erase(cmpId))
-			{
-				nodePair.second.usedAsStorageBy_.insert(newNodeId);
+				nodePair.second.UseAsStorageFor(newNodeId);
 			}
 		}
 	}
 
 	return true;
+}
+
+void NodeRef::SetNodeRef(Graph* graph, Node::Id_t id)
+{
+	graph_ = graph;
+	nodeId_ = id;
 }
 
 bool NodeRef::StoreIn(const NodeRef* nodeRef) const
@@ -627,7 +775,7 @@ bool NodeRef::StoreIn(const NodeRef* nodeRef) const
 		return false;
 	}
 
-	thisNode->storedIn_ = nodeRef->nodeId_;
+	thisNode->StoreIn(nodeRef->nodeId_);
 
 	Node * storageNode = graph_->GetNodeModifyable(nodeRef->nodeId_);
 	if(nullptr == storageNode)
@@ -636,7 +784,27 @@ bool NodeRef::StoreIn(const NodeRef* nodeRef) const
 		return false;
 	}
 
-	storageNode->usedAsStorageBy_.insert(nodeId_);
+	storageNode->UseAsStorageFor(nodeId_);
 
 	return true;
+}
+
+void NodeRef::PushParent(Node::Id_t parent)
+{
+	bool success = graph_->AddParent(parent, nodeId_);
+
+	if(!success)
+	{
+		Error("Could not push parent!\n");
+	}
+}
+
+Node::Id_t NodeRef::Id() const
+{
+	return nodeId_;
+}
+
+Graph* NodeRef::GetGraph() const
+{
+	return graph_;
 }

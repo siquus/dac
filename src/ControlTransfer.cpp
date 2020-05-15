@@ -24,9 +24,9 @@
 
 using namespace ControlTransfer;
 
-While::While(Graph * graph)
+While::While()
 {
-	graph_ = graph;
+
 }
 
 bool While::Set(
@@ -35,65 +35,64 @@ bool While::Set(
 		const NodeRef* trueNode,
 		const NodeRef* falseNode)
 {
-	if((nullptr == graph_) || (nullptr == condition))
+	if(nullptr == condition)
 	{
 		Error("nullptr\n");
 		return false;
 	}
 
-	if(condition->graph_ != graph_)
-	{
-		Error("Condition graph does not match While Graph!\n");
-		return false;
-	}
-
-	if(condition->__space_->GetDim() != 1)
+	if(condition->Space()->GetDim() != 1)
 	{
 		Error("Condition must be a scalar!\n");
 		return false;
 	}
 
-	if((nullptr != trueNode) && (trueNode->graph_ != graph_))
+	if((nullptr != trueNode) && (trueNode->GetGraph() != condition->GetGraph()))
 	{
 		Error("trueNode graph does not match While Graph!\n");
 		return false;
 	}
 
-	if((nullptr != falseNode) && (falseNode->graph_ != graph_))
+	if((nullptr != falseNode) && (falseNode->GetGraph() != condition->GetGraph()))
 	{
 		Error("falseNode graph does not match While Graph!\n");
 		return false;
 	}
 
-	Node node;
-	node.parents.push_back(condition->nodeId_);
+	auto param = new Node::ControlTransferParameters_t;
+
+	if(nullptr != falseNode)
+	{
+		param->BranchFalse = falseNode->Id();
+	}
+
+	if(nullptr != trueNode)
+	{
+		param->BranchTrue = trueNode->Id();
+	}
+
+	Node node(
+			Node::Object_t::NONE, nullptr,
+			Node::Type::CONTROL_TRANSFER_WHILE, param);
+
+	Node::Id_t id = condition->GetGraph()->AddNode(&node);
+
+	if(Node::ID_NONE == id)
+	{
+		Error("Could not add Node!\n");
+		return false;
+	}
+
+	SetNodeRef(condition->GetGraph(), id);
+
+	PushParent(condition->Id());
 
 	for(const NodeRef * nodeRef: parents)
 	{
 		if(nodeRef != condition) // Make sure condition is not added twice
 		{
-			node.parents.push_back(nodeRef->nodeId_);
+			PushParent(nodeRef->Id());
 		}
-	}
-
-	node.type = Node::Type::CONTROL_TRANSFER_WHILE;
-
-	if(nullptr != falseNode)
-	{
-		node.branchFalse = falseNode->nodeId_;
-	}
-
-	if(nullptr != trueNode)
-	{
-		node.branchTrue = trueNode->nodeId_;
-	}
-
-	Node::Id_t nodeId = graph_->AddNode(&node);
-
-	if(Node::ID_NONE == nodeId)
-	{
-		Error("Could not add Node!\n");
-		return false;
 	}
 
 	return true;

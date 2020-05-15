@@ -32,15 +32,14 @@
 #include "Graph.h"
 #include "Ring.h"
 
-
 namespace Algebra {
 namespace Module {
 
 class VectorSpace {
 public:
 	typedef struct {
-		Ring::type_t ring_; // TODO: Do we really want to implement different rings in one vector?
-		dimension_t dim_;
+		Ring::type_t Ring; // TODO: Do we really want to implement different rings in one vector?
+		dimension_t Dim;
 	} simpleVs_t;
 
 	VectorSpace(Ring::type_t ring, dimension_t dim);
@@ -49,19 +48,18 @@ public:
 	VectorSpace(std::vector<const VectorSpace*> vSpaces);
 	VectorSpace(const VectorSpace &vSpace, size_t nTimes);
 
-	// Vector space created by the tensor product of given factors
-	std::vector<simpleVs_t> factors_; // TODO: Currently not allowed to take the product of product spaces
-
 	dimension_t GetDim() const;
 	Ring::type_t GetRing() const;
+
+	// Calculate Strides. // TODO: assumes Row-Major Layout
+	// https://en.wikipedia.org/wiki/Row-_and_column-major_order#Address_calculation_in_general
 	void GetStrides(std::vector<uint32_t> * strides) const;
+	const std::vector<simpleVs_t> * Factors() const;
+
 	static bool AreEqual(const VectorSpace * lVs, const VectorSpace * rVs);
 
 	class Vector : public NodeRef {
 	public:
-		const VectorSpace * __space_;
-		const void* __value_ = nullptr;
-
 		void PrintInfo() const;
 		static bool SameValue(const Vector * lVec, const Vector * rVec);
 
@@ -92,6 +90,11 @@ public:
 
 		const Vector* JoinIndices(std::vector<std::vector<uint32_t>> &indices) const; // B_ik = JoinIndices(A_ijk, {0, 1})= A_iik (no sum)
 
+		const Vector * CrossCorrelate(const Vector* Kernel) const; // TODO: Description. See "Deep learning", p.324
+		const Vector * MaxPool(const std::vector<uint32_t> &poolSize) const; // https://en.wikipedia.org/wiki/Convolutional_neural_network#Pooling_layer
+
+		const Vector * IndexSplitSum(const std::vector<uint32_t> &splitPosition) const; // IndexSplitSum(A_ij, {0, 3}) = B_ijk = A_i(j+k), where j = 0...2, k = 3..., i.e. splitPosition = 0 means this axis won't be split
+
 		const Vector* Derivative(const Vector* vec) const;
 
 		typedef struct {
@@ -112,14 +115,39 @@ public:
 			std::pair<uint32_t, uint32_t> Pairs; // declaring which two indices have this property. If size == 0, then all.
 		} propertyParameterDiagonal_t;
 
+		typedef struct {
+			Node::Id_t InputNode;
+		} propertyExternalInput_t;
+
 		enum class Property {
 			Diagonal, // propertyParameterDiagonal_t
 			Symmetric, // propertyParameterSymmetric_t
 			Antisymmetric, // propertyParameterSymmetric_t
 			Sparse, // propertyParameterSparse_t
+			ExternalInput, // propertyExternalInput_t
 		};
 
+		Vector(Graph* graph, const VectorSpace * vSpace);
+		Vector(Graph* graph, const VectorSpace * vSpace, const std::map<Property, const void *> &properties);
+		Vector(Graph* graph, const VectorSpace * vSpace, const void * value, const std::map<Property, const void *> &properties = std::map<Property, const void *>{});
+		Vector(Graph* graph, const VectorSpace * vSpace, Node::Type type, void * typeParam);
+
+		const std::map<Property, const void *> * Properties() const;
+		const VectorSpace * Space() const;
+		const void * InitValue() const;
+
 	private:
+		const VectorSpace * Space_ = nullptr;
+		const void * Value_ = nullptr;
+		std::map<Property, const void *> Properties_;
+
+		bool Init(
+				Graph* graph,
+				const VectorSpace * vSpace,
+				const void * value,
+				const std::map<Property, const void *> &properties,
+				Node::Type type, void * typeParam);
+
 		static bool AreCompatible(const Vector* vec1, const Vector* vec2);
 
 		typedef struct depNode_s {
@@ -136,7 +164,10 @@ public:
 		static const Vector* MultiplyDerivative(const Vector* vecValuedFct, const Vector* arg);
 		static const Vector* PowerDerivative(const Vector* vecValuedFct, const Vector* arg);
 		static const Vector* ProjectDerivative(const Vector* vecValuedFct, const Vector* arg);
+		static const Vector* CrossCorrelationDerivative(const Vector* vecValuedFct, const Vector* arg);
 	};
+
+	const Vector * Element(Graph* graph, const std::map<Vector::Property, const void *> &properties) const;
 
 	template<typename T>
 	const Vector * Element(Graph* graph, const std::vector<T> &initializer) const; // initializer Pointer is taken
@@ -152,8 +183,7 @@ public:
 	const Vector * Element(
 			Graph* graph,
 			const std::vector<T> &initializer,
-			const std::vector<Vector::Property> &properties,
-			const std::vector<const void *> &propertiesParameter) const;  // initializer Pointer is taken
+			const std::map<Vector::Property, const void *> &properties) const;  // initializer Pointer is taken
 
 	const Vector * Element(Graph* graph, const std::vector<uint32_t> &DeltaPairs, float Scaling = 1.f) const;
 
@@ -174,8 +204,12 @@ public:
 	const Vector * Homomorphism(
 			Graph* graph,
 			const std::vector<T> &initializer,
-			const std::vector<Vector::Property> &properties,
-			const std::vector<const void *> &propertiesParameter) const;  // initializer Pointer is taken
+			const std::map<Vector::Property, const void *> &properties) const;  // initializer Pointer is taken
+
+	private:
+	// Vector space created by the tensor product of given factors
+	std::vector<simpleVs_t> Factors_; // TODO: Currently not allowed to take the product of product spaces
+
 };
 }
 }

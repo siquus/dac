@@ -137,7 +137,7 @@ bool ModuleProduct::Generate(const std::string &path)
 	if(!GenSuccess)
 	{
 		printf("Could not generate Code\n");
-		return 1;
+		return false;
 	}
 
 	return true;
