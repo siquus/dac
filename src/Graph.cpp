@@ -91,7 +91,7 @@ bool Graph::AddChild(Node::Id_t parent, Node::Id_t child)
 		return false;
 	}
 
-	parentNode->second.children.insert(child);
+	parentNode->second.ChildrenModifiable()->insert(child);
 
 	return true;
 }
@@ -129,11 +129,11 @@ bool Graph::DeleteChildReferences(Node::Id_t child)
 {
 	for(auto &parentPair: nodes_)
 	{
-		for(auto childIt = parentPair.second.children.begin(); childIt != parentPair.second.children.end(); childIt++)
+		for(auto childIt = parentPair.second.Children()->begin(); childIt != parentPair.second.Children()->end(); childIt++)
 		{
 			if(child == *childIt)
 			{
-				parentPair.second.children.erase(childIt);
+				parentPair.second.ChildrenModifiable()->erase(childIt);
 				break;
 			}
 		}
@@ -152,7 +152,7 @@ bool Graph::AddParent(Node::Id_t parent, Node::Id_t child)
 		return false;
 	}
 
-	childPair->second.parents.push_back(parent);
+	childPair->second.ParentsModifiable()->push_back(parent);
 
 	return AddChild(parent, child);
 }
@@ -550,6 +550,26 @@ void * Node::TypeParametersModifiable()
 	return TypeParameters_;
 }
 
+const std::vector<Node::Id_t> * Node::Parents() const
+{
+	return &parents;
+}
+
+std::vector<Node::Id_t> * Node::ParentsModifiable()
+{
+	return &parents;
+}
+
+const std::set<Node::Id_t> * Node::Children() const
+{
+	return &children;
+}
+
+std::set<Node::Id_t> * Node::ChildrenModifiable()
+{
+	return &children;
+}
+
 bool Graph::GetRootAncestors(std::set<Node::Id_t> * rootParents, Node::Id_t child) const
 {
 	const Node * childNode = GetNode(child);
@@ -559,13 +579,13 @@ bool Graph::GetRootAncestors(std::set<Node::Id_t> * rootParents, Node::Id_t chil
 		return false;
 	}
 
-	if(0 == childNode->parents.size())
+	if(0 == childNode->Parents()->size())
 	{
 		rootParents->insert(childNode->id);
 		return true;
 	}
 
-	for(const auto &parentId: childNode->parents)
+	for(const auto &parentId: *childNode->Parents())
 	{
 		if(false == GetRootAncestors(rootParents, parentId))
 		{
@@ -676,9 +696,9 @@ bool Graph::ReduceToOne(const std::vector<Node::Id_t> &nodes)
 	{
 		// Carry over children
 		auto eraseNodeIt = nodes_.find(nodes[nodePos]);
-		newNodeIt->second.children.insert(
-				eraseNodeIt->second.children.begin(),
-				eraseNodeIt->second.children.end());
+		newNodeIt->second.ChildrenModifiable()->insert(
+				eraseNodeIt->second.Children()->begin(),
+				eraseNodeIt->second.Children()->end());
 
 		nodes_.erase(eraseNodeIt);
 	}
@@ -691,7 +711,7 @@ bool Graph::ReduceToOne(const std::vector<Node::Id_t> &nodes)
 		{
 			const Node::Id_t cmpId = nodes[nodePos];
 
-			for(Node::Id_t &parent: nodePair.second.parents)
+			for(Node::Id_t &parent: *nodePair.second.ParentsModifiable())
 			{
 				if(cmpId == parent)
 				{
@@ -699,9 +719,9 @@ bool Graph::ReduceToOne(const std::vector<Node::Id_t> &nodes)
 				}
 			}
 
-			if(nodePair.second.children.erase(cmpId))
+			if(nodePair.second.ChildrenModifiable()->erase(cmpId))
 			{
-				nodePair.second.children.insert(newNodeId);
+				nodePair.second.ChildrenModifiable()->insert(newNodeId);
 			}
 
 			if(Node::Type::CONTROL_TRANSFER_WHILE == nodePair.second.GetType())

@@ -107,9 +107,6 @@ public:
 	typedef uint32_t Id_t;
 	static constexpr Id_t ID_NONE = 0;
 
-	std::vector<Id_t> parents; // TODO: No std::set, because position matters
-	std::set<Id_t> children;
-
 	void UseAsStorageFor(Id_t id);
 	bool RemoveStorageFor(Id_t id);
 	bool UsedAsStorageByOthers() const;
@@ -128,6 +125,12 @@ public:
 	Object_t GetObject() const;
 	const void * GetObjectPt() const;
 
+	const std::vector<Id_t> * Parents() const;
+	std::vector<Id_t> * ParentsModifiable();
+
+	const std::set<Id_t> * Children() const;
+	std::set<Id_t> * ChildrenModifiable();
+
 private:
 	std::set<Id_t> usedAsStorageBy_;
 	Id_t storedIn_ = ID_NONE;
@@ -137,6 +140,9 @@ private:
 
 	Type Type_ = Type::NONE;
 	void* TypeParameters_ = nullptr; // see fooParameters_t
+
+	std::vector<Id_t> parents; // TODO: No std::set, because position matters
+	std::set<Id_t> children;
 };
 
 class Graph {

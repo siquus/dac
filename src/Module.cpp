@@ -1121,7 +1121,7 @@ void VectorSpace::Vector::TraverseParents(std::map<Node::Id_t, depNode_t> * depN
 		return;
 	}
 
-	for(const auto &nextNodeId: currentNodePt->parents)
+	for(const auto &nextNodeId: *currentNodePt->Parents())
 	{
 		depNode_t &nextDepNode = (*depNodes)[nextNodeId];
 
@@ -1264,7 +1264,7 @@ const VectorSpace::Vector* VectorSpace::Vector::CreateDerivative(const Vector* v
 {
 	// Check if arg actually is a parent to this function
 	const Node* fctNode = vecValuedFct->GetGraph()->GetNode(vecValuedFct->Id());
-	if(fctNode->parents.end() == std::find(fctNode->parents.begin(), fctNode->parents.end(), arg->Id()))
+	if(fctNode->Parents()->end() == std::find(fctNode->Parents()->begin(), fctNode->Parents()->end(), arg->Id()))
 	{
 		Error("Tried to take derivative w.r.t. non-existing input node!\n");
 		return nullptr;
@@ -1662,7 +1662,7 @@ const VectorSpace::Vector* VectorSpace::Vector::CrossCorrelationDerivative(const
 		return nullptr;
 	}
 
-	bool argIsKernel = (arg->Id() == fctNode->parents[1]);
+	bool argIsKernel = (arg->Id() == fctNode->Parents()->at(1));
 	if(!argIsKernel)
 	{
 		Error("Not implemented: Cross-correlations derivative w.r.t. input\n"); // TODO: Implement
@@ -1671,7 +1671,7 @@ const VectorSpace::Vector* VectorSpace::Vector::CrossCorrelationDerivative(const
 
 	const Vector * kernelVector = arg; // for readability
 
-	const Node * inputNode = vecValuedFct->GetGraph()->GetNode(fctNode->parents[0]);
+	const Node * inputNode = vecValuedFct->GetGraph()->GetNode(fctNode->Parents()->at(0));
 	if(nullptr == inputNode)
 	{
 		Error("Could not find node!\n");
@@ -1792,24 +1792,24 @@ const VectorSpace::Vector* VectorSpace::Vector::PowerDerivative(const Vector* ve
 		return nullptr;
 	}
 
-	const Node * lNode = arg->GetGraph()->GetNode(fctNode->parents[0]);
+	const Node * lNode = arg->GetGraph()->GetNode(fctNode->Parents()->at(0));
 	if(nullptr == lNode)
 	{
-		Error("Could not find node Id%u!\n", fctNode->parents[0]);
+		Error("Could not find node Id%u!\n", fctNode->Parents()->at(0));
 		return nullptr;
 	}
 
-	const Node * rNode = arg->GetGraph()->GetNode(fctNode->parents[1]);
+	const Node * rNode = arg->GetGraph()->GetNode(fctNode->Parents()->at(1));
 	if(nullptr == rNode)
 	{
-		Error("Could not find node Id%u!\n", fctNode->parents[1]);
+		Error("Could not find node Id%u!\n", fctNode->Parents()->at(1));
 		return nullptr;
 	}
 
 	const Vector* baseVector = (const Vector *) lNode->GetObjectPt();
 	const Vector* expVector = (const Vector *) rNode->GetObjectPt();
 
-	bool derivativeWrtBase = (fctNode->parents[0] == arg->Id());
+	bool derivativeWrtBase = (fctNode->Parents()->at(0) == arg->Id());
 
 	if(!derivativeWrtBase)
 	{
@@ -1906,15 +1906,15 @@ const VectorSpace::Vector* VectorSpace::Vector::MultiplyDerivative(const Vector*
 
 	bool argOnRightSide;
 	Node::Id_t otherNodeId;
-	if(fctNode->parents[0] == arg->Id())
+	if(fctNode->Parents()->at(0) == arg->Id())
 	{
 		argOnRightSide = false;
-		otherNodeId = fctNode->parents[1];
+		otherNodeId = fctNode->Parents()->at(1);
 	}
 	else
 	{
 		argOnRightSide = true;
-		otherNodeId = fctNode->parents[0];
+		otherNodeId = fctNode->Parents()->at(0);
 	}
 
 	const Node * otherNode = arg->GetGraph()->GetNode(otherNodeId);
@@ -2033,18 +2033,18 @@ const VectorSpace::Vector* VectorSpace::Vector::ContractDerivative(const Vector*
 	const std::vector<uint32_t> * otherContrFactors;
 	const Node * otherNode = nullptr;
 	bool argOnRightSide;
-	if(fctNode->parents[0] == arg->Id())
+	if(fctNode->Parents()->at(0) == arg->Id())
 	{
 		argContrFactors = &contractValue->lfactors;
 		otherContrFactors = &contractValue->rfactors;
-		otherNode = vecValuedFct->GetGraph()->GetNode(fctNode->parents[1]);
+		otherNode = vecValuedFct->GetGraph()->GetNode(fctNode->Parents()->at(1));
 		argOnRightSide = false;
 	}
 	else
 	{
 		otherContrFactors = &contractValue->lfactors;
 		argContrFactors = &contractValue->rfactors;
-		otherNode = vecValuedFct->GetGraph()->GetNode(fctNode->parents[0]);
+		otherNode = vecValuedFct->GetGraph()->GetNode(fctNode->Parents()->at(0));
 		argOnRightSide = true;
 	}
 
