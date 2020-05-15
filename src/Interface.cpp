@@ -54,9 +54,9 @@ void Output::Init(Graph * graph, const char * name)
 	graph_ = graph;
 
 	Node node;
-	node.type = Node::Type::OUTPUT;
-	node.objectType = Node::ObjectType::INTERFACE_OUTPUT;
-	node.object = this;
+	node.Type_ = Node::Type::OUTPUT;
+	node.Object_ = Node::Object_t::INTERFACE_OUTPUT;
+	node.ObjectPt_ = this;
 
 	nodeId_ = graph->AddNode(&node);
 	if(Node::ID_NONE == nodeId_)
@@ -174,9 +174,9 @@ const Algebra::Module::VectorSpace::Vector * Input::Get(const Algebra::Module::V
 	}
 
 	Node node;
-	node.type = Node::Type::INPUT;
-	node.objectType = Node::ObjectType::INTERFACE_INPUT;
-	node.object = this;
+	node.Type_ = Node::Type::INPUT;
+	node.Object_ = Node::Object_t::INTERFACE_INPUT;
+	node.ObjectPt_ = this;
 
 	Node::Id_t inNodeId = graph_->AddNode(&node);
 	if(Node::ID_NONE == inNodeId)

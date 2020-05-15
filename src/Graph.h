@@ -95,9 +95,9 @@ public:
 
 	static bool areDuplicate(const Node &lNode, const Node &rNode);
 	static bool sameObject(const Node &lNode, const Node &rNode);
-	static bool sameTypeParameters(const Node &lNode, const Node &rNode);
+	static bool sameType(const Node &lNode, const Node &rNode);
 
-	enum class ObjectType {
+	enum class Object_t {
 		NONE,
 		MODULE_VECTORSPACE_VECTOR,
 		INTERFACE_OUTPUT,
@@ -110,11 +110,6 @@ public:
 	std::vector<Id_t> parents; // TODO: No std::set, because position matters
 	std::set<Id_t> children;
 
-	Type type = Type::NONE;
-	const void* typeParameters = nullptr; // see fooParameters_t
-	ObjectType objectType = ObjectType::NONE;
-	const void* object = nullptr;
-
 	void UseAsStorageFor(Id_t id);
 	bool RemoveStorageFor(Id_t id);
 	bool UsedAsStorageByOthers() const;
@@ -122,11 +117,25 @@ public:
 	bool StoreIn(Id_t id);
 	Node::Id_t IsStoredIn() const;
 
+	const void * TypeParameters() const;
+	void * TypeParametersModifiable();
+
 	Id_t id = ID_NONE;
+
+	//Node(ObjectType objectType, const void * object, Type type, void * typeParam);
+
+
+	Object_t Object_ = Object_t::NONE;
+	const void* ObjectPt_ = nullptr;
+
+	Type Type_ = Type::NONE;
+	void* TypeParameters_ = nullptr; // see fooParameters_t
 
 private:
 	std::set<Id_t> usedAsStorageBy_;
 	Id_t storedIn_ = ID_NONE;
+
+
 };
 
 class Graph {
@@ -164,7 +173,7 @@ class NodeRef {
 public:
 	bool StoreIn(const NodeRef* nodeRef) const;
 
-	void SetType(Node::Type type, const void * param = nullptr);
+	void SetType(Node::Type type, void * param = nullptr);
 	void PushParent(Node::Id_t parent);
 
 	Node::Id_t nodeId_ = Node::ID_NONE;

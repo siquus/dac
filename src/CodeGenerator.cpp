@@ -315,8 +315,8 @@ bool CodeGenerator::Generate(const Graph* graph)
 	{
 		DEBUG("nodeMap Node%2u: %s,\t\t ObjType %2u,  Children ",
 				nodePair.first,
-				Node::getName(nodePair.second.type),
-				(unsigned int) nodePair.second.objectType);
+				Node::getName(nodePair.second.Type_),
+				(unsigned int) nodePair.second.Object_);
 
 		for(Node::Id_t nodeId: nodePair.second.children)
 		{
@@ -455,7 +455,7 @@ bool CodeGenerator::GenerateNodesArray()
 		}
 
 		std::vector<uint32_t> childrenArrayPosition;
-		switch(nodePair.second->type)
+		switch(nodePair.second->Type_)
 		{
 		case Node::Type::CONTROL_TRANSFER_WHILE:
 			// Control Transfers don't have children
@@ -626,10 +626,10 @@ bool CodeGenerator::GenerateInstructions()
 	for(const auto &nodePair: *nodes)
 	{
 		// Does this node require a function?
-		switch(nodePair.second.type)
+		switch(nodePair.second.Type_)
 		{
 		default:
-			Error("Unknown Node-Type %u\n", (uint8_t) nodePair.second.type);
+			Error("Unknown Node-Type %u\n", (uint8_t) nodePair.second.Type_);
 			return false;
 
 		case Node::Type::NONE:
@@ -663,7 +663,7 @@ bool CodeGenerator::GenerateInstructions()
 		GenerateInstructionId(&fctId, nodePair.second.id);
 
 		// Set param to unused if not used
-		if(Node::Type::CONTROL_TRANSFER_WHILE != nodePair.second.type)
+		if(Node::Type::CONTROL_TRANSFER_WHILE != nodePair.second.Type_)
 		{
 			fileInstructions_.PrintfLine("static void %s(void * instance __attribute__((unused)), void (*PushNode)(void * instance, struct node_s * node) __attribute__((unused)))", fctId.c_str());
 		}
@@ -702,11 +702,11 @@ bool CodeGenerator::GenerateCallbackPtCheck(FileWriter* file) const
 	auto nodes = graph_->GetNodes();
 	for(const auto &nodePair: *nodes)
 	{
-		switch(nodePair.second.type)
+		switch(nodePair.second.Type_)
 		{
 		case Node::Type::OUTPUT:
 		{
-			auto output = (const Interface::Output*) nodePair.second.object;
+			auto output = (const Interface::Output*) nodePair.second.ObjectPt_;
 
 			file->PrintfLine("if(NULL == %s)", output->GetCallbackName()->c_str());
 			file->PrintfLine("{");
@@ -717,14 +717,14 @@ bool CodeGenerator::GenerateCallbackPtCheck(FileWriter* file) const
 
 		case Node::Type::INPUT:
 		{
-			auto insert = inputCheckCreated.insert(nodePair.second.object);
+			auto insert = inputCheckCreated.insert(nodePair.second.ObjectPt_);
 			if(!insert.second)
 			{
 				// Pointer check for this input already created
 				continue;
 			}
 
-			auto input = (const Interface::Input*) nodePair.second.object;
+			auto input = (const Interface::Input*) nodePair.second.ObjectPt_;
 
 			file->PrintfLine("if(NULL == %s)", input->GetCallbackName()->c_str());
 			file->PrintfLine("{");
@@ -852,7 +852,7 @@ bool CodeGenerator::InputCode(const Node* node, FileWriter * file)
 {
 	file->PrintfLine("// %s\n", __func__);
 
-	auto input = (const Interface::Input* ) node->object;
+	auto input = (const Interface::Input* ) node->ObjectPt_;
 
 	// What is the identifier?
 	size_t identifier = input->GetIdentifier(node->id);
@@ -885,7 +885,7 @@ bool CodeGenerator::OutputCode(const Node* node, FileWriter * file)
 	{
 		getVarRetFalseOnError(var, outId);
 
-		auto output = (const Interface::Output*) node->object;
+		auto output = (const Interface::Output*) node->ObjectPt_;
 
 		const std::string * varIdentifier = var->GetIdentifier();
 		if(nullptr == varIdentifier)
@@ -916,7 +916,7 @@ bool CodeGenerator::OutputCode(const Node* node, FileWriter * file)
 
 bool CodeGenerator::GenerateOperationCode(const Node* node, FileWriter * file)
 {
-	switch(node->type)
+	switch(node->Type_)
 	{
 	case Node::Type::VECTOR_ADDITION:
 		retFalseOnFalse(VectorAdditionCode(node, file), "Could not generate Vector Addition Code!\n");
@@ -983,7 +983,7 @@ bool CodeGenerator::GenerateOperationCode(const Node* node, FileWriter * file)
 		break;
 
 	case Node::Type::VECTOR:
-		Error("Type %i is no operation!\n", (int) node->type);
+		Error("Type %i is no operation!\n", (int) node->Type_);
 		return false;
 
 	case Node::Type::VECTOR_CONTRACTION:
@@ -997,7 +997,7 @@ bool CodeGenerator::GenerateOperationCode(const Node* node, FileWriter * file)
 		break;
 
 	default:
-		Error("Unknown Type %i!\n", (int) node->type);
+		Error("Unknown Type %i!\n", (int) node->Type_);
 		return false;
 	}
 
@@ -1027,7 +1027,7 @@ bool CodeGenerator::VectorAdditionCode(const Node* node, FileWriter * file)
 
 	GenerateLocalVariableDeclaration(varOp);
 
-	auto vecOp = (const Algebra::Module::VectorSpace::Vector*) node->object;
+	auto vecOp = (const Algebra::Module::VectorSpace::Vector*) node->ObjectPt_;
 
 	bool resultIsArray = (1 < vecOp->Space()->GetDim());
 
@@ -1075,8 +1075,8 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 		return false;
 	}
 
-	if((Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lnode->second.type) &&
-			(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == rnode->second.type))
+	if((Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lnode->second.Type_) &&
+			(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == rnode->second.Type_))
 	{
 		Error("Contraction of two KroneckerDeltas not supported: Should be handled in graph creation!\n");
 		return false;
@@ -1085,7 +1085,7 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 	const Node * argVecNode;
 	const Node * kronNode;
 	bool argVecIsLeftArg;
-	if(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lnode->second.type)
+	if(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lnode->second.Type_)
 	{
 		argVecNode = &rnode->second;
 		kronNode = &lnode->second;
@@ -1101,11 +1101,11 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 	getVarRetFalseOnError(varOp, node->id);
 	getVarRetFalseOnError(varArgVec, argVecNode->id);
 
-	const Algebra::Module::VectorSpace::Vector* argVec = (const Algebra::Module::VectorSpace::Vector*) argVecNode->object;
-	const Algebra::Module::VectorSpace::Vector* kronVec = (const Algebra::Module::VectorSpace::Vector*) kronNode->object;
-	const Algebra::Module::VectorSpace::Vector* opVec = (const Algebra::Module::VectorSpace::Vector*) node->object;
+	const Algebra::Module::VectorSpace::Vector* argVec = (const Algebra::Module::VectorSpace::Vector*) argVecNode->ObjectPt_;
+	const Algebra::Module::VectorSpace::Vector* kronVec = (const Algebra::Module::VectorSpace::Vector*) kronNode->ObjectPt_;
+	const Algebra::Module::VectorSpace::Vector* opVec = (const Algebra::Module::VectorSpace::Vector*) node->ObjectPt_;
 
-	const Node::contractParameters_t * contractValue = (const Node::contractParameters_t *) node->typeParameters;
+	const Node::contractParameters_t * contractValue = (const Node::contractParameters_t *) node->TypeParameters_;
 
 	const std::vector<uint32_t> * argContractFactors;
 	const std::vector<uint32_t> * kronContractFactors;
@@ -1120,7 +1120,7 @@ bool CodeGenerator::VectorContractionKroneckerDeltaCode(const Node* node, FileWr
 		kronContractFactors = &contractValue->lfactors;
 	}
 
-	const Node::KroneckerDeltaParameters_t * kroneckerParam = (Node::KroneckerDeltaParameters_t *) kronNode->typeParameters;
+	const Node::KroneckerDeltaParameters_t * kroneckerParam = (Node::KroneckerDeltaParameters_t *) kronNode->TypeParameters_;
 
 	// Copy delta pairs array into file
 	std::string deltaPairs = "const uint32_t deltaPairs[] = {";
@@ -1280,7 +1280,7 @@ bool CodeGenerator::VectorPermutationCode(const Node* node, FileWriter * file)
 {
 	file->PrintfLine("// %s\n", __func__);
 
-	const Node::permuteParameters_t * permuteParam = (const Node::permuteParameters_t *) node->typeParameters;
+	const Node::permuteParameters_t * permuteParam = (const Node::permuteParameters_t *) node->TypeParameters_;
 
 	auto nodes = graph_->GetNodes();
 	const auto argNode = nodes->find(node->parents[0]);
@@ -1290,7 +1290,7 @@ bool CodeGenerator::VectorPermutationCode(const Node* node, FileWriter * file)
 		return false;
 	}
 
-	const Algebra::Module::VectorSpace::Vector* vec = (const Algebra::Module::VectorSpace::Vector*) argNode->second.object;
+	const Algebra::Module::VectorSpace::Vector* vec = (const Algebra::Module::VectorSpace::Vector*) argNode->second.ObjectPt_;
 
 	getVarRetFalseOnError(varOp, node->id);
 	getVarRetFalseOnError(varArg, node->parents[0]);
@@ -1355,8 +1355,8 @@ bool CodeGenerator::VectorContractionCode(const Node* node, FileWriter * file)
 		return false;
 	}
 
-	if((Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lnode->second.type) ||
-			(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == rnode->second.type))
+	if((Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lnode->second.Type_) ||
+			(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == rnode->second.Type_))
 	{
 		return VectorContractionKroneckerDeltaCode(node, file);
 	}
@@ -1365,11 +1365,11 @@ bool CodeGenerator::VectorContractionCode(const Node* node, FileWriter * file)
 	getVarRetFalseOnError(varLVec, node->parents[0]);
 	getVarRetFalseOnError(varRVec, node->parents[1]);
 
-	const Algebra::Module::VectorSpace::Vector* lVec = (const Algebra::Module::VectorSpace::Vector*) lnode->second.object;
-	const Algebra::Module::VectorSpace::Vector* rVec = (const Algebra::Module::VectorSpace::Vector*) rnode->second.object;
+	const Algebra::Module::VectorSpace::Vector* lVec = (const Algebra::Module::VectorSpace::Vector*) lnode->second.ObjectPt_;
+	const Algebra::Module::VectorSpace::Vector* rVec = (const Algebra::Module::VectorSpace::Vector*) rnode->second.ObjectPt_;
 
-	const Algebra::Module::VectorSpace::Vector* opVec = (const Algebra::Module::VectorSpace::Vector*) node->object;
-	const Node::contractParameters_t * contractValue = (Node::contractParameters_t *) node->typeParameters;
+	const Algebra::Module::VectorSpace::Vector* opVec = (const Algebra::Module::VectorSpace::Vector*) node->ObjectPt_;
+	const Node::contractParameters_t * contractValue = (Node::contractParameters_t *) node->TypeParameters_;
 
 	const char * varOpId = varOp->GetIdentifier()->c_str();
 
@@ -1624,7 +1624,7 @@ bool CodeGenerator::ControlTransferWhileCode(const Node* node, FileWriter * file
 		return false;
 	}
 
-	auto whileParam = (const Node::ControlTransferParameters_t*) node->typeParameters;
+	auto whileParam = (const Node::ControlTransferParameters_t*) node->TypeParameters_;
 
 	std::set<uint32_t> arrayPosTrue;
 	if(Node::ID_NONE != whileParam->BranchTrue)
@@ -1721,7 +1721,7 @@ bool CodeGenerator::VectorScalarProductKroneckerDeltaCode(const Node* node, File
 
 	Node::Id_t varScalarNodeId;
 	const Node * kronNode = nullptr;
-	if(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lVecNode->second.type)
+	if(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lVecNode->second.Type_)
 	{
 		kronNode = &lVecNode->second;
 		varScalarNodeId = node->parents[1];
@@ -1742,11 +1742,11 @@ bool CodeGenerator::VectorScalarProductKroneckerDeltaCode(const Node* node, File
 	getVarRetFalseOnError(varOp, node->id);
 	getVarRetFalseOnError(varScalar, varScalarNodeId);
 
-	const Node::KroneckerDeltaParameters_t * kroneckerParam = (const Node::KroneckerDeltaParameters_t *) kronNode->typeParameters;
+	const Node::KroneckerDeltaParameters_t * kroneckerParam = (const Node::KroneckerDeltaParameters_t *) kronNode->TypeParameters_;
 
 	retFalseOnFalse(GenerateLocalVariableDeclaration(varOp), "Could not generate Var. Decl.\n");
 
-	auto opVec = (const Algebra::Module::VectorSpace::Vector*) node->object;
+	auto opVec = (const Algebra::Module::VectorSpace::Vector*) node->ObjectPt_;
 
 	// TODO: This is a giant waste of resources: Every Node should have a "scaling" attached to it, so multiplication needs
 	// to only be performed on that.
@@ -1823,8 +1823,8 @@ bool CodeGenerator::VectorVectorProductKroneckerDeltaCode(const Node* node, File
 		return false;
 	}
 
-	bool lNodeIsKron = (Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lnode->second.type);
-	bool rNodeIsKron = (Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == rnode->second.type);
+	bool lNodeIsKron = (Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lnode->second.Type_);
+	bool rNodeIsKron = (Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == rnode->second.Type_);
 
 	if(lNodeIsKron && rNodeIsKron)
 	{
@@ -1845,22 +1845,22 @@ bool CodeGenerator::VectorVectorProductKroneckerDeltaCode(const Node* node, File
 	if(lNodeIsKron)
 	{
 		vecNodeId = node->parents[1];
-		kronVec = (const Algebra::Module::VectorSpace::Vector*) lnode->second.object;
-		vec = (const Algebra::Module::VectorSpace::Vector*) rnode->second.object;
-		kroneckerParam = (const Node::KroneckerDeltaParameters_t *) lnode->second.typeParameters;
+		kronVec = (const Algebra::Module::VectorSpace::Vector*) lnode->second.ObjectPt_;
+		vec = (const Algebra::Module::VectorSpace::Vector*) rnode->second.ObjectPt_;
+		kroneckerParam = (const Node::KroneckerDeltaParameters_t *) lnode->second.TypeParameters_;
 	}
 	else
 	{
 		vecNodeId = node->parents[0];
-		kronVec = (const Algebra::Module::VectorSpace::Vector*) rnode->second.object;
-		vec = (const Algebra::Module::VectorSpace::Vector*) lnode->second.object;
-		kroneckerParam = (const Node::KroneckerDeltaParameters_t *) rnode->second.typeParameters;
+		kronVec = (const Algebra::Module::VectorSpace::Vector*) rnode->second.ObjectPt_;
+		vec = (const Algebra::Module::VectorSpace::Vector*) lnode->second.ObjectPt_;
+		kroneckerParam = (const Node::KroneckerDeltaParameters_t *) rnode->second.TypeParameters_;
 	}
 
 	getVarRetFalseOnError(varOp, node->id);
 	getVarRetFalseOnError(varVec, vecNodeId);
 
-	const Algebra::Module::VectorSpace::Vector* opVec = (const Algebra::Module::VectorSpace::Vector*) node->object;
+	const Algebra::Module::VectorSpace::Vector* opVec = (const Algebra::Module::VectorSpace::Vector*) node->ObjectPt_;
 
 	std::string deltaPairs = "const uint32_t deltaPairs[] = {";
 	for(size_t paramPos = 0; paramPos < kroneckerParam->DeltaPair.size(); paramPos++)
@@ -1976,8 +1976,8 @@ bool CodeGenerator::VectorVectorProductCode(const Node* node, FileWriter * file,
 		return false;
 	}
 
-	if((Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lnode->second.type) ||
-			(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == rnode->second.type))
+	if((Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lnode->second.Type_) ||
+			(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == rnode->second.Type_))
 	{
 		return VectorVectorProductKroneckerDeltaCode(node, file, divide);
 	}
@@ -1986,10 +1986,10 @@ bool CodeGenerator::VectorVectorProductCode(const Node* node, FileWriter * file,
 	getVarRetFalseOnError(varLVec, node->parents[0]);
 	getVarRetFalseOnError(varRVec, node->parents[1]);
 
-	const Algebra::Module::VectorSpace::Vector* lVec = (const Algebra::Module::VectorSpace::Vector*) lnode->second.object;
-	const Algebra::Module::VectorSpace::Vector* rVec = (const Algebra::Module::VectorSpace::Vector*) rnode->second.object;
+	const Algebra::Module::VectorSpace::Vector* lVec = (const Algebra::Module::VectorSpace::Vector*) lnode->second.ObjectPt_;
+	const Algebra::Module::VectorSpace::Vector* rVec = (const Algebra::Module::VectorSpace::Vector*) rnode->second.ObjectPt_;
 
-	const Algebra::Module::VectorSpace::Vector* opVec = (const Algebra::Module::VectorSpace::Vector*) node->object;
+	const Algebra::Module::VectorSpace::Vector* opVec = (const Algebra::Module::VectorSpace::Vector*) node->ObjectPt_;
 
 	const char * varOpId = varOp->GetIdentifier()->c_str();
 
@@ -2066,7 +2066,7 @@ bool CodeGenerator::VectorIndexSplitSumCode(const Node* node, FileWriter * file)
 
 	auto nodes = graph_->GetNodes();
 
-	const Node::splitSumIndicesParameters_t * param = (Node::splitSumIndicesParameters_t *) node->typeParameters;
+	const Node::splitSumIndicesParameters_t * param = (Node::splitSumIndicesParameters_t *) node->TypeParameters_;
 
 	getVarRetFalseOnError(varOp, node->id);
 	getVarRetFalseOnError(varArg, node->parents[0]);
@@ -2078,8 +2078,8 @@ bool CodeGenerator::VectorIndexSplitSumCode(const Node* node, FileWriter * file)
 		return false;
 	}
 
-	const Algebra::Module::VectorSpace::Vector* vecArg = (const Algebra::Module::VectorSpace::Vector*) argNode->second.object;
-	const Algebra::Module::VectorSpace::Vector* vecOp = (const Algebra::Module::VectorSpace::Vector*) node->object;
+	const Algebra::Module::VectorSpace::Vector* vecArg = (const Algebra::Module::VectorSpace::Vector*) argNode->second.ObjectPt_;
+	const Algebra::Module::VectorSpace::Vector* vecOp = (const Algebra::Module::VectorSpace::Vector*) node->ObjectPt_;
 
 	file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
 			varOp->GetIdentifier()->c_str(), varOp->GetIdentifier()->c_str());
@@ -2131,7 +2131,7 @@ bool CodeGenerator::VectorJoinIndicesCode(const Node* node, FileWriter * file)
 
 	auto nodes = graph_->GetNodes();
 
-	const Node::joinIndicesParameters_t * param = (Node::joinIndicesParameters_t *) node->typeParameters;
+	const Node::joinIndicesParameters_t * param = (Node::joinIndicesParameters_t *) node->TypeParameters_;
 
 	getVarRetFalseOnError(varOp, node->id);
 	getVarRetFalseOnError(varArg, node->parents[0]);
@@ -2143,8 +2143,8 @@ bool CodeGenerator::VectorJoinIndicesCode(const Node* node, FileWriter * file)
 		return false;
 	}
 
-	const Algebra::Module::VectorSpace::Vector* vecArg = (const Algebra::Module::VectorSpace::Vector*) argNode->second.object;
-	const Algebra::Module::VectorSpace::Vector* vecOp = (const Algebra::Module::VectorSpace::Vector*) node->object;
+	const Algebra::Module::VectorSpace::Vector* vecArg = (const Algebra::Module::VectorSpace::Vector*) argNode->second.ObjectPt_;
+	const Algebra::Module::VectorSpace::Vector* vecOp = (const Algebra::Module::VectorSpace::Vector*) node->ObjectPt_;
 
 	file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
 			varOp->GetIdentifier()->c_str(), varOp->GetIdentifier()->c_str());
@@ -2216,7 +2216,7 @@ bool CodeGenerator::VectorMaxPoolCode(const Node* node, FileWriter * file)
 	getVarRetFalseOnError(varOp, node->id);
 	getVarRetFalseOnError(varIn, node->parents[0]);
 
-	const Node::PoolParameters_t * param = (const Node::PoolParameters_t *) node->typeParameters;
+	const Node::PoolParameters_t * param = (const Node::PoolParameters_t *) node->TypeParameters_;
 
 	const char * varOpId = varOp->GetIdentifier()->c_str();
 	const char * varInId = varIn->GetIdentifier()->c_str();
@@ -2229,8 +2229,8 @@ bool CodeGenerator::VectorMaxPoolCode(const Node* node, FileWriter * file)
 		return false;
 	}
 
-	auto inVec = (const Algebra::Module::VectorSpace::Vector*) inNode->second.object;
-	auto opVec = (const Algebra::Module::VectorSpace::Vector*) node->object;
+	auto inVec = (const Algebra::Module::VectorSpace::Vector*) inNode->second.ObjectPt_;
+	auto opVec = (const Algebra::Module::VectorSpace::Vector*) node->ObjectPt_;
 
 	const char maxFunctions[][6] =
 	{
@@ -2393,9 +2393,9 @@ bool CodeGenerator::VectorCrossCorrelationCode(const Node* node, FileWriter * fi
 		return false;
 	}
 
-	auto inVec = (const Algebra::Module::VectorSpace::Vector*) inNode->second.object;
-	auto KernelVec = (const Algebra::Module::VectorSpace::Vector*) kernelNode->second.object;
-	auto opVec = (const Algebra::Module::VectorSpace::Vector*) node->object;
+	auto inVec = (const Algebra::Module::VectorSpace::Vector*) inNode->second.ObjectPt_;
+	auto KernelVec = (const Algebra::Module::VectorSpace::Vector*) kernelNode->second.ObjectPt_;
+	auto opVec = (const Algebra::Module::VectorSpace::Vector*) node->ObjectPt_;
 
 	// Get strides
 	std::vector<uint32_t> InStrides;
@@ -2515,7 +2515,7 @@ bool CodeGenerator::VectorProjectionCode(const Node* node, FileWriter * file)
 
 	auto nodes = graph_->GetNodes();
 
-	const Node::projectParameters_t * param = (const Node::projectParameters_t *) node->typeParameters;
+	const Node::projectParameters_t * param = (const Node::projectParameters_t *) node->TypeParameters_;
 
 	getVarRetFalseOnError(varOp, node->id);
 	getVarRetFalseOnError(varArg, node->parents[0]);
@@ -2527,8 +2527,8 @@ bool CodeGenerator::VectorProjectionCode(const Node* node, FileWriter * file)
 		return false;
 	}
 
-	const Algebra::Module::VectorSpace::Vector* vecArg = (const Algebra::Module::VectorSpace::Vector*) argNode->second.object;
-	const Algebra::Module::VectorSpace::Vector* vecOp = (const Algebra::Module::VectorSpace::Vector*) node->object;
+	const Algebra::Module::VectorSpace::Vector* vecArg = (const Algebra::Module::VectorSpace::Vector*) argNode->second.ObjectPt_;
+	const Algebra::Module::VectorSpace::Vector* vecOp = (const Algebra::Module::VectorSpace::Vector*) node->ObjectPt_;
 
 	file->PrintfLine("for(size_t opIndex = 0; opIndex < sizeof(%s) / sizeof(%s[0]); opIndex++)",
 			varOp->GetIdentifier()->c_str(), varOp->GetIdentifier()->c_str());
@@ -2668,8 +2668,8 @@ bool CodeGenerator::VectorScalarProductCode(const Node* node, FileWriter * file,
 		return false;
 	}
 
-	if((Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lVecNode->second.type) ||
-			(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == rVecNode->second.type))
+	if((Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == lVecNode->second.Type_) ||
+			(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == rVecNode->second.Type_))
 	{
 		return VectorScalarProductKroneckerDeltaCode(node, file, divide);
 	}
@@ -2680,7 +2680,7 @@ bool CodeGenerator::VectorScalarProductCode(const Node* node, FileWriter * file,
 
 	retFalseOnFalse(GenerateLocalVariableDeclaration(varOp), "Could not generate Var. Decl.\n");
 
-	auto vecOp = (const Algebra::Module::VectorSpace::Vector*) node->object;
+	auto vecOp = (const Algebra::Module::VectorSpace::Vector*) node->ObjectPt_;
 
 	bool lVarIsScalar = (1 == lVar->Length());
 	bool rVarIsScalar = (1 == rVar->Length());
@@ -2843,17 +2843,17 @@ bool CodeGenerator::FetchVariables()
 		SNPRINTF(tmpIdStr, sizeof(tmpIdStr), "Node%u", nodePair.second.id);
 		identifier.append(tmpIdStr);
 
-		switch(nodePair.second.objectType)
+		switch(nodePair.second.Object_)
 		{
-		case Node::ObjectType::MODULE_VECTORSPACE_VECTOR:
+		case Node::Object_t::MODULE_VECTORSPACE_VECTOR:
 		{
-			if((Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == nodePair.second.type) ||
-					(Node::Type::CONTROL_TRANSFER_WHILE == nodePair.second.type))
+			if((Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == nodePair.second.Type_) ||
+					(Node::Type::CONTROL_TRANSFER_WHILE == nodePair.second.Type_))
 			{
 				continue; // doesn't require variable.
 			}
 
-			auto vector = (const Algebra::Module::VectorSpace::Vector*) nodePair.second.object;
+			auto vector = (const Algebra::Module::VectorSpace::Vector*) nodePair.second.ObjectPt_;
 			auto vecProperties = vector->Properties();
 
 			if(vecProperties->end() != vecProperties->find(vector->Property::ExternalInput))
@@ -2890,9 +2890,9 @@ bool CodeGenerator::FetchVariables()
 		}
 		break;
 
-		case Node::ObjectType::NONE: // no break intended
-		case Node::ObjectType::INTERFACE_OUTPUT:
-		case Node::ObjectType::INTERFACE_INPUT:
+		case Node::Object_t::NONE: // no break intended
+		case Node::Object_t::INTERFACE_OUTPUT:
+		case Node::Object_t::INTERFACE_INPUT:
 			// No variable to create.
 			continue;
 
@@ -2922,7 +2922,7 @@ bool CodeGenerator::FetchVariables()
 	// Identify interfaces and mark their variables as such
 	for(const auto &nodePair: *nodes)
 	{
-		switch(nodePair.second.type)
+		switch(nodePair.second.Type_)
 		{
 		case Node::Type::OUTPUT: // no break intended
 			// Find all variables of the output's parents, i.e. the nodes that
@@ -2970,11 +2970,11 @@ bool CodeGenerator::GenerateInterfaceFunctions()
 	auto nodes = graph_->GetNodes();
 	for(const auto &nodePair: *nodes)
 	{
-		switch(nodePair.second.type)
+		switch(nodePair.second.Type_)
 		{
 		case Node::Type::OUTPUT:
 		{
-			auto * output = (const Interface::Output* ) nodePair.second.object;
+			auto * output = (const Interface::Output* ) nodePair.second.ObjectPt_;
 
 			// Get Variable attached to node
 			getVarRetFalseOnError(var, nodePair.second.parents[0]);
@@ -3018,14 +3018,14 @@ bool CodeGenerator::GenerateInterfaceFunctions()
 
 		case Node::Type::INPUT:
 		{
-			auto insert = inputCreated.insert(nodePair.second.object);
+			auto insert = inputCreated.insert(nodePair.second.ObjectPt_);
 			if(!insert.second)
 			{
 				// Input was created already
 				continue;
 			}
 
-			auto * input = (const Interface::Input* ) nodePair.second.object;
+			auto * input = (const Interface::Input* ) nodePair.second.ObjectPt_;
 
 			// Get Variable attached to node
 			Node::Id_t childNodeId = *(nodePair.second.children.begin());

@@ -491,9 +491,9 @@ bool VectorSpace::Vector::Init(Graph* graph, const VectorSpace * vSpace, const v
 	Properties_ = properties;
 
 	Node node;
-	node.type = Node::Type::VECTOR;
-	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
-	node.object = this;
+	node.Type_ = Node::Type::VECTOR;
+	node.Object_ = Node::Object_t::MODULE_VECTORSPACE_VECTOR;
+	node.ObjectPt_ = this;
 
 	nodeId_ = graph->AddNode(&node);
 	if(Node::ID_NONE == nodeId_)
@@ -608,9 +608,9 @@ const VectorSpace::Vector* VectorSpace::Vector::Power(const Vector* vec, const s
 	Node node;
 	node.parents.push_back(nodeId_);
 	node.parents.push_back(vec->nodeId_);
-	node.type = Node::Type::VECTOR_POWER;
-	node.objectType = Node::ObjectType::MODULE_VECTORSPACE_VECTOR;
-	node.object = retVec;
+	node.Type_ = Node::Type::VECTOR_POWER;
+	node.Object_ = Node::Object_t::MODULE_VECTORSPACE_VECTOR;
+	node.ObjectPt_ = retVec;
 
 	retVec->nodeId_ = graph_->AddNode(&node);
 
@@ -1132,15 +1132,15 @@ const VectorSpace::Vector* VectorSpace::Vector::CreateDerivative(std::map<Node::
 				fctNode->getName(), fctNode->id,
 				parentNode->getName(), parentNode->id);
 
-		if(Node::ObjectType::MODULE_VECTORSPACE_VECTOR != parentNode->objectType)
+		if(Node::Object_t::MODULE_VECTORSPACE_VECTOR != parentNode->Object_)
 		{
 			Error("Can't take derivative w.r.t. non-vector node of object type %u!\n",
-					(uint8_t) parentNode->objectType);
+					(uint8_t) parentNode->Object_);
 			return nullptr;
 		}
 
 		// TODO: Check for Null returns
-		const Vector * parentVec = (const Vector *) parentNode->object;
+		const Vector * parentVec = (const Vector *) parentNode->ObjectPt_;
 
 		const Vector * derivativeVec = CreateDerivative(currentVec, parentVec);
 		if(nullptr == derivativeVec)
@@ -1231,7 +1231,7 @@ const VectorSpace::Vector* VectorSpace::Vector::CreateDerivative(const Vector* v
 		return nullptr;
 	}
 
-	switch(fctNode->type)
+	switch(fctNode->Type_)
 	{
 	case Node::Type::VECTOR_ADDITION:
 		return AddDerivative(vecValuedFct, arg);
@@ -1256,7 +1256,7 @@ const VectorSpace::Vector* VectorSpace::Vector::CreateDerivative(const Vector* v
 		return CrossCorrelationDerivative(vecValuedFct, arg);
 
 	default:
-		Error("Node Type %s does not support taking its derivative!\n", Node::getName(fctNode->type));
+		Error("Node Type %s does not support taking its derivative!\n", Node::getName(fctNode->Type_));
 		return nullptr;
 	}
 
@@ -1361,8 +1361,8 @@ const VectorSpace::Vector* VectorSpace::Vector::Contract(const Vector* vec, cons
 	const Node * thisNode = graph_->GetNode(nodeId_);
 	const Node * vecNode = graph_->GetNode(vec->nodeId_);
 
-	if((Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == thisNode->type) &&
-			(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == vecNode->type))
+	if((Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == thisNode->Type_) &&
+			(Node::Type::VECTOR_KRONECKER_DELTA_PRODUCT == vecNode->Type_))
 	{
 		// Example:
 		// Say we have C_jklmnp = A_ijkl B_mnip = d_ij d_kl d_mi d_np
@@ -1377,8 +1377,8 @@ const VectorSpace::Vector* VectorSpace::Vector::Contract(const Vector* vec, cons
 		// 4. C *= |i|
 		// done.
 
-		const Node::KroneckerDeltaParameters_t * thisKronParam = (const Node::KroneckerDeltaParameters_t *) thisNode->typeParameters;
-		const Node::KroneckerDeltaParameters_t * vecKronParam = (const Node::KroneckerDeltaParameters_t *) vecNode->typeParameters;
+		const Node::KroneckerDeltaParameters_t * thisKronParam = (const Node::KroneckerDeltaParameters_t *) thisNode->TypeParameters_;
+		const Node::KroneckerDeltaParameters_t * vecKronParam = (const Node::KroneckerDeltaParameters_t *) vecNode->TypeParameters_;
 
 		Node::KroneckerDeltaParameters_t * opKronParam = new Node::KroneckerDeltaParameters_t;
 		opKronParam->Scaling = thisKronParam->Scaling * vecKronParam->Scaling;
@@ -1632,7 +1632,7 @@ const VectorSpace::Vector* VectorSpace::Vector::CrossCorrelationDerivative(const
 		return nullptr;
 	}
 
-	const Vector * inputVector = (const Vector *) inputNode->object;
+	const Vector * inputVector = (const Vector *) inputNode->ObjectPt_;
 
 	// Derivative_klij = dOut(i,j) / dK(kl) = dI(i + m, j + n)K(m,n) / dK(kl) = I(i + k, j + l)
 	std::vector<uint32_t> splitPos(kernelVector->Space_->Factors_.size());
@@ -1666,7 +1666,7 @@ const VectorSpace::Vector* VectorSpace::Vector::ProjectDerivative(const Vector* 
 		return nullptr;
 	}
 
-	const Node::projectParameters_t * projParam = (const Node::projectParameters_t *) fctNode->typeParameters;
+	const Node::projectParameters_t * projParam = (const Node::projectParameters_t *) fctNode->TypeParameters_;
 
 	auto retSpace = new VectorSpace(std::vector<const VectorSpace*>{arg->Space_, vecValuedFct->Space_});
 
@@ -1760,8 +1760,8 @@ const VectorSpace::Vector* VectorSpace::Vector::PowerDerivative(const Vector* ve
 		return nullptr;
 	}
 
-	const Vector* baseVector = (const Vector *) lNode->object;
-	const Vector* expVector = (const Vector *) rNode->object;
+	const Vector* baseVector = (const Vector *) lNode->ObjectPt_;
+	const Vector* expVector = (const Vector *) rNode->ObjectPt_;
 
 	bool derivativeWrtBase = (fctNode->parents[0] == arg->nodeId_);
 
@@ -1878,7 +1878,7 @@ const VectorSpace::Vector* VectorSpace::Vector::MultiplyDerivative(const Vector*
 		return nullptr;
 	}
 
-	const Vector * otherVec = (const Vector *) otherNode->object;
+	const Vector * otherVec = (const Vector *) otherNode->ObjectPt_;
 
 	// Vector - Scalar multiplication: Do not add V-Space factors
 	// Rationale for creating an exception by not adding factors: Multiplying scalars would quickly become a confusion of indices.
@@ -1948,7 +1948,7 @@ const VectorSpace::Vector* VectorSpace::Vector::PermuteDerivative(const Vector* 
 		return nullptr;
 	}
 
-	const Node::permuteParameters_t * permutation = (const Node::permuteParameters_t *) fctNode->typeParameters;
+	const Node::permuteParameters_t * permutation = (const Node::permuteParameters_t *) fctNode->TypeParameters_;
 
 	// The result will just be a Kronecker product
 	std::vector<uint32_t> deltaPairs(2 * arg->Space_->Factors_.size());
@@ -1981,7 +1981,7 @@ const VectorSpace::Vector* VectorSpace::Vector::ContractDerivative(const Vector*
 		return nullptr;
 	}
 
-	const Node::contractParameters_t * contractValue = (const Node::contractParameters_t *) fctNode->typeParameters;
+	const Node::contractParameters_t * contractValue = (const Node::contractParameters_t *) fctNode->TypeParameters_;
 
 	const std::vector<uint32_t> * argContrFactors;
 	const std::vector<uint32_t> * otherContrFactors;
@@ -2008,7 +2008,7 @@ const VectorSpace::Vector* VectorSpace::Vector::ContractDerivative(const Vector*
 		return nullptr;
 	}
 
-	const Vector * otherVec = (const Vector *) otherNode->object;
+	const Vector * otherVec = (const Vector *) otherNode->ObjectPt_;
 
 	// Create the Kronecker the otherVec (i.e. non-arg factor of contraction) will be contracted with
 	// d/dB_lmn (A_opqr B_ops) = d(l,o) d(m,p) d(n,s) A_opqr
