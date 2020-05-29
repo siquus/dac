@@ -43,6 +43,16 @@ static const float * vectorInput(size_t identifier, size_t size)
 	return ModuleCNNPt->VectorInput(identifier, size);
 }
 
+static void maxInput(const float * data, size_t size)
+{
+	if(NULL == ModuleCNNPt)
+	{
+		fatal("Nullpointer!");
+	}
+
+	ModuleCNNPt->MaxInput(data, size);
+}
+
 static void cc(const float * data, size_t size)
 {
 	if(NULL == ModuleCNNPt)
@@ -106,6 +116,22 @@ void ModuleCNN::Vector21(const float * data, size_t size)
 		}
 
 		called_[CALLED_Vector21] = true;
+}
+
+void ModuleCNN::MaxInput(const float * data, size_t size)
+{
+	const float expected[] = {2, 2, 2, 0, 0, 2, 1, 0, 1};
+	if(sizeof(expected) != size)
+		{
+			Error("Size Mismatch! %lu vs %lu\n", sizeof(expected), size);
+		}
+		else if(memcmp(data, expected, sizeof(expected)))
+		{
+			Error("Unexpected result!\n");
+			PrintMatrix(stderr, data, size, 9);
+		}
+
+		called_[CALLED_MaxInput] = true;
 }
 
 void ModuleCNN::Vector42(const float * data, size_t size)
@@ -231,6 +257,7 @@ ModuleCNN::ModuleCNN() {
 	DacModuleCNNOutputCallbackvectorSplit_Register(&vectorSplit);
 	DacModuleCNNOutputCallbackvector21_Register(&vector21);
 	DacModuleCNNOutputCallbackvector42_Register(&vector42);
+	DacModuleCNNOutputCallbackvectorMaxInput_Register(&maxInput);
 
 	DacModuleCNNInputCallbackvector_Register(&vectorInput);
 }

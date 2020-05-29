@@ -97,6 +97,8 @@ public:
 
 		const Vector* Derivative(const Vector* vec) const;
 
+		static const Vector * MaxInput(const std::vector<const Vector *> &inputs);
+
 		typedef struct {
 			enum initializer_t {DENSE, COO, CSR, CSC};
 			initializer_t Initializer;

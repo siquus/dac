@@ -376,6 +376,7 @@ bool CodeGenerator::Generate(const Graph* graph)
 
 	fileInstructions_.PrintfLine("#include <stdint.h>");
 	fileInstructions_.PrintfLine("#include <math.h>\n");
+	fileInstructions_.PrintfLine("#include <string.h>\n");
 	fileInstructions_.PrintfLine("#include \"Dac%s.h\"", graph_->Name().c_str());
 	fileInstructions_.PrintfLine("#include \"Instructions%s.h\"\n", graph_->Name().c_str());
 
@@ -653,6 +654,7 @@ bool CodeGenerator::GenerateInstructions()
 		case Node::Type::VECTOR_INDEX_SPLIT_SUM: // no break intended
 		case Node::Type::VECTOR_CROSS_CORRELATION: // no break intended
 		case Node::Type::VECTOR_MAX_POOL: // no break intended
+		case Node::Type::VECTOR_MAX_INPUT: // no break intended
 		case Node::Type::OUTPUT: // no break intended
 		case Node::Type::INPUT:
 			break; // create instruction
@@ -950,6 +952,11 @@ bool CodeGenerator::GenerateOperationCode(const Node* node, FileWriter * file)
 	case Node::Type::VECTOR_MAX_POOL:
 		retFalseOnFalse(VectorMaxPoolCode(node, file),
 				"Could not generate Vector max pool Code!\n");
+		break;
+
+	case Node::Type::VECTOR_MAX_INPUT:
+		retFalseOnFalse(VectorMaxInputCode(node, file),
+				"Could not generate Vector max input Code!\n");
 		break;
 
 	case Node::Type::VECTOR_VECTOR_PRODUCT:
@@ -2202,6 +2209,87 @@ bool CodeGenerator::VectorJoinIndicesCode(const Node* node, FileWriter * file)
 	equationStr += ";";
 
 	file->PrintfLine(equationStr.c_str());
+
+	file->Outdent();
+	file->PrintfLine("}");
+
+	return true;
+}
+
+bool CodeGenerator::VectorMaxInputCode(const Node* node, FileWriter * file)
+{
+	file->PrintfLine("// %s\n", __func__);
+
+	getVarRetFalseOnError(varOp, node->id);
+
+	file->PrintfLine("const %s * inputs[] = {", varOp->GetTypeString());
+	file->Indent();
+
+	for(const Node::Id_t &parentId: *node->Parents())
+	{
+		getVarRetFalseOnError(varIn, parentId);
+
+		if(varOp->Length() != 1)
+		{
+			file->PrintfLine("%s,", varIn->GetIdentifier()->c_str());
+		}
+		else
+		{
+			file->PrintfLine("&%s,", varIn->GetIdentifier()->c_str());
+		}
+	}
+
+	file->Outdent();
+	file->PrintfLine("};\n");
+
+	if(varOp->Length() != 1)
+	{
+		file->PrintfLine("%s currentMaxValues[%lu];", varOp->GetTypeString(), varOp->Length());
+		file->PrintfLine("memcpy(currentMaxValues, inputs[0], %lu * sizeof(%s));",
+				varOp->Length(), varOp->GetTypeString());
+
+		// TODO: memset on float is theoretically not portable.
+		file->PrintfLine("memset(%s, 0, %lu * sizeof(%s));\n",
+				varOp->GetIdentifier()->c_str(),
+				varOp->Length(), varOp->GetTypeString());
+	}
+	else
+	{
+		file->PrintfLine("%s currentMaxValues = *inputs[0];", varOp->GetTypeString());
+		file->PrintfLine("%s = 0;", varOp->GetIdentifier()->c_str());
+	}
+
+	file->PrintfLine("for(size_t input = 1; input < sizeof(inputs) / sizeof(inputs[0]); input++)");
+	file->PrintfLine("{");
+	file->Indent();
+
+	if(varOp->Length() != 1)
+	{
+		file->PrintfLine("for(size_t index = 0; index < %lu; index++)", varOp->Length());
+		file->PrintfLine("{");
+		file->Indent();
+
+		file->PrintfLine("if(currentMaxValues[index] < inputs[input][index])");
+		file->PrintfLine("{");
+		file->Indent();
+
+		file->PrintfLine("currentMaxValues[index] = inputs[input][index];");
+		file->PrintfLine("%s[index] = input;", varOp->GetIdentifier()->c_str());
+
+		file->Outdent();
+		file->PrintfLine("}");
+
+		file->Outdent();
+		file->PrintfLine("}");
+	}
+	else
+	{
+		file->PrintfLine("if(currentMaxValues < *inputs[input])");
+		file->PrintfLine("{");
+		file->PrintfLine("\tcurrentMaxValues = *inputs[input];");
+		file->PrintfLine("\t%s = input;", varOp->GetIdentifier()->c_str());
+		file->PrintfLine("}");
+	}
 
 	file->Outdent();
 	file->PrintfLine("}");

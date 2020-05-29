@@ -2218,6 +2218,37 @@ const std::vector<VectorSpace::simpleVs_t> * VectorSpace::Factors() const
 	return &Factors_;
 }
 
+const VectorSpace::Vector * VectorSpace::Vector::MaxInput(const std::vector<const Vector *> &inputs)
+{
+	if(inputs.empty())
+	{
+		Error("No inputs specified!");
+		return nullptr;
+	}
+
+	for(const Vector *input: inputs)
+	{
+		if(!AreEqual(input->Space(), inputs[0]->Space()))
+		{
+			Error("Vector spaces are not the same!");
+			return nullptr;
+		}
+	}
+
+	// TODO: Vector space could / should be integer? Make it specifiable?
+	// for machine learning integer might not make sense for non-integer input
+	Vector* retVec = new Vector(
+			inputs[0]->GetGraph(), inputs[0]->Space(),
+			Node::Type::VECTOR_MAX_INPUT, nullptr);
+
+	for(const Vector *input: inputs)
+	{
+		retVec->PushParent(input->Id());
+	}
+
+	return retVec;
+}
+
 VectorSpace::VectorSpace(const std::vector<simpleVs_t> &factors)
 {
 	Factors_ = factors;

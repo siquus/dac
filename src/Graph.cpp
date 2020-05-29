@@ -202,6 +202,9 @@ const char* Node::getName(Type type)
 	case Type::VECTOR_MAX_POOL:
 		return "VECTOR_MAX_POOL";
 
+	case Type::VECTOR_MAX_INPUT:
+		return "VECTOR_MAX_INPUT";
+
 	case Type::VECTOR_JOIN_INDICES:
 		return "VECTOR_JOIN_INDICES";
 
@@ -360,7 +363,8 @@ bool Node::sameType(const Node &lNode, const Node &rNode)
 	case Type::OUTPUT: // no break intended
 	case Type::INPUT: // no break intended
 	case Type::VECTOR_CROSS_CORRELATION: // no break intended
-		Error("Error comparing node types!\n");
+	case Type::VECTOR_MAX_INPUT: // no break intended
+		Error("Error comparing node types: They should have nullptr TypeParameters!\n");
 		return false;
 
 	case Type::CONTROL_TRANSFER_WHILE:
